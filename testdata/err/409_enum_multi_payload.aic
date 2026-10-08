@@ -1,0 +1,11 @@
+import print
+
+// L4-f 锚点：**枚举负载是单值**（设计定案：`Variant(T)` 一个类型；元组不在类型构造子表里）。
+// 多字段负载要么写成 @packed 值类型承载，要么就是写错 —— 诊断必须指向可照做的写法，
+// 而不是报 "missing `)`"（那会让人以为只是括号写错）。
+enum Shape { Circle(i32), Rect(i32, i32) }
+
+func main() {
+    var s Shape = Shape.Circle(1)
+    print.println(s)
+}

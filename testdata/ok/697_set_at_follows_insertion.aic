@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var s set[str] = set.new()
+    s.add("z")
+    s.add("y")
+    print.println(s.at(0))
+    print.println(s.at(1))
+    print.println(s.len())
+}

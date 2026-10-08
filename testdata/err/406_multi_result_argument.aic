@@ -1,0 +1,15 @@
+import print
+
+// L4 err 锚点：§二.2 —— **多返回值不是值**，不能作为实参（也不能打印）。
+// 此前只在 var 声明处拦，于是 `print.println(f(3))` 过 check、到发射才炸出
+// "type (i32, Err) cannot be printed"（check 与 build 分叉）。
+func f(v i32) -> (i32, Err) {
+    if v < 0 {
+        return 0, Err(2, "neg")
+    }
+    return v * 2, nil
+}
+
+func main() {
+    print.println(f(3))
+}

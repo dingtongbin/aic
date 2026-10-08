@@ -1,0 +1,3 @@
+testdata/err/263_call_too_few_args.aic:6:14: error: wrong number of arguments
+    g needs 2 arguments, got 1
+    fix: match the signature: add or delete arguments

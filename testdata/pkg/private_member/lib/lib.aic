@@ -1,0 +1,9 @@
+// `_` 前缀成员 = 包私有（成员不按大小写判定，但 `_` 仍是私有）。
+class Box {
+    var _hidden i32
+    var Pub i32
+}
+
+func New() -> Box {
+    return Box{_hidden: 1, Pub: 2}
+}

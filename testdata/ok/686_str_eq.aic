@@ -1,0 +1,11 @@
+import print
+
+func main() {
+    var a str = "same"
+    var b str = "different"
+    var empty str = ""
+    print.println(a == "same")
+    print.println(a == b)
+    print.println(empty == "")
+    print.println(a != b)
+}

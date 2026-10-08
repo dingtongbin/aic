@@ -1,0 +1,14 @@
+import print
+
+func main() {
+    var m map[str]i32 = map.new()
+    m.put("one", 1)
+    m.put("two", 2)
+    m.put("one", 11)
+    print.println(m.len())
+    print.println(m.get("one"))
+    print.println(m.get("two"))
+    print.println(m.get("missing"))
+    print.println(m.has("two"))
+    print.println(m.has("nope"))
+}

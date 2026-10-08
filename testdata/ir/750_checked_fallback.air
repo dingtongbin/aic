@@ -1,0 +1,85 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/750_checked_fallback.aic:7:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/750_checked_fallback.aic:7:20 let t2 : void = call list.append[i32](lit1, const 1)
+    loc ../../testdata/ok/750_checked_fallback.aic:7:20 let t3 : void = call list.append[i32](lit1, const 2)
+    loc ../../testdata/ok/750_checked_fallback.aic:7:20 let t4 : void = call list.append[i32](lit1, const 3)
+    loc ../../testdata/ok/750_checked_fallback.aic:7:20 let t5 : void = call list.append[i32](lit1, const 4)
+    loc ../../testdata/ok/750_checked_fallback.aic:7:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/750_checked_fallback.aic:8:5 var total : i32 = const 0
+    loc ../../testdata/ok/750_checked_fallback.aic:9:23 let t6 : usize = call list_i32_len(xs)
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 var i : usize = const 0
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 let t7 : bool = cmp lt i, t6
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 cbr t7, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/750_checked_fallback.aic:10:27 let t8 : i32 = elem elem xs, i, i
+    loc ../../testdata/ok/750_checked_fallback.aic:10:23 let t9 : i32 = binop + total, t8
+    loc ../../testdata/ok/750_checked_fallback.aic:10:15 store total, t9
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 let t10 : usize = binop + i, const 1
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 store i, t10
+    loc ../../testdata/ok/750_checked_fallback.aic:9:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/750_checked_fallback.aic:12:18 let t11 : void = call print_println(total)
+    loc ../../testdata/ok/750_checked_fallback.aic:13:20 let lit12 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/750_checked_fallback.aic:13:20 let t13 : void = call list.append[i32](lit12, const 5)
+    loc ../../testdata/ok/750_checked_fallback.aic:13:20 let t14 : void = call list.append[i32](lit12, const 6)
+    loc ../../testdata/ok/750_checked_fallback.aic:13:5 var ys : i32[] = lit12
+    loc ../../testdata/ok/750_checked_fallback.aic:14:23 let t15 : usize = call list_i32_len(ys)
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 var i : usize = const 0
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 let t16 : bool = cmp lt i, t15
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 cbr t16, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/750_checked_fallback.aic:15:19 let t17 : i32 = elem elem ys, i, i
+    loc ../../testdata/ok/750_checked_fallback.aic:15:23 let t18 : i32 = binop + t17, const 1
+    loc ../../testdata/ok/750_checked_fallback.aic:15:15 store elem ys, i, t18
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 let t19 : usize = binop + i, const 1
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 store i, t19
+    loc ../../testdata/ok/750_checked_fallback.aic:14:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/750_checked_fallback.aic:17:23 let t20 : usize = call list_i32_len(ys)
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 var i : usize = const 0
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 br forhead9
+  forhead9:
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 let t21 : bool = cmp lt i, t20
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 cbr t21, forbody10, fordone12
+  forbody10:
+    loc ../../testdata/ok/750_checked_fallback.aic:18:25 let t22 : i32 = elem elem ys, i, i
+    loc ../../testdata/ok/750_checked_fallback.aic:18:22 let t23 : void = call print_println(t22)
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 br forpost11
+  forpost11:
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 let t24 : usize = binop + i, const 1
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 store i, t24
+    loc ../../testdata/ok/750_checked_fallback.aic:17:5 br forhead9
+  fordone12:
+    loc ../../testdata/ok/750_checked_fallback.aic:20:20 let lit25 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/750_checked_fallback.aic:20:20 let t26 : void = call list.append[i32](lit25, const 7)
+    loc ../../testdata/ok/750_checked_fallback.aic:20:5 var zs : i32[] = lit25
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 var i : usize = const 0
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 br forhead13
+  forhead13:
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 let t27 : bool = cmp lt i, const 1
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 cbr t27, forbody14, fordone16
+  forbody14:
+    loc ../../testdata/ok/750_checked_fallback.aic:22:22 let t28 : i32 = call i32(i)
+    loc ../../testdata/ok/750_checked_fallback.aic:22:18 let t29 : void = call list_i32_append(zs, t28)
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 br forpost15
+  forpost15:
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 let t30 : usize = binop + i, const 1
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 store i, t30
+    loc ../../testdata/ok/750_checked_fallback.aic:21:5 br forhead13
+  fordone16:
+    loc ../../testdata/ok/750_checked_fallback.aic:24:25 let t31 : usize = call list_i32_len(zs)
+    loc ../../testdata/ok/750_checked_fallback.aic:24:18 let t32 : void = call print_println(t31)
+    loc ../../testdata/ok/750_checked_fallback.aic:6:1 br exit
+  exit:
+    loc ../../testdata/ok/750_checked_fallback.aic:6:1 ret 
+}

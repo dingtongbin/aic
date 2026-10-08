@@ -1,0 +1,38 @@
+import print
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Shape {
+    Dot,
+    Circle(i32),
+    Square(str)
+}
+
+func main() {
+    var xs i32[] = [1, 2, 3]
+    print.println(xs)
+    var empty i32[] = []
+    print.println(empty)
+    var names str[] = ["a", "b"]
+    print.println(names)
+    var flags bool[] = [true, false]
+    print.println(flags)
+    var s set[i32] = set.new()
+    s.add(3)
+    s.add(1)
+    print.println(s)
+    var m map[str]i32 = map.new()
+    m.put("x", 7)
+    m.put("y", 8)
+    print.println(m)
+    print.println(Color.Red)
+    print.println(Shape.Circle(5))
+    print.println(Shape.Dot)
+    var a [i32;3] = [4, 5, 6]
+    print.println(a)
+    print.println(2.5)
+}

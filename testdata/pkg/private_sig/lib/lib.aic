@@ -1,0 +1,8 @@
+// 公开函数的签名是跨包契约：签名里出现包私有类型 = 编译错（在**本包**报）。
+class secret {
+    var n i32
+}
+
+func Make() -> secret {
+    return secret{n: 1}
+}

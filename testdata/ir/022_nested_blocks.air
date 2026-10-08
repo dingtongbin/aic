@@ -1,0 +1,16 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/022_nested_blocks.aic:4:5 var a : i32 = const 1
+    loc ../../testdata/ok/022_nested_blocks.aic:5:5 br scope1
+  scope1:
+    loc ../../testdata/ok/022_nested_blocks.aic:6:9 var b : i32 = const 2
+    loc ../../testdata/ok/022_nested_blocks.aic:7:15 let t1 : i32 = binop + a, b
+    loc ../../testdata/ok/022_nested_blocks.aic:7:11 store a, t1
+    loc ../../testdata/ok/022_nested_blocks.aic:5:5 br scopeend2
+  scopeend2:
+    loc ../../testdata/ok/022_nested_blocks.aic:9:18 let t2 : void = call print_println(const "block ok")
+    loc ../../testdata/ok/022_nested_blocks.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/022_nested_blocks.aic:3:1 ret 
+}

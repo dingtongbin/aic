@@ -1,0 +1,3 @@
+testdata/err/406_multi_result_argument.aic:14:20: error: a multi-result call cannot be printed
+    the argument produces (i32, Err)
+    fix: bind it first: var v, err = f(); then print v (or consume the Err with ? / or / catch / !) (core design §2.2)

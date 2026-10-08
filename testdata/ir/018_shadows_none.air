@@ -1,0 +1,12 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/018_shadows_none.aic:4:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/018_shadows_none.aic:4:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/018_shadows_none.aic:5:5 var i : usize = const 0
+    loc ../../testdata/ok/018_shadows_none.aic:6:11 store elem xs, i, const 7
+    loc ../../testdata/ok/018_shadows_none.aic:7:18 let t2 : void = call print_println(const "list ok")
+    loc ../../testdata/ok/018_shadows_none.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/018_shadows_none.aic:3:1 ret 
+}

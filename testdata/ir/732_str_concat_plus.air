@@ -1,0 +1,24 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/732_str_concat_plus.aic:5:5 var a : str = const "aic"
+    loc ../../testdata/ok/732_str_concat_plus.aic:6:5 var b : str = const "-v2"
+    loc ../../testdata/ok/732_str_concat_plus.aic:8:21 let t1 : str = binop + a, b
+    loc ../../testdata/ok/732_str_concat_plus.aic:8:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/732_str_concat_plus.aic:9:29 let t3 : str = call str_concat(a, b)
+    loc ../../testdata/ok/732_str_concat_plus.aic:9:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/732_str_concat_plus.aic:10:21 let t5 : str = binop + a, const ""
+    loc ../../testdata/ok/732_str_concat_plus.aic:10:26 let t6 : str = binop + t5, b
+    loc ../../testdata/ok/732_str_concat_plus.aic:10:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/732_str_concat_plus.aic:11:20 let lit8 : str[] = call list.new[str]()
+    loc ../../testdata/ok/732_str_concat_plus.aic:11:20 let t9 : void = call list.append[str](lit8, const "x")
+    loc ../../testdata/ok/732_str_concat_plus.aic:11:20 let t10 : void = call list.append[str](lit8, const "y")
+    loc ../../testdata/ok/732_str_concat_plus.aic:11:5 var xs : str[] = lit8
+    loc ../../testdata/ok/732_str_concat_plus.aic:12:21 let t11 : str = elem elem xs, const 0, const 0
+    loc ../../testdata/ok/732_str_concat_plus.aic:12:29 let t12 : str = elem elem xs, const 1, const 1
+    loc ../../testdata/ok/732_str_concat_plus.aic:12:25 let t13 : str = binop + t11, t12
+    loc ../../testdata/ok/732_str_concat_plus.aic:12:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/732_str_concat_plus.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/732_str_concat_plus.aic:4:1 ret 
+}

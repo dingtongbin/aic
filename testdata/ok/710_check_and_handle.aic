@@ -1,0 +1,24 @@
+import print
+
+func parse(v i32) -> (i32, Err) {
+    if v < 0 {
+        return 0, Err(2, "negative")
+    }
+    return v * 2, nil
+}
+
+// v2：check 直接传播（无 handle）——错误路径返回前置零值 + err，输出不变。
+func run(v i32) -> (i32, Err) {
+    var out = check parse(v)
+    return out, nil
+}
+
+func main() {
+    var ok, e1 = run(21)
+    print.println(ok)
+    print.println(e1.code)
+    var bad, e2 = run(i32(0) - i32(1))
+    print.println(bad)
+    print.println(e2.code)
+    print.println(e2.msg)
+}

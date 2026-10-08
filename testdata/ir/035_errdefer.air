@@ -1,0 +1,94 @@
+air v1 module ok
+func ok_mayFail(n:i32) -> (i32, Err) {
+  entry:
+    loc ../../testdata/ok/035_errdefer.aic:5:1 var ret0 : i32
+    loc ../../testdata/ok/035_errdefer.aic:5:1 var ret1 : Err
+    loc ../../testdata/ok/035_errdefer.aic:6:5 var failed : bool = const false
+    loc ../../testdata/ok/035_errdefer.aic:7:5 defer.reg
+    loc ../../testdata/ok/035_errdefer.aic:7:5 defer.init 1, 
+    loc ../../testdata/ok/035_errdefer.aic:13:10 let t1 : bool = cmp < n, const 0
+    loc ../../testdata/ok/035_errdefer.aic:13:5 cbr t1, then1, else2
+  then1:
+    loc ../../testdata/ok/035_errdefer.aic:14:16 store failed, const true
+    loc ../../testdata/ok/035_errdefer.aic:15:9 store ret0, const 0
+    loc ../../testdata/ok/035_errdefer.aic:15:22 let t2 : Err = call Err(const 1, const "bad")
+    loc ../../testdata/ok/035_errdefer.aic:15:9 store ret1, t2
+    loc ../../testdata/ok/035_errdefer.aic:15:9 br exit
+  else2:
+    loc ../../testdata/ok/035_errdefer.aic:13:5 br join3
+  join3:
+    loc ../../testdata/ok/035_errdefer.aic:17:5 store ret0, n
+    loc ../../testdata/ok/035_errdefer.aic:17:5 store ret1, nil
+    loc ../../testdata/ok/035_errdefer.aic:17:5 br exit
+  exit:
+    loc ../../testdata/ok/035_errdefer.aic:5:1 ret ret0, ret1
+}
+func ok_viaCheck(n:i32) -> (i32, Err) {
+  entry:
+    loc ../../testdata/ok/035_errdefer.aic:20:1 var ret0 : i32
+    loc ../../testdata/ok/035_errdefer.aic:20:1 var ret1 : Err
+    loc ../../testdata/ok/035_errdefer.aic:21:5 var failed : bool = const false
+    loc ../../testdata/ok/035_errdefer.aic:22:5 defer.reg
+    loc ../../testdata/ok/035_errdefer.aic:22:5 defer.init 1, 
+    loc ../../testdata/ok/035_errdefer.aic:28:25 let t1 : (i32, Err) = call ok_mayFail(n)
+    loc ../../testdata/ok/035_errdefer.aic:28:5 let t2 : i32 = multi.extract t1, 0
+    loc ../../testdata/ok/035_errdefer.aic:28:9 var v : i32 = t2
+    loc ../../testdata/ok/035_errdefer.aic:28:5 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/035_errdefer.aic:28:12 var err : Err = t3
+    loc ../../testdata/ok/035_errdefer.aic:29:12 let t4 : bool = cmp != err, nil
+    loc ../../testdata/ok/035_errdefer.aic:29:5 cbr t4, then1, else2
+  then1:
+    loc ../../testdata/ok/035_errdefer.aic:30:22 let t5 : void = call print_println(const "wrapper caught")
+    loc ../../testdata/ok/035_errdefer.aic:31:16 store failed, const true
+    loc ../../testdata/ok/035_errdefer.aic:32:9 store ret0, const 0
+    loc ../../testdata/ok/035_errdefer.aic:32:9 store ret1, err
+    loc ../../testdata/ok/035_errdefer.aic:32:9 br exit
+  else2:
+    loc ../../testdata/ok/035_errdefer.aic:29:5 br join3
+  join3:
+    loc ../../testdata/ok/035_errdefer.aic:34:5 store ret0, v
+    loc ../../testdata/ok/035_errdefer.aic:34:5 store ret1, nil
+    loc ../../testdata/ok/035_errdefer.aic:34:5 br exit
+  exit:
+    loc ../../testdata/ok/035_errdefer.aic:20:1 ret ret0, ret1
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/035_errdefer.aic:38:24 let t1 : (i32, Err) = call ok_mayFail(const 2)
+    loc ../../testdata/ok/035_errdefer.aic:38:5 let t2 : i32 = multi.extract t1, 0
+    loc ../../testdata/ok/035_errdefer.aic:38:9 var a : i32 = t2
+    loc ../../testdata/ok/035_errdefer.aic:38:5 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/035_errdefer.aic:38:12 var e1 : Err = t3
+    loc ../../testdata/ok/035_errdefer.aic:39:18 let t4 : void = call print_println(a)
+    loc ../../testdata/ok/035_errdefer.aic:40:21 let t5 : i32 = field e1, 0
+    loc ../../testdata/ok/035_errdefer.aic:40:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/035_errdefer.aic:41:25 let t7 : i32 = unop - const 1
+    loc ../../testdata/ok/035_errdefer.aic:41:24 let t8 : (i32, Err) = call ok_mayFail(t7)
+    loc ../../testdata/ok/035_errdefer.aic:41:5 let t9 : i32 = multi.extract t8, 0
+    loc ../../testdata/ok/035_errdefer.aic:41:9 var b : i32 = t9
+    loc ../../testdata/ok/035_errdefer.aic:41:5 let t10 : Err = multi.extract t8, 1
+    loc ../../testdata/ok/035_errdefer.aic:41:12 var e2 : Err = t10
+    loc ../../testdata/ok/035_errdefer.aic:42:18 let t11 : void = call print_println(b)
+    loc ../../testdata/ok/035_errdefer.aic:43:21 let t12 : i32 = field e2, 0
+    loc ../../testdata/ok/035_errdefer.aic:43:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/035_errdefer.aic:44:25 let t14 : (i32, Err) = call ok_viaCheck(const 4)
+    loc ../../testdata/ok/035_errdefer.aic:44:5 let t15 : i32 = multi.extract t14, 0
+    loc ../../testdata/ok/035_errdefer.aic:44:9 var c : i32 = t15
+    loc ../../testdata/ok/035_errdefer.aic:44:5 let t16 : Err = multi.extract t14, 1
+    loc ../../testdata/ok/035_errdefer.aic:44:12 var e3 : Err = t16
+    loc ../../testdata/ok/035_errdefer.aic:45:18 let t17 : void = call print_println(c)
+    loc ../../testdata/ok/035_errdefer.aic:46:21 let t18 : i32 = field e3, 0
+    loc ../../testdata/ok/035_errdefer.aic:46:18 let t19 : void = call print_println(t18)
+    loc ../../testdata/ok/035_errdefer.aic:47:26 let t20 : i32 = unop - const 1
+    loc ../../testdata/ok/035_errdefer.aic:47:25 let t21 : (i32, Err) = call ok_viaCheck(t20)
+    loc ../../testdata/ok/035_errdefer.aic:47:5 let t22 : i32 = multi.extract t21, 0
+    loc ../../testdata/ok/035_errdefer.aic:47:9 var d : i32 = t22
+    loc ../../testdata/ok/035_errdefer.aic:47:5 let t23 : Err = multi.extract t21, 1
+    loc ../../testdata/ok/035_errdefer.aic:47:12 var e4 : Err = t23
+    loc ../../testdata/ok/035_errdefer.aic:48:18 let t24 : void = call print_println(d)
+    loc ../../testdata/ok/035_errdefer.aic:49:21 let t25 : i32 = field e4, 0
+    loc ../../testdata/ok/035_errdefer.aic:49:18 let t26 : void = call print_println(t25)
+    loc ../../testdata/ok/035_errdefer.aic:37:1 br exit
+  exit:
+    loc ../../testdata/ok/035_errdefer.aic:37:1 ret 
+}

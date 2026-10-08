@@ -1,0 +1,17 @@
+class Point {
+    var x i32
+}
+
+// N3 负例：Point 没有 @derive(Compare) ⇒ 不满足 Ord；报错落在**调用点**。
+func maxOf[T: Ord](a T, b T) -> T {
+    if a.compare(b) < 0 {
+        return b
+    }
+    return a
+}
+
+func main() {
+    var p = Point{x: 1}
+    var q = Point{x: 2}
+    var m = maxOf(p, q)
+}

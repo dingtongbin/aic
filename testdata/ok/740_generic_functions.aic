@@ -1,0 +1,38 @@
+import print
+
+// 泛型函数：T 由调用点实参定夺，每个实参类型一个实例（单态化 + 实例缓存）。
+func id[T](x T) -> T {
+    return x
+}
+
+func first[T](xs T[]) -> T {
+    return xs[0]
+}
+
+// 泛型类：字段类型按实例实参代换。
+class Box[T] {
+    var v T
+}
+
+@packed
+class Pair[A, B] {
+    var a A
+    var b B
+}
+
+func main() {
+    print.println(id(5))
+    print.println(id("hi"))
+    print.println(id(true))
+    var xs i32[] = [7, 8, 9]
+    print.println(first(xs))
+    var names str[] = ["a", "b"]
+    print.println(first(names))
+    var b = Box[i32]{v: 42}
+    print.println(b.v)
+    var s = Box[str]{v: "boxed"}
+    print.println(s.v)
+    var p = Pair[i32, str]{a: 1, b: "one"}
+    print.println(p.a)
+    print.println(p.b)
+}

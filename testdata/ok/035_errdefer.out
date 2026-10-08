@@ -1,0 +1,18 @@
+defer ran
+2
+0
+errdefer ran
+defer ran
+0
+1
+defer ran
+defer in wrapper
+4
+0
+errdefer ran
+defer ran
+wrapper caught
+errdefer in wrapper
+defer in wrapper
+0
+1

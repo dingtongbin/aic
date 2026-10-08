@@ -1,0 +1,65 @@
+import print
+
+// N4 编译期反射（语言级）：`comptime { … }` + 内省原语 fieldsOf / variantsOf。
+// 整块在编译期求值，`assert` 为 false 即编译错；**产物里没有任何运行期元数据**
+// ——下面打印的全是折出来的常量，不是类型表查询的结果（核心设计 §16 N4）。
+class Point {
+    var x i32
+    var y i32
+    var tag str
+}
+
+enum Shape {
+    Dot, Line(i32)
+}
+
+@packed
+class Vec2 {
+    var x f32
+    var y f32
+}
+
+comptime {
+    // 值性（@packed = 无区域头的内联值）与字段表都是编译期事实。
+    assert isValueType(Vec2) == true
+    assert fieldsOf(Vec2).len == 2
+    assert fieldsOf(Vec2)[0].name == "x"
+    assert fieldsOf(Vec2)[1].ty == "f32"
+}
+
+comptime {
+    const SIZE = sizeOf(Point)
+    assert SIZE == 8
+
+    const FIELDS = fieldsOf(Point).len
+    assert FIELDS == 3
+    assert fieldsOf(Point)[0].name == "x"
+    assert fieldsOf(Point)[1].name == "y"
+    assert fieldsOf(Point)[2].name == "tag"
+    assert fieldsOf(Point)[2].ty == "str"
+    assert fieldsOf(Point)[0].ty == "i32"
+    assert fieldsOf(Point)[2].index == 2
+
+    const VARIANTS = variantsOf(Shape).len
+    assert VARIANTS == 2
+    assert variantsOf(Shape)[0].name == "Dot"
+    assert variantsOf(Shape)[0].hasPayload == false
+    assert variantsOf(Shape)[1].name == "Line"
+    assert variantsOf(Shape)[1].hasPayload == true
+    assert variantsOf(Shape)[1].index == 1
+
+    // 值性也是编译期常量（@packed = 无区域头的内联值）
+    assert isValueType(Point) == false
+}
+
+func main() {
+    print.println(FIELDS)
+    print.println(VARIANTS)
+    print.println(SIZE)
+    print.println(FIRST_NAME)
+}
+
+// comptime 块里声明的常量是**包级**的：块外、函数体内都能直接用。
+comptime {
+    const FIRST_NAME = fieldsOf(Point)[0].name
+}

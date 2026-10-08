@@ -1,0 +1,8 @@
+import print
+import math
+
+func main() {
+    print.println(math.min(1.5, 2.5))
+    print.println(math.max(1.5, 2.5))
+    print.println(math.abs(0.0 - 2.5))
+}

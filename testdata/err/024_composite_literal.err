@@ -1,0 +1,12 @@
+testdata/err/024_composite_literal.aic:11:11: error: this looks like a composite literal, but a composite literal cannot appear in a condition (it is ambiguous with the block body)
+    got x's `:`
+    fix: assign the literal to a local first: var c = C{field: value}, then write the condition
+testdata/err/024_composite_literal.aic:11:15: error: expression is missing or incomplete
+    got PUNCT .
+    fix: add an expression: a name, a literal, or a call; keep `()` and `[]` balanced
+testdata/err/024_composite_literal.aic:14:5: error: a non-declaration statement at the top level
+    got KW return
+    fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)
+testdata/err/024_composite_literal.aic:14:12: error: a non-declaration statement at the top level
+    got IDENT g
+    fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)

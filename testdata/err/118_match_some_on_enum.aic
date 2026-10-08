@@ -1,0 +1,11 @@
+enum Color {
+    Red,
+    Green
+}
+
+func f(c Color) -> i32 {
+    match c {
+        Some(x) => { return 1 }
+        None => { return 2 }
+    }
+}

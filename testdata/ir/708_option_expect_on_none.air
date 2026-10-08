@@ -1,0 +1,20 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/708_option_expect_on_none.aic:5:43 let t1 : option_Option[i32] = call option_none()
+    loc ../../testdata/ok/708_option_expect_on_none.aic:5:5 var o : option_Option[i32] = t1
+    loc ../../testdata/ok/708_option_expect_on_none.aic:6:5 let t2 : i32 = enum.tag o
+    loc ../../testdata/ok/708_option_expect_on_none.aic:6:5 switch t2 (arm12 arm23)
+  mjoin1:
+    loc ../../testdata/ok/708_option_expect_on_none.aic:4:1 br exit
+  arm12:
+    loc ../../testdata/ok/708_option_expect_on_none.aic:7:9 let t3 : i32 = enum.payload o, 0
+    loc ../../testdata/ok/708_option_expect_on_none.aic:7:9 var v : i32 = t3
+    loc ../../testdata/ok/708_option_expect_on_none.aic:7:35 let t4 : void = call print_println(v)
+    loc ../../testdata/ok/708_option_expect_on_none.aic:7:9 br mjoin1
+  arm23:
+    loc ../../testdata/ok/708_option_expect_on_none.aic:8:32 let t5 : void = call print_println(const "none")
+    loc ../../testdata/ok/708_option_expect_on_none.aic:8:9 br mjoin1
+  exit:
+    loc ../../testdata/ok/708_option_expect_on_none.aic:4:1 ret 
+}

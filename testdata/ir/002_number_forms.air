@@ -1,0 +1,17 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/002_number_forms.aic:4:5 var a : i32 = const 0
+    loc ../../testdata/ok/002_number_forms.aic:5:5 var b : i32 = const 42
+    loc ../../testdata/ok/002_number_forms.aic:6:5 var c : i32 = const 0xFF
+    loc ../../testdata/ok/002_number_forms.aic:7:5 var d : i32 = const 0xff
+    loc ../../testdata/ok/002_number_forms.aic:8:5 var e : i32 = const 0b101
+    loc ../../testdata/ok/002_number_forms.aic:9:5 var f : i32 = const 0b1_0
+    loc ../../testdata/ok/002_number_forms.aic:10:5 var g : i32 = const 1_000_000
+    loc ../../testdata/ok/002_number_forms.aic:11:5 var h : f64 = const 3.14
+    loc ../../testdata/ok/002_number_forms.aic:12:5 var i : f64 = const 0.5
+    loc ../../testdata/ok/002_number_forms.aic:13:18 let t1 : void = call print_println(const "forms ok")
+    loc ../../testdata/ok/002_number_forms.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/002_number_forms.aic:3:1 ret 
+}

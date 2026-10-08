@@ -1,0 +1,8 @@
+class Point {
+    var x i32
+}
+
+func main() {
+    var p = Point{x: 1}
+    var s = "p={p}"
+}

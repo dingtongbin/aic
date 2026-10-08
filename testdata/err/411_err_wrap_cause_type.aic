@@ -1,0 +1,8 @@
+import print
+
+// L4-g err 锚点：`Err.wrap` 的 cause 位必须是 `Err`（把整数传进去 = 编译错，
+// 不允许隐式转换 —— 红线 1）。
+func main() {
+    var bad = Err.wrap(2, "outer", 7)
+    print.println(bad.code)
+}

@@ -1,0 +1,35 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/704_nested_loops.aic:4:5 var n : i32 = const 0
+    loc ../../testdata/ok/704_nested_loops.aic:5:9 var i : i32 = const 0
+    loc ../../testdata/ok/704_nested_loops.aic:5:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/704_nested_loops.aic:5:26 let t1 : bool = cmp < i, const 3
+    loc ../../testdata/ok/704_nested_loops.aic:5:5 cbr t1, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/704_nested_loops.aic:6:13 var j : i32 = const 0
+    loc ../../testdata/ok/704_nested_loops.aic:6:9 br forhead5
+  forpost3:
+    loc ../../testdata/ok/704_nested_loops.aic:5:37 let t5 : i32 = binop + i, const 1
+    loc ../../testdata/ok/704_nested_loops.aic:5:33 store i, t5
+    loc ../../testdata/ok/704_nested_loops.aic:5:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/704_nested_loops.aic:10:18 let t6 : void = call print_println(n)
+    loc ../../testdata/ok/704_nested_loops.aic:3:1 br exit
+  forhead5:
+    loc ../../testdata/ok/704_nested_loops.aic:6:30 let t2 : bool = cmp < j, const 3
+    loc ../../testdata/ok/704_nested_loops.aic:6:9 cbr t2, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/704_nested_loops.aic:7:19 let t3 : i32 = binop + n, const 1
+    loc ../../testdata/ok/704_nested_loops.aic:7:15 store n, t3
+    loc ../../testdata/ok/704_nested_loops.aic:6:9 br forpost7
+  forpost7:
+    loc ../../testdata/ok/704_nested_loops.aic:6:41 let t4 : i32 = binop + j, const 1
+    loc ../../testdata/ok/704_nested_loops.aic:6:37 store j, t4
+    loc ../../testdata/ok/704_nested_loops.aic:6:9 br forhead5
+  fordone8:
+    loc ../../testdata/ok/704_nested_loops.aic:5:5 br forpost3
+  exit:
+    loc ../../testdata/ok/704_nested_loops.aic:3:1 ret 
+}

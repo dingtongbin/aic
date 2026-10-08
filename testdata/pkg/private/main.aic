@@ -1,0 +1,7 @@
+import print
+import lib
+
+// 可见性（核心设计 §四，Go 风格）：小写开头的顶层名 = 包私有，跨包使用 = 编译错。
+func main() {
+    print.println(lib.helper())
+}

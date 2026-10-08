@@ -1,0 +1,60 @@
+air v1 module ok
+func ok_apply(g:fn(i32)->i32, v:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/718_lambda.aic:3:1 var ret0 : i32
+    loc ../../testdata/ok/718_lambda.aic:4:13 let t1 : i32 = call.closure g(v)
+    loc ../../testdata/ok/718_lambda.aic:4:5 store ret0, t1
+    loc ../../testdata/ok/718_lambda.aic:4:5 br exit
+  exit:
+    loc ../../testdata/ok/718_lambda.aic:3:1 ret ret0
+}
+func ok_add2(a:fn(i32,i32)->i32, x:i32, y:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/718_lambda.aic:7:1 var ret0 : i32
+    loc ../../testdata/ok/718_lambda.aic:8:13 let t1 : i32 = call.closure a(x, y)
+    loc ../../testdata/ok/718_lambda.aic:8:5 store ret0, t1
+    loc ../../testdata/ok/718_lambda.aic:8:5 br exit
+  exit:
+    loc ../../testdata/ok/718_lambda.aic:7:1 ret ret0
+}
+func ok_lambda1(x:i32) -> i32 static {
+  entry:
+    loc ../../testdata/ok/718_lambda.aic:12:28 var ret0 : i32
+    loc ../../testdata/ok/718_lambda.aic:12:37 let t1 : i32 = binop + x, const 1
+    loc ../../testdata/ok/718_lambda.aic:12:28 store ret0, t1
+    loc ../../testdata/ok/718_lambda.aic:12:28 br exit
+  exit:
+    loc ../../testdata/ok/718_lambda.aic:12:28 ret ret0
+}
+func ok_lambda2(x:i32) -> i32 static {
+  entry:
+    loc ../../testdata/ok/718_lambda.aic:14:25 var ret0 : i32
+    loc ../../testdata/ok/718_lambda.aic:14:32 let t1 : i32 = binop * x, const 2
+    loc ../../testdata/ok/718_lambda.aic:14:25 store ret0, t1
+    loc ../../testdata/ok/718_lambda.aic:14:25 br exit
+  exit:
+    loc ../../testdata/ok/718_lambda.aic:14:25 ret ret0
+}
+func ok_lambda3(a:i32, b:i32) -> i32 static {
+  entry:
+    loc ../../testdata/ok/718_lambda.aic:15:33 var ret0 : i32
+    loc ../../testdata/ok/718_lambda.aic:16:18 let t1 : i32 = binop + a, b
+    loc ../../testdata/ok/718_lambda.aic:16:9 store ret0, t1
+    loc ../../testdata/ok/718_lambda.aic:16:9 br exit
+  exit:
+    loc ../../testdata/ok/718_lambda.aic:15:33 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/718_lambda.aic:12:5 var inc : fn(i32)->i32 = const ok_lambda1
+    loc ../../testdata/ok/718_lambda.aic:13:24 let t1 : i32 = call ok_apply(inc, const 41)
+    loc ../../testdata/ok/718_lambda.aic:13:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/718_lambda.aic:14:24 let t3 : i32 = call ok_apply(const ok_lambda2, const 21)
+    loc ../../testdata/ok/718_lambda.aic:14:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/718_lambda.aic:15:5 var sum : fn(i32,i32)->i32 = const ok_lambda3
+    loc ../../testdata/ok/718_lambda.aic:18:23 let t5 : i32 = call ok_add2(sum, const 20, const 22)
+    loc ../../testdata/ok/718_lambda.aic:18:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/718_lambda.aic:11:1 br exit
+  exit:
+    loc ../../testdata/ok/718_lambda.aic:11:1 ret 
+}

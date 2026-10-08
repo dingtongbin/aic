@@ -1,0 +1,16 @@
+import print
+
+// N6 err 锚点：select 分支只能是通道收发或 time.after（核心设计 §16 N6）。
+// `case ch.len() { … }` 既不是收也不是发 —— 必须被拒，不给"默认分支"留口子。
+func main() {
+    var ch chan[i32] = chan[i32].new()
+    ch.send(1)
+    select {
+        case v = ch.recv() {
+            print.println(v)
+        }
+        case ch.len() {
+            print.println(0)
+        }
+    }
+}

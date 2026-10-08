@@ -1,0 +1,22 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/008_arith.aic:4:5 var a : i32 = const 10
+    loc ../../testdata/ok/008_arith.aic:5:5 var b : i32 = const 3
+    loc ../../testdata/ok/008_arith.aic:6:19 let t1 : i32 = binop * b, const 2
+    loc ../../testdata/ok/008_arith.aic:6:15 let t2 : i32 = binop + a, t1
+    loc ../../testdata/ok/008_arith.aic:6:23 let t3 : i32 = binop - t2, const 1
+    loc ../../testdata/ok/008_arith.aic:6:5 var c : i32 = t3
+    loc ../../testdata/ok/008_arith.aic:7:15 let t4 : i32 = binop / a, b
+    loc ../../testdata/ok/008_arith.aic:7:5 var d : i32 = t4
+    loc ../../testdata/ok/008_arith.aic:8:15 let t5 : i32 = binop % a, b
+    loc ../../testdata/ok/008_arith.aic:8:5 var e : i32 = t5
+    loc ../../testdata/ok/008_arith.aic:9:20 let t6 : i64 = call i64(a)
+    loc ../../testdata/ok/008_arith.aic:9:29 let t7 : i64 = call i64(b)
+    loc ../../testdata/ok/008_arith.aic:9:24 let t8 : i64 = binop * t6, t7
+    loc ../../testdata/ok/008_arith.aic:9:5 var f : i64 = t8
+    loc ../../testdata/ok/008_arith.aic:10:18 let t9 : void = call print_println(const "arith ok")
+    loc ../../testdata/ok/008_arith.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/008_arith.aic:3:1 ret 
+}

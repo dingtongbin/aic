@@ -1,0 +1,15 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:5:33 let t1 : bool = call str_startsWith(const "compiler", const "comp")
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:5:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:6:33 let t3 : bool = call str_startsWith(const "compiler", const "pile")
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:6:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:7:31 let t5 : bool = call str_endsWith(const "compiler", const "iler")
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:7:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:8:31 let t7 : bool = call str_endsWith(const "compiler", const "comp")
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:8:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/681_str_prefix_suffix.aic:4:1 ret 
+}

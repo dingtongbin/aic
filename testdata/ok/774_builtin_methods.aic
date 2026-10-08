@@ -1,0 +1,41 @@
+import print
+
+// L4 审计补锚点：内建方法面（这些方法此前**一个锚点都没有**，正是它们悄悄坏掉的原因）。
+// 覆盖：list.remove/clear、set.clear、map.clear、str.isEmpty（变量接收者）、chan.cap、
+// bytes 自追加（长度先快照）。
+func main() {
+    var xs i32[] = [1, 2, 3, 4]
+    xs.remove(1) // [1, 3, 4]
+    print.println(xs.len())
+    print.println(xs[1])
+    xs.clear()
+    print.println(xs.isEmpty())
+
+    var s set[str] = set.new()
+    s.add("a")
+    s.add("b")
+    print.println(s.len())
+    s.clear()
+    print.println(s.len())
+
+    var m map[str]i32 = map.new()
+    m.put("k", 7)
+    print.println(m.get("k"))
+    m.clear()
+    print.println(m.has("k"))
+    print.println(m.len())
+
+    var t = "aic"
+    print.println(t.isEmpty())
+    var e = ""
+    print.println(e.isEmpty())
+
+    var unbounded chan[i32] = chan[i32].new()
+    var bounded chan[i32] = chan[i32].new(2)
+    print.println(unbounded.cap())
+    print.println(bounded.cap())
+
+    var b bytes = bytes.fromStr("ab")
+    b.appendBytes(b)
+    print.println(b.toStr())
+}

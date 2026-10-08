@@ -1,0 +1,4 @@
+func f() {
+    g(1
+}
+func g(x i32) {}

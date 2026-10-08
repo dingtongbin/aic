@@ -1,0 +1,3 @@
+testdata/pkg/private/main.aic:6:29: error: a package-private function cannot be called across packages
+    lib.helper
+    fix: capitalise the first letter to make it visible across packages (core design §4 visibility)

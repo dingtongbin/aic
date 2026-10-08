@@ -1,0 +1,12 @@
+// N10 负例：use 委托的字段不在本类声明。
+class Engine {
+    func start() -> i32 {
+        return 1
+    }
+}
+
+class Car {
+    use eng Engine
+
+    var name str
+}

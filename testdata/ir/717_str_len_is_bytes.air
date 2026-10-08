@@ -1,0 +1,17 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:5:28 let t1 : usize = call str_len(const "abc")
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:5:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:6:30 let t3 : usize = call str_len(const "héllo")
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:6:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:7:33 let t5 : u32[] = call str_codepoints(const "héllo")
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:7:46 let t6 : usize = call list_u32_len(t5)
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:7:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:8:33 let t8 : u32[] = call str_codepoints(const "中文")
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:8:43 let t9 : usize = call list_u32_len(t8)
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:8:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/717_str_len_is_bytes.aic:4:1 ret 
+}

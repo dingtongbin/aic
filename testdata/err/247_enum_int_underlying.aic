@@ -1,0 +1,7 @@
+enum E {
+    A
+}
+
+func f() -> i32 {
+    return E.A
+}

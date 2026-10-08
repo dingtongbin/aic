@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var a f64 = 1.5
+    var b f64 = 0.25
+    print.println(a + b)
+    print.println(a - b)
+    print.println(a * b)
+    print.println(b / a)
+}

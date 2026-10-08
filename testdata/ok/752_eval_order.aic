@@ -1,0 +1,30 @@
+import print
+
+// C15 / L18 锚点：**求值顺序显式化**。
+//
+// C 不规定实参、二元操作数与初始化列表的求值顺序（本机 gcc 实测右→左），
+// 本锚点用一个带副作用的记录器把顺序变成可观察输出：
+// 顺序错了，第一行就不是 "abcd"（而是 "badc" 之类），返回值 r1/r2 也会分叉。
+class Log {
+    var s str
+    var n i32
+
+    func add(t str) -> i32 {
+        this.s = this.s + t
+        this.n = this.n + 1
+        return this.n
+    }
+}
+
+func add2(a i32, b i32) -> i32 {
+    return a + b
+}
+
+func main() {
+    var lg = Log{}
+    var r1 = add2(lg.add("a"), lg.add("b")) // 实参位：左到右 ⇒ "a" 先求值（n=1）
+    var r2 = lg.add("c") + lg.add("d")      // 二元操作数位：左到右 ⇒ "c" 先求值（n=3）
+    print.println(lg.s)
+    print.println(r1)
+    print.println(r2)
+}

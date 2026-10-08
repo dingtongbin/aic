@@ -1,0 +1,22 @@
+import print
+
+func inner(fail bool) -> Err {
+    if fail {
+        return Err(3, "inner failed")
+    }
+    return nil
+}
+
+func outer(fail bool) -> Err {
+    var e = inner(fail)
+    if e.code != 0 {
+        return e
+    }
+    return nil
+}
+
+func main() {
+    print.println(outer(false).code)
+    print.println(outer(true).code)
+    print.println(outer(true).msg)
+}

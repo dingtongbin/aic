@@ -1,0 +1,39 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/030_map.aic:4:32 let t1 : map[str]i32 = call map_new_str_i32()
+    loc ../../testdata/ok/030_map.aic:4:5 var m : map[str]i32 = t1
+    loc ../../testdata/ok/030_map.aic:5:10 let t2 : void = call map_str_i32_put(m, const "one", const 1)
+    loc ../../testdata/ok/030_map.aic:6:10 let t3 : void = call map_str_i32_put(m, const "two", const 2)
+    loc ../../testdata/ok/030_map.aic:7:10 let t4 : void = call map_str_i32_put(m, const "one", const 11)
+    loc ../../testdata/ok/030_map.aic:8:24 let t5 : usize = call map_str_i32_len(m)
+    loc ../../testdata/ok/030_map.aic:8:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/030_map.aic:9:24 let t7 : i32 = call map_str_i32_get(m, const "one")
+    loc ../../testdata/ok/030_map.aic:9:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/030_map.aic:10:24 let t9 : i32 = call map_str_i32_get(m, const "two")
+    loc ../../testdata/ok/030_map.aic:10:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/030_map.aic:11:24 let t11 : bool = call map_str_i32_has(m, const "three")
+    loc ../../testdata/ok/030_map.aic:11:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/030_map.aic:12:24 let t13 : i32 = call map_str_i32_get(m, const "three")
+    loc ../../testdata/ok/030_map.aic:12:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/030_map.aic:13:5 var i : usize = const 0
+    loc ../../testdata/ok/030_map.aic:14:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/030_map.aic:14:18 let t15 : usize = call map_str_i32_len(m)
+    loc ../../testdata/ok/030_map.aic:14:11 let t16 : bool = cmp < i, t15
+    loc ../../testdata/ok/030_map.aic:14:5 cbr t16, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/030_map.aic:15:30 let t17 : str = call map_str_i32_keyAt(m, i)
+    loc ../../testdata/ok/030_map.aic:15:22 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/030_map.aic:16:30 let t19 : i32 = call map_str_i32_valAt(m, i)
+    loc ../../testdata/ok/030_map.aic:16:22 let t20 : void = call print_println(t19)
+    loc ../../testdata/ok/030_map.aic:17:15 let t21 : usize = binop + i, const 1
+    loc ../../testdata/ok/030_map.aic:17:11 store i, t21
+    loc ../../testdata/ok/030_map.aic:14:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/030_map.aic:14:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/030_map.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/030_map.aic:3:1 ret 
+}

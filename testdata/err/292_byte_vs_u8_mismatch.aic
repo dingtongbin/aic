@@ -1,0 +1,6 @@
+func f() -> byte {
+    return u8(1)
+}
+
+func main() {
+}

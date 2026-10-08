@@ -1,0 +1,19 @@
+import print
+
+// §10.4 第 12 条②：已证在界内 → unchecked 访问器（证明义务在编译器）。
+// 事实：xs = [1,2,3,4]（容器字面量 → len 是常量 4）+ for i in 0..4（字面量上界）
+//   → 体内 i ∈ [0,3] < 4 → 读写都走 unchecked 形态。
+func main() {
+    var xs i32[] = [1, 2, 3, 4]
+    var total i32 = 0
+    for i in 0..4 {
+        total = total + xs[i]
+    }
+    print.println(total)
+    for i in 0..4 {
+        xs[i] = xs[i] * 2
+    }
+    for i in 0..4 {
+        print.println(xs[i])
+    }
+}

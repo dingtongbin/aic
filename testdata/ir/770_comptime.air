@@ -1,0 +1,21 @@
+air v1 module ok
+type ok_Point = struct
+    0:x:i32
+    1:y:i32
+    2:tag:str
+type ok_Vec2 = struct packed
+    0:x:f32
+    1:y:f32
+type ok_Shape = enum
+    Dot
+    Line(i32)
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/770_comptime.aic:56:18 let t1 : void = call print_println(const 3)
+    loc ../../testdata/ok/770_comptime.aic:57:18 let t2 : void = call print_println(const 2)
+    loc ../../testdata/ok/770_comptime.aic:58:18 let t3 : void = call print_println(const 8)
+    loc ../../testdata/ok/770_comptime.aic:59:18 let t4 : void = call print_println(const "x")
+    loc ../../testdata/ok/770_comptime.aic:55:1 br exit
+  exit:
+    loc ../../testdata/ok/770_comptime.aic:55:1 ret 
+}

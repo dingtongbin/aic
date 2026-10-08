@@ -1,0 +1,15 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/719_str_codepoints_values.aic:5:29 let t1 : u32[] = call str_codepoints(const "a中")
+    loc ../../testdata/ok/719_str_codepoints_values.aic:5:5 var cps : u32[] = t1
+    loc ../../testdata/ok/719_str_codepoints_values.aic:6:26 let t2 : usize = call list_u32_len(cps)
+    loc ../../testdata/ok/719_str_codepoints_values.aic:6:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/719_str_codepoints_values.aic:7:22 let t4 : u32 = elem elem cps, const 0, const 0
+    loc ../../testdata/ok/719_str_codepoints_values.aic:7:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/719_str_codepoints_values.aic:8:22 let t6 : u32 = elem elem cps, const 1, const 1
+    loc ../../testdata/ok/719_str_codepoints_values.aic:8:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/719_str_codepoints_values.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/719_str_codepoints_values.aic:4:1 ret 
+}

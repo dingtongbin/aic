@@ -1,0 +1,8 @@
+import option
+
+// 语料改写（L4 审计）：原例是 `option.unwrap(Some("text"))` —— 它依赖"Some 的未定型
+// 字面量负载无法定型"这个**旧缺陷**才成为错误；修好 `Some(字面量)` 之后该表达式是合法的
+// （Option[str] 的 unwrap）。本锚点改成真正该被拒的形态：unwrap 的实参不是 Option。
+func main() {
+    var v = option.unwrap("text")
+}

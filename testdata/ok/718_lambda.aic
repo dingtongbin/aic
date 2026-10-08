@@ -1,0 +1,19 @@
+import print
+
+func apply(g (i32) -> i32, v i32) -> i32 {
+    return g(v)
+}
+
+func add2(a (i32, i32) -> i32, x i32, y i32) -> i32 {
+    return a(x, y)
+}
+
+func main() {
+    var inc (i32) -> i32 = (x) => x + 1
+    print.println(apply(inc, 41))
+    print.println(apply(x => x * 2, 21))
+    var sum (i32, i32) -> i32 = (a, b) => {
+        return a + b
+    }
+    print.println(add2(sum, 20, 22))
+}

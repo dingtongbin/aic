@@ -1,0 +1,12 @@
+import print
+
+func divmod(a i32, b i32) -> (i32, i32) {
+    return a / b, a % b
+}
+
+func main() {
+    var q i32 = 0
+    var r i32 = 0
+    q, r = divmod(17, 5)
+    print.println("multi ok")
+}

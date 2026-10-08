@@ -1,0 +1,16 @@
+import print
+
+// N4 err 锚点：comptime assert 为 false = 编译错（断言在编译期求值）。
+// Point 是非 @packed 类 ⇒ 引用 = 8 字节；写成 16 必须被拒（核心设计 §16 N4）。
+class Point {
+    var x i32
+    var y i32
+}
+
+comptime {
+    assert sizeOf(Point) == 16
+}
+
+func main() {
+    print.println(1)
+}

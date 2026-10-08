@@ -1,0 +1,7 @@
+class P {
+    var x i32
+}
+
+func main() {
+    var p = P[i32]{x: 1}
+}

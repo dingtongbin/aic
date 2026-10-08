@@ -1,0 +1,19 @@
+import print
+
+// L4-e 锚点 3：**列表元素读回后的字段访问** —— 元素槽是 void*，
+// 字段访问前必须按语义类型补一次指针转换（否则发出 void* 解引用，C 层直接报错）。
+class Buf {
+    var n i32
+}
+
+func main() {
+    var xs Buf[] = []
+    xs.append(Buf{n: 7})
+    xs.append(Buf{n: 9})
+    print.println(xs[0].n)
+    print.println(xs[1].n)
+    var b = xs[1]
+    print.println(b.n)
+    xs[0].n = 42
+    print.println(xs[0].n)
+}

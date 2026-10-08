@@ -1,0 +1,40 @@
+import print
+
+// N4 锚点（编译期反射的第一半）：@derive(Default) / @derive(Clone)。
+// 派生方法 = **可见的普通方法**（可调用、可检查、可 dump），体由 emit 按字段序
+// 合成；**运行期零元数据**（不生成类型表）。
+@derive(Default, Clone, Compare, ToString)
+@packed
+class Point {
+    var x i32
+    var y i32
+}
+
+@derive(Default, Clone)
+class Session {
+    var id i64
+    var name str
+}
+
+func main() {
+    // Default：全零实例
+    var z = Point.default()
+    print.println(z.x)
+    print.println(z.y)
+
+    // Clone：按值拷贝（改副本不影响原值）
+    var p = Point{x: 3, y: 4}
+    var q = p.clone()
+    print.println(q.x)
+    print.println(q.y)
+    print.println(p.compare(q))
+
+    // 引用类的 Default/Clone
+    var s = Session{id: 7, name: "s"}
+    var d = Session.default()
+    print.println(d.id)
+    print.println(d.name)
+    var t = s.clone()
+    print.println(t.id)
+    print.println(t.name)
+}

@@ -1,0 +1,25 @@
+import print
+import str
+
+func main() {
+    var s str = "héllo→"
+    // utf8At returns (u32, usize): the code point and its byte width.
+    var cp, width = str.utf8At(s, 0)
+    print.println(cp)
+    print.println(width)
+    var c2, w2 = str.utf8At(s, 1)
+    print.println(c2)
+    print.println(w2)
+    var c3, w3 = str.utf8At(s, 6)
+    print.println(c3)
+    print.println(w3)
+
+    // codepoints yields the code points themselves, never a count.
+    var points = str.codepoints(s)
+    print.println(points.len())
+    var i usize = 0
+    for i < points.len() {
+        print.println(points[i])
+        i = i + 1
+    }
+}

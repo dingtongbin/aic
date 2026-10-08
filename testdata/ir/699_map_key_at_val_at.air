@@ -1,0 +1,21 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:4:32 let t1 : map[i32]str = call map_new_i32_str()
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:4:5 var m : map[i32]str = t1
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:5:10 let t2 : void = call map_i32_str_put(m, const 7, const "seven")
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:6:10 let t3 : void = call map_i32_str_put(m, const 3, const "three")
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:7:24 let t4 : usize = call map_i32_str_len(m)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:7:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:8:26 let t6 : i32 = call map_i32_str_keyAt(m, const 0)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:8:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:9:26 let t8 : str = call map_i32_str_valAt(m, const 0)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:9:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:10:26 let t10 : i32 = call map_i32_str_keyAt(m, const 1)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:10:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:11:26 let t12 : str = call map_i32_str_valAt(m, const 1)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:11:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/699_map_key_at_val_at.aic:3:1 ret 
+}

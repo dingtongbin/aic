@@ -1,0 +1,9 @@
+import print
+
+// L4 trap 锚点：移位计数 ≥ 左操作数位宽 = trap（§一「移位语义」；C 里是 UB，
+// 此前静默算出 0 —— "静默算错"级缺陷）。
+func main() {
+    var n i32 = 32
+    print.println(1 << n)
+    print.println(999) // 不可达
+}

@@ -1,0 +1,13 @@
+import print
+
+func add(a i32, b i32) -> i32 {
+    return a + b
+}
+
+func twice(x i32) -> i32 {
+    return add(x, x)
+}
+
+func main() {
+    print.println("fn ok")
+}

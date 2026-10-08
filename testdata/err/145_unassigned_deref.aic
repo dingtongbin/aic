@@ -1,0 +1,9 @@
+class Box {
+    var n i32
+}
+
+func main() {
+    var b Box
+    var x i32 = b.n
+    x = x + 1
+}

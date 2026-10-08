@@ -1,0 +1,53 @@
+// aic:ir-only
+import print
+
+// E2/E3/E4 锚点（核心设计 §15.7）。
+// 直译路径（AST→C）已**冻结**（核心设计 §十七），新特性只在 IR 路径实现，
+// 故本语料在 T-A 阶段只要求 `check` + `dump-ir --stage air` 通过；
+// .out 已按语义独立算出，T-B 的 IR 发射器接上后删掉首行标记即自动纳入运行门禁。
+func lookup(k i32) -> (str, Err) {
+    if k < 0 {
+        return "", Err(10, "bad key")
+    }
+    if k == 0 {
+        return "", Err(11, "missing")
+    }
+    return "value", nil
+}
+
+// E2 降级：出错取默认值，控制流不中断。
+func fallback(k i32) -> str {
+    return lookup(k) or "default"
+}
+
+// E3 就地处理：块以表达式结尾 ⇒ 那条表达式的值就是整个表达式的值。
+func inPlace(k i32) -> str {
+    return lookup(k) catch e {
+        print.println(e.code)
+        "handled"
+    }
+}
+
+// E3 的必退出形态：块以 return 结尾，表达式本身不再产出值。
+func bail(k i32) -> (str, Err) {
+    var v = lookup(k) catch e {
+        return "", Err(100, e.msg)
+    }
+    return v, nil
+}
+
+// E4 断言：此处失败即程序缺陷 ⇒ trap。
+func asserted(k i32) -> str {
+    return lookup(k)!
+}
+
+func main() {
+    print.println(fallback(-1))
+    print.println(fallback(1))
+    print.println(inPlace(0))
+    print.println(inPlace(1))
+    var v, err = bail(-1)
+    print.println(err.code)
+    print.println(v)
+    print.println(asserted(2))
+}

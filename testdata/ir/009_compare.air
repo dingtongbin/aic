@@ -1,0 +1,22 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/009_compare.aic:4:5 var a : i32 = const 5
+    loc ../../testdata/ok/009_compare.aic:5:15 let t1 : bool = cmp > a, const 1
+    loc ../../testdata/ok/009_compare.aic:5:5 var b : bool = t1
+    loc ../../testdata/ok/009_compare.aic:6:15 let t2 : bool = cmp == a, const 5
+    loc ../../testdata/ok/009_compare.aic:6:5 var c : bool = t2
+    loc ../../testdata/ok/009_compare.aic:7:15 let t3 : bool = cmp != a, const 5
+    loc ../../testdata/ok/009_compare.aic:7:5 var d : bool = t3
+    loc ../../testdata/ok/009_compare.aic:8:15 let t4 : bool = cmp <= a, const 5
+    loc ../../testdata/ok/009_compare.aic:8:25 let t5 : bool = cmp >= a, const 5
+    loc ../../testdata/ok/009_compare.aic:8:20 let t6 : bool = cmp && t4, t5
+    loc ../../testdata/ok/009_compare.aic:8:5 var e : bool = t6
+    loc ../../testdata/ok/009_compare.aic:9:15 let t7 : bool = cmp < a, const 1
+    loc ../../testdata/ok/009_compare.aic:9:19 let t8 : bool = cmp || t7, c
+    loc ../../testdata/ok/009_compare.aic:9:5 var f : bool = t8
+    loc ../../testdata/ok/009_compare.aic:10:18 let t9 : void = call print_println(const "compare ok")
+    loc ../../testdata/ok/009_compare.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/009_compare.aic:3:1 ret 
+}

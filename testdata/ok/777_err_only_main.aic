@@ -1,0 +1,27 @@
+import print
+
+// L4 审计补锚点：**结果位恰好 1 个（就是 Err）**的函数用 `?` —— 文档化的形态
+// `func main() -> Err`（核心设计 §六）。此前发射侧一律按"合成返回结构"发，
+// 产出 `unknown type name 'aic_r_aic_Err'` + `._0` 的非法 C。
+func boom(n i32) -> (i32, Err) {
+    if n < 0 {
+        return 0, Err(1, "negative")
+    }
+    return n * 2, nil
+}
+
+func run() -> Err {
+    var v = boom(5)?
+    print.println(v)
+    var w = boom(-1)? // 传播 ⇒ run 返回该 Err（下面一行不执行）
+    print.println(w)
+    return nil
+}
+
+func main() -> Err {
+    var e = run()
+    if e != nil {
+        print.println(e.msg)
+    }
+    return nil // main 正常退出（锚点判据：退出码 0）
+}

@@ -1,0 +1,3 @@
+testdata/err/362_derive_compare_missing_nested.aic:9:1: error: a field of @derive(Compare) is not comparable
+    Outer.i: class err.Inner has no @derive(Compare)
+    fix: Compare supports numeric / bool / str / payload-free enum / @packed / Compare-enabled class fields only (core design §4)

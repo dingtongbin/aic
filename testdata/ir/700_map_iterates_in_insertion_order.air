@@ -1,0 +1,27 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:4:32 let t1 : map[str]i32 = call map_new_str_i32()
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:4:5 var m : map[str]i32 = t1
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:5:10 let t2 : void = call map_str_i32_put(m, const "a", const 1)
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:6:10 let t3 : void = call map_str_i32_put(m, const "b", const 2)
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 let t4 : usize = len m
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 var k : usize = const 0
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 let t5 : bool = cmp lt k, t4
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 cbr t5, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 let t6 : i32 = elem m, k
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:9 var k : i32 = t6
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:8:22 let t7 : void = call print_println(k)
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 let t8 : usize = binop + k, const 1
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 store k, t8
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:7:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/700_map_iterates_in_insertion_order.aic:3:1 ret 
+}

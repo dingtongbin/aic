@@ -1,0 +1,6 @@
+enum E { A }
+func f(x E) {
+    match x {
+        A { }
+    }
+}

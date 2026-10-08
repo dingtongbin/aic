@@ -1,0 +1,3 @@
+testdata/pkg/private_member/main.aic:8:20: error: a package-private member cannot be used across packages
+    Box._hidden
+    fix: the `_` prefix keeps a member inside its package; use a public member or a method on Box (core design §4 visibility)

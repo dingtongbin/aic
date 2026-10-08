@@ -1,0 +1,6 @@
+func f() -> unknown {
+    return 1
+}
+
+func main() {
+}

@@ -1,0 +1,19 @@
+import print
+import option
+
+func describe(v i32) -> str {
+    match Some(v) {
+        Some(x) => {
+            if x > 0 {
+                return "positive"
+            }
+            return "other"
+        }
+        None => { return "none" }
+    }
+}
+
+func main() {
+    print.println(describe(5))
+    print.println(describe(-2))
+}

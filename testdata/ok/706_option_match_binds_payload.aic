@@ -1,0 +1,14 @@
+import print
+import option
+
+func doubled(o option.Option[i32]) -> i32 {
+    match o {
+        Some(v) => { return v * 2 }
+        None => { return 0 }
+    }
+}
+
+func main() {
+    print.println(doubled(Some(21)))
+    print.println(doubled(None))
+}

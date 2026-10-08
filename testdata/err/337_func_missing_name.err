@@ -1,0 +1,9 @@
+testdata/err/337_func_missing_name.aic:1:1: error: function is missing a name
+    got PUNCT (
+    fix: write `func name(...)`; methods live inside a class body and start with `func`
+testdata/err/337_func_missing_name.aic:2:5: error: a non-declaration statement at the top level
+    got KW return
+    fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)
+testdata/err/337_func_missing_name.aic:2:12: error: a non-declaration statement at the top level
+    got INT 1
+    fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)

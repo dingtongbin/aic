@@ -1,0 +1,111 @@
+air v1 module ok
+func ok_load(name:str) -> (i32, Err) {
+  entry:
+    loc ../../testdata/ok/791_err_cause.aic:7:1 var ret0 : i32
+    loc ../../testdata/ok/791_err_cause.aic:7:1 var ret1 : Err
+    loc ../../testdata/ok/791_err_cause.aic:8:13 let t1 : bool = cmp == name, const "bad"
+    loc ../../testdata/ok/791_err_cause.aic:8:5 cbr t1, then1, else2
+  then1:
+    loc ../../testdata/ok/791_err_cause.aic:9:9 store ret0, const 0
+    loc ../../testdata/ok/791_err_cause.aic:9:22 let t2 : Err = call Err(const 2, const "file not found")
+    loc ../../testdata/ok/791_err_cause.aic:9:9 store ret1, t2
+    loc ../../testdata/ok/791_err_cause.aic:9:9 br exit
+  else2:
+    loc ../../testdata/ok/791_err_cause.aic:8:5 br join3
+  join3:
+    loc ../../testdata/ok/791_err_cause.aic:11:13 let t3 : bool = cmp == name, const "hash"
+    loc ../../testdata/ok/791_err_cause.aic:11:5 cbr t3, then4, else5
+  then4:
+    loc ../../testdata/ok/791_err_cause.aic:12:9 store ret0, const 0
+    loc ../../testdata/ok/791_err_cause.aic:12:22 let t4 : Err = call Err(const 3, const "checksum mismatch")
+    loc ../../testdata/ok/791_err_cause.aic:12:9 store ret1, t4
+    loc ../../testdata/ok/791_err_cause.aic:12:9 br exit
+  else5:
+    loc ../../testdata/ok/791_err_cause.aic:11:5 br join6
+  join6:
+    loc ../../testdata/ok/791_err_cause.aic:14:5 store ret0, const 42
+    loc ../../testdata/ok/791_err_cause.aic:14:5 store ret1, nil
+    loc ../../testdata/ok/791_err_cause.aic:14:5 br exit
+  exit:
+    loc ../../testdata/ok/791_err_cause.aic:7:1 ret ret0, ret1
+}
+func ok_parse(name:str) -> (i32, Err) {
+  entry:
+    loc ../../testdata/ok/791_err_cause.aic:17:1 var ret0 : i32
+    loc ../../testdata/ok/791_err_cause.aic:17:1 var ret1 : Err
+    loc ../../testdata/ok/791_err_cause.aic:18:20 let t1 : (i32, Err) = call ok_load(name)
+    loc ../../testdata/ok/791_err_cause.aic:18:5 let t2 : i32 = multi.extract t1, 0
+    loc ../../testdata/ok/791_err_cause.aic:18:9 var v : i32 = t2
+    loc ../../testdata/ok/791_err_cause.aic:18:5 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/791_err_cause.aic:18:12 var e : Err = t3
+    loc ../../testdata/ok/791_err_cause.aic:19:10 let t4 : bool = cmp != e, nil
+    loc ../../testdata/ok/791_err_cause.aic:19:5 cbr t4, then1, else2
+  then1:
+    loc ../../testdata/ok/791_err_cause.aic:20:9 store ret0, const 0
+    loc ../../testdata/ok/791_err_cause.aic:20:27 let t5 : Err = call Err_wrap(const 10, const "parse failed", e)
+    loc ../../testdata/ok/791_err_cause.aic:20:9 store ret1, t5
+    loc ../../testdata/ok/791_err_cause.aic:20:9 br exit
+  else2:
+    loc ../../testdata/ok/791_err_cause.aic:19:5 br join3
+  join3:
+    loc ../../testdata/ok/791_err_cause.aic:22:5 store ret0, v
+    loc ../../testdata/ok/791_err_cause.aic:22:5 store ret1, nil
+    loc ../../testdata/ok/791_err_cause.aic:22:5 br exit
+  exit:
+    loc ../../testdata/ok/791_err_cause.aic:17:1 ret ret0, ret1
+}
+func ok_run(name:str) -> (i32, Err) {
+  entry:
+    loc ../../testdata/ok/791_err_cause.aic:25:1 var ret0 : i32
+    loc ../../testdata/ok/791_err_cause.aic:25:1 var ret1 : Err
+    loc ../../testdata/ok/791_err_cause.aic:26:21 let t1 : (i32, Err) = call ok_parse(name)
+    loc ../../testdata/ok/791_err_cause.aic:26:5 let t2 : i32 = multi.extract t1, 0
+    loc ../../testdata/ok/791_err_cause.aic:26:9 var v : i32 = t2
+    loc ../../testdata/ok/791_err_cause.aic:26:5 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/791_err_cause.aic:26:12 var e : Err = t3
+    loc ../../testdata/ok/791_err_cause.aic:27:10 let t4 : bool = cmp != e, nil
+    loc ../../testdata/ok/791_err_cause.aic:27:5 cbr t4, then1, else2
+  then1:
+    loc ../../testdata/ok/791_err_cause.aic:28:9 store ret0, const 0
+    loc ../../testdata/ok/791_err_cause.aic:28:27 let t5 : Err = call Err_wrap(const 20, const "run failed", e)
+    loc ../../testdata/ok/791_err_cause.aic:28:9 store ret1, t5
+    loc ../../testdata/ok/791_err_cause.aic:28:9 br exit
+  else2:
+    loc ../../testdata/ok/791_err_cause.aic:27:5 br join3
+  join3:
+    loc ../../testdata/ok/791_err_cause.aic:30:5 store ret0, v
+    loc ../../testdata/ok/791_err_cause.aic:30:5 store ret1, nil
+    loc ../../testdata/ok/791_err_cause.aic:30:5 br exit
+  exit:
+    loc ../../testdata/ok/791_err_cause.aic:25:1 ret ret0, ret1
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/791_err_cause.aic:34:19 let t1 : (i32, Err) = call ok_run(const "ok")
+    loc ../../testdata/ok/791_err_cause.aic:34:5 let t2 : i32 = multi.extract t1, 0
+    loc ../../testdata/ok/791_err_cause.aic:34:9 var v : i32 = t2
+    loc ../../testdata/ok/791_err_cause.aic:34:5 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/791_err_cause.aic:34:12 var e : Err = t3
+    loc ../../testdata/ok/791_err_cause.aic:35:18 let t4 : void = call print_println(v)
+    loc ../../testdata/ok/791_err_cause.aic:36:21 let t5 : (i32, Err) = call ok_run(const "bad")
+    loc ../../testdata/ok/791_err_cause.aic:36:5 let t6 : i32 = multi.extract t5, 0
+    loc ../../testdata/ok/791_err_cause.aic:36:9 var v2 : i32 = t6
+    loc ../../testdata/ok/791_err_cause.aic:36:5 let t7 : Err = multi.extract t5, 1
+    loc ../../testdata/ok/791_err_cause.aic:36:13 var e2 : Err = t7
+    loc ../../testdata/ok/791_err_cause.aic:37:21 let t8 : i32 = field e2, 0
+    loc ../../testdata/ok/791_err_cause.aic:37:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/791_err_cause.aic:38:21 let t10 : str = field e2, 1
+    loc ../../testdata/ok/791_err_cause.aic:38:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/791_err_cause.aic:39:27 let t12 : str = field field e2, 2, 1
+    loc ../../testdata/ok/791_err_cause.aic:39:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/791_err_cause.aic:40:21 let t14 : (i32, Err) = call ok_run(const "hash")
+    loc ../../testdata/ok/791_err_cause.aic:40:5 let t15 : i32 = multi.extract t14, 0
+    loc ../../testdata/ok/791_err_cause.aic:40:9 var v3 : i32 = t15
+    loc ../../testdata/ok/791_err_cause.aic:40:5 let t16 : Err = multi.extract t14, 1
+    loc ../../testdata/ok/791_err_cause.aic:40:13 var e3 : Err = t16
+    loc ../../testdata/ok/791_err_cause.aic:41:33 let t17 : str = field field field e3, 2, 2, 1
+    loc ../../testdata/ok/791_err_cause.aic:41:18 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/791_err_cause.aic:33:1 br exit
+  exit:
+    loc ../../testdata/ok/791_err_cause.aic:33:1 ret 
+}

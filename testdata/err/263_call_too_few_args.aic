@@ -1,0 +1,7 @@
+func g(a i32, b i32) -> i32 {
+    return a
+}
+
+func main() {
+    var x = g(1)
+}

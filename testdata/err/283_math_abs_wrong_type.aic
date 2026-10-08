@@ -1,0 +1,6 @@
+import math
+
+func main() {
+    var v = math.abs(true)
+    print.println(v)
+}

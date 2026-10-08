@@ -1,0 +1,48 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/038_std_unicode.aic:5:5 var s : str = const "héllo→"
+    loc ../../testdata/ok/038_std_unicode.aic:7:31 let t1 : (u32, usize) = call str_utf8At(s, const 0)
+    loc ../../testdata/ok/038_std_unicode.aic:7:5 let t2 : u32 = multi.extract t1, 0
+    loc ../../testdata/ok/038_std_unicode.aic:7:9 var cp : u32 = t2
+    loc ../../testdata/ok/038_std_unicode.aic:7:5 let t3 : usize = multi.extract t1, 1
+    loc ../../testdata/ok/038_std_unicode.aic:7:13 var width : usize = t3
+    loc ../../testdata/ok/038_std_unicode.aic:8:18 let t4 : void = call print_println(cp)
+    loc ../../testdata/ok/038_std_unicode.aic:9:18 let t5 : void = call print_println(width)
+    loc ../../testdata/ok/038_std_unicode.aic:10:28 let t6 : (u32, usize) = call str_utf8At(s, const 1)
+    loc ../../testdata/ok/038_std_unicode.aic:10:5 let t7 : u32 = multi.extract t6, 0
+    loc ../../testdata/ok/038_std_unicode.aic:10:9 var c2 : u32 = t7
+    loc ../../testdata/ok/038_std_unicode.aic:10:5 let t8 : usize = multi.extract t6, 1
+    loc ../../testdata/ok/038_std_unicode.aic:10:13 var w2 : usize = t8
+    loc ../../testdata/ok/038_std_unicode.aic:11:18 let t9 : void = call print_println(c2)
+    loc ../../testdata/ok/038_std_unicode.aic:12:18 let t10 : void = call print_println(w2)
+    loc ../../testdata/ok/038_std_unicode.aic:13:28 let t11 : (u32, usize) = call str_utf8At(s, const 6)
+    loc ../../testdata/ok/038_std_unicode.aic:13:5 let t12 : u32 = multi.extract t11, 0
+    loc ../../testdata/ok/038_std_unicode.aic:13:9 var c3 : u32 = t12
+    loc ../../testdata/ok/038_std_unicode.aic:13:5 let t13 : usize = multi.extract t11, 1
+    loc ../../testdata/ok/038_std_unicode.aic:13:13 var w3 : usize = t13
+    loc ../../testdata/ok/038_std_unicode.aic:14:18 let t14 : void = call print_println(c3)
+    loc ../../testdata/ok/038_std_unicode.aic:15:18 let t15 : void = call print_println(w3)
+    loc ../../testdata/ok/038_std_unicode.aic:18:32 let t16 : u32[] = call str_codepoints(s)
+    loc ../../testdata/ok/038_std_unicode.aic:18:5 var points : u32[] = t16
+    loc ../../testdata/ok/038_std_unicode.aic:19:29 let t17 : usize = call list_u32_len(points)
+    loc ../../testdata/ok/038_std_unicode.aic:19:18 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/038_std_unicode.aic:20:5 var i : usize = const 0
+    loc ../../testdata/ok/038_std_unicode.aic:21:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/038_std_unicode.aic:21:23 let t19 : usize = call list_u32_len(points)
+    loc ../../testdata/ok/038_std_unicode.aic:21:11 let t20 : bool = cmp < i, t19
+    loc ../../testdata/ok/038_std_unicode.aic:21:5 cbr t20, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/038_std_unicode.aic:22:29 let t21 : u32 = elem elem points, i, i
+    loc ../../testdata/ok/038_std_unicode.aic:22:22 let t22 : void = call print_println(t21)
+    loc ../../testdata/ok/038_std_unicode.aic:23:15 let t23 : usize = binop + i, const 1
+    loc ../../testdata/ok/038_std_unicode.aic:23:11 store i, t23
+    loc ../../testdata/ok/038_std_unicode.aic:21:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/038_std_unicode.aic:21:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/038_std_unicode.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/038_std_unicode.aic:4:1 ret 
+}

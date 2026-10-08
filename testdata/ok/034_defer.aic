@@ -1,0 +1,27 @@
+import print
+
+func traced(n i32) -> i32 {
+    defer print.println("close 1")
+    defer print.println("close 2")
+    if n < 0 {
+        return 0
+    }
+    return n * 2
+}
+
+func counter(n i32) -> i32 {
+    var total i32 = 0
+    var i usize = 0
+    for i < 3 {
+        defer print.println("loop end")
+        total = total + i32(i)
+        i = i + 1
+    }
+    return total
+}
+
+func main() {
+    print.println(traced(3))
+    print.println(traced(-1))
+    print.println(counter(2))
+}

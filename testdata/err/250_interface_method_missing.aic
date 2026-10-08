@@ -1,0 +1,10 @@
+interface Shape {
+    func area() -> i32
+}
+
+class Square implements Shape {
+    var side i32 = 0
+}
+
+func main() {
+}

@@ -1,0 +1,15 @@
+import print
+
+func emit(tag str, n i32) {
+    print.println(tag)
+    print.println(n)
+}
+
+func f(n i32) {
+    defer emit("done", n)
+    print.println("start")
+}
+
+func main() {
+    f(9)
+}

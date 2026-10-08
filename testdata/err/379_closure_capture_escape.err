@@ -1,0 +1,3 @@
+testdata/err/379_closure_capture_escape.aic:11:13: error: closure captures a reference that does not outlive the closure
+    the closure is created at depth 1, variable g lives at depth 0
+    fix: create the closure in the variable's region, capture by value instead (copy the fields you need), or add @live to the declaration (core design §16 N1)

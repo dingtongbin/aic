@@ -1,0 +1,16 @@
+import print
+
+// C 边界标注（§七）：@noblock = 直调（默认档），@blocking = 提交阻塞池。
+// T1 阶段没有真调度，标注**只记录不改变语义**（标错只损性能不损正确性，§七）；
+// 换真调度（圆 3）时按标注选调用路径。extern 以 C 原名链接（零 mangle，§八）。
+@noblock
+extern func abs(x i32) -> i32
+
+@blocking
+extern func llabs(x i64) -> i64
+
+func main() {
+    print.println(abs(-5))
+    print.println(llabs(-7))
+    print.println(abs(3))
+}

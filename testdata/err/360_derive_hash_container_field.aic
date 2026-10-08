@@ -1,0 +1,10 @@
+import print
+
+@derive(Hash)
+class P {
+    var xs i32[]
+}
+
+func main() {
+    print.println(1)
+}

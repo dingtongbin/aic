@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var a i32 = 5
+    var b i64 = i64(a)
+    var c u8 = u8(a)
+    var d f64 = 1.5
+    var e i32 = i32(d)
+    print.println("conv ok")
+}

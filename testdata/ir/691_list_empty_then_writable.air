@@ -1,0 +1,16 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:4:20 let lit1 : i64[] = call list.new[i64]()
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:4:5 var xs : i64[] = lit1
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:5:29 let t2 : bool = call list_i64_isEmpty(xs)
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:5:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:6:14 let t4 : void = call list_i64_append(xs, const 7)
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:7:25 let t5 : usize = call list_i64_len(xs)
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:7:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:8:21 let t7 : i64 = elem elem xs, const 0, const 0
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:8:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/691_list_empty_then_writable.aic:3:1 ret 
+}

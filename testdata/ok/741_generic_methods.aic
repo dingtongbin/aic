@@ -1,0 +1,38 @@
+import print
+
+class Box[T] {
+    var v T
+
+    func get() -> T {
+        return this.v
+    }
+
+    func with(n T) -> T {
+        return n
+    }
+}
+
+@packed
+class Pair[A, B] {
+    var a A
+    var b B
+
+    func left() -> A {
+        return this.a
+    }
+
+    func right() -> B {
+        return this.b
+    }
+}
+
+func main() {
+    var bi = Box[i32]{v: 5}
+    print.println(bi.get())
+    print.println(bi.with(9))
+    var bs = Box[str]{v: "boxed"}
+    print.println(bs.get())
+    var p = Pair[i32, str]{a: 1, b: "one"}
+    print.println(p.left())
+    print.println(p.right())
+}

@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var ints i32[] = [1]
+    var strs str[] = ["1"]
+    print.println(ints[0])
+    print.println(strs[0])
+    print.println(ints.len())
+    print.println(strs.len())
+}

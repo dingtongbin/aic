@@ -1,0 +1,35 @@
+import print
+
+func main() {
+    // chan[T]：安全集元素（基本/str）；send 入队、recv 出队（空 = 零值 + false）
+    var ch chan[i32] = chan[i32].new()
+    ch.send(1)
+    ch.send(2)
+    print.println(ch.len())
+    var a, ok = ch.recv()
+    print.println(a)
+    print.println(ok)
+    var b, ok2 = ch.recv()
+    print.println(b)
+    var c, ok3 = ch.recv()
+    print.println(c)
+    print.println(ok3)
+    // str 元素
+    var names chan[str] = chan[str].new()
+    names.send("aic")
+    var s, sok = names.recv()
+    print.println(s)
+    print.println(sok)
+    // 任务里用 channel：scope 退出 join 后主任务再收（串行 L2 下顺序确定）
+    var out chan[i32] = chan[i32].new()
+    scope {
+        spawn produce(out)
+    }
+    var v, vok = out.recv()
+    print.println(v)
+    print.println(vok)
+}
+
+func produce(ch chan[i32]) {
+    ch.send(42)
+}

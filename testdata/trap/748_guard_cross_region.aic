@@ -1,0 +1,19 @@
+import print
+
+class Buf {
+    var n i32
+}
+
+func pick(p Buf) -> Buf {
+    return p
+}
+
+func main() -> Err {
+    var outer Buf = nil
+    region {
+        var inner = Buf{n: 5} // 深度 1（region 块内创建）
+        outer = pick(inner)   // 非精确界 = 1 > 槽深度 0 → 存储点守卫 → 运行时 trap
+    }
+    print.println(outer.n)
+    return nil
+}

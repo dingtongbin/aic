@@ -1,0 +1,14 @@
+import print
+
+// 标识符字符集（核心设计 §一，2026-10 收紧）：首字符 = ASCII 字母或 `_`；
+// 后续 = ASCII 字母 / 数字 / 单个 `_`（`__` 相邻仍拒绝）。
+// 可见性（§四）：首字符 A-Z = 跨包可见；小写与 `_` 前缀 = 包私有。
+func main() {
+    var Name1 = 1
+    var x_ = 2
+    var _private = 3
+    var aZ9 = 4
+    var total = Name1 + x_ + _private + aZ9
+    print.println(total)
+    print.println("idents ok")
+}

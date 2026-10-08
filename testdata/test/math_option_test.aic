@@ -1,0 +1,37 @@
+// math / str / option 的测试（v2 面：func testXxx + testing.eq/gt/lt 三参）。
+import math
+import option
+import str
+import testing
+
+func testMath() {
+    testing.eq(math.abs(-7.0), 7.0, "abs of a negative")
+    testing.eq(math.max(3.0, 9.0), 9.0, "max picks the larger")
+    testing.eq(math.min(3.0, 9.0), 3.0, "min picks the smaller")
+    testing.gt(math.sqrt(16.0), 3.9, "sqrt(16) > 3.9")
+    testing.lt(math.floor(2.7), 3.0, "floor(2.7) < 3")
+}
+
+func testStrToI64() {
+    var good, gerr = str.toI64("42")
+    testing.eq(gerr.code, 0, "42 parses")
+    testing.eq(good, 42, "parsed value")
+    var bad, berr = str.toI64("4x2")
+    testing.gt(berr.code, 0, "malformed number carries an Err code")
+    testing.eq(bad, 0, "failed parse yields the zero value")
+}
+
+func testOption() {
+    var o option.Option[i32] = option.ok(7)
+    testing.eq(option.isSome(o), true, "ok is Some")
+    testing.eq(option.unwrap(o), 7, "unwrap returns the value")
+    var n option.Option[i32] = option.none()
+    testing.eq(option.isSome(n), false, "none is not Some")
+}
+
+func testStrOps() {
+    testing.eq(str.concat("aic", "-v2"), "aic-v2", "concat")
+    testing.eq(str.trim("  x  "), "x", "trim")
+    testing.eq(str.startsWith("aic", "ai"), true, "startsWith")
+    testing.eq(str.indexOf("aic", "c"), 2, "indexOf")
+}

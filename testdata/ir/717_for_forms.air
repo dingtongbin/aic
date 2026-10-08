@@ -1,0 +1,101 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/717_for_forms.aic:4:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/717_for_forms.aic:4:20 let t2 : void = call list.append[i32](lit1, const 10)
+    loc ../../testdata/ok/717_for_forms.aic:4:20 let t3 : void = call list.append[i32](lit1, const 20)
+    loc ../../testdata/ok/717_for_forms.aic:4:20 let t4 : void = call list.append[i32](lit1, const 30)
+    loc ../../testdata/ok/717_for_forms.aic:4:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/717_for_forms.aic:5:5 let t5 : usize = len xs
+    loc ../../testdata/ok/717_for_forms.aic:5:5 var x : usize = const 0
+    loc ../../testdata/ok/717_for_forms.aic:5:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/717_for_forms.aic:5:5 let t6 : bool = cmp lt x, t5
+    loc ../../testdata/ok/717_for_forms.aic:5:5 cbr t6, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/717_for_forms.aic:5:5 let t7 : i32 = elem xs, x
+    loc ../../testdata/ok/717_for_forms.aic:5:9 var x : i32 = t7
+    loc ../../testdata/ok/717_for_forms.aic:6:22 let t8 : void = call print_println(x)
+    loc ../../testdata/ok/717_for_forms.aic:5:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/717_for_forms.aic:5:5 let t9 : usize = binop + x, const 1
+    loc ../../testdata/ok/717_for_forms.aic:5:5 store x, t9
+    loc ../../testdata/ok/717_for_forms.aic:5:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/717_for_forms.aic:8:5 let t10 : usize = len xs
+    loc ../../testdata/ok/717_for_forms.aic:8:5 var i : usize = const 0
+    loc ../../testdata/ok/717_for_forms.aic:8:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/717_for_forms.aic:8:5 let t11 : bool = cmp lt i, t10
+    loc ../../testdata/ok/717_for_forms.aic:8:5 cbr t11, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/717_for_forms.aic:8:5 let t12 : i32 = elem xs, i
+    loc ../../testdata/ok/717_for_forms.aic:8:12 var x : i32 = t12
+    loc ../../testdata/ok/717_for_forms.aic:9:22 let t13 : void = call print_println(i)
+    loc ../../testdata/ok/717_for_forms.aic:10:22 let t14 : void = call print_println(x)
+    loc ../../testdata/ok/717_for_forms.aic:8:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/717_for_forms.aic:8:5 let t15 : usize = binop + i, const 1
+    loc ../../testdata/ok/717_for_forms.aic:8:5 store i, t15
+    loc ../../testdata/ok/717_for_forms.aic:8:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/717_for_forms.aic:12:5 var i : usize = const 0
+    loc ../../testdata/ok/717_for_forms.aic:12:5 br forhead9
+  forhead9:
+    loc ../../testdata/ok/717_for_forms.aic:12:5 let t16 : bool = cmp lt i, const 3
+    loc ../../testdata/ok/717_for_forms.aic:12:5 cbr t16, forbody10, fordone12
+  forbody10:
+    loc ../../testdata/ok/717_for_forms.aic:13:22 let t17 : void = call print_println(i)
+    loc ../../testdata/ok/717_for_forms.aic:12:5 br forpost11
+  forpost11:
+    loc ../../testdata/ok/717_for_forms.aic:12:5 let t18 : usize = binop + i, const 1
+    loc ../../testdata/ok/717_for_forms.aic:12:5 store i, t18
+    loc ../../testdata/ok/717_for_forms.aic:12:5 br forhead9
+  fordone12:
+    loc ../../testdata/ok/717_for_forms.aic:15:5 var n : i32 = const 3
+    loc ../../testdata/ok/717_for_forms.aic:16:5 var i : i32 = const 0
+    loc ../../testdata/ok/717_for_forms.aic:17:5 br forhead13
+  forhead13:
+    loc ../../testdata/ok/717_for_forms.aic:17:11 let t19 : bool = cmp < i, n
+    loc ../../testdata/ok/717_for_forms.aic:17:5 cbr t19, forbody14, fordone16
+  forbody14:
+    loc ../../testdata/ok/717_for_forms.aic:18:22 let t20 : void = call print_println(const "cond")
+    loc ../../testdata/ok/717_for_forms.aic:19:15 let t21 : i32 = binop + i, const 1
+    loc ../../testdata/ok/717_for_forms.aic:19:11 store i, t21
+    loc ../../testdata/ok/717_for_forms.aic:17:5 br forpost15
+  forpost15:
+    loc ../../testdata/ok/717_for_forms.aic:17:5 br forhead13
+  fordone16:
+    loc ../../testdata/ok/717_for_forms.aic:21:9 var j : i32 = const 0
+    loc ../../testdata/ok/717_for_forms.aic:21:5 br forhead17
+  forhead17:
+    loc ../../testdata/ok/717_for_forms.aic:21:26 let t22 : bool = cmp < j, const 2
+    loc ../../testdata/ok/717_for_forms.aic:21:5 cbr t22, forbody18, fordone20
+  forbody18:
+    loc ../../testdata/ok/717_for_forms.aic:22:22 let t23 : void = call print_println(const "cstyle")
+    loc ../../testdata/ok/717_for_forms.aic:21:5 br forpost19
+  forpost19:
+    loc ../../testdata/ok/717_for_forms.aic:21:33 let t25 : i32 = binop + j, const 1
+    loc ../../testdata/ok/717_for_forms.aic:21:33 store j, t25
+    loc ../../testdata/ok/717_for_forms.aic:21:5 br forhead17
+  fordone20:
+    loc ../../testdata/ok/717_for_forms.aic:24:5 let t26 : usize = len xs
+    loc ../../testdata/ok/717_for_forms.aic:24:5 var i__ : usize = const 0
+    loc ../../testdata/ok/717_for_forms.aic:24:5 br forhead21
+  forhead21:
+    loc ../../testdata/ok/717_for_forms.aic:24:5 let t27 : bool = cmp lt i__, t26
+    loc ../../testdata/ok/717_for_forms.aic:24:5 cbr t27, forbody22, fordone24
+  forbody22:
+    loc ../../testdata/ok/717_for_forms.aic:24:5 let t28 : i32 = elem xs, i__
+    loc ../../testdata/ok/717_for_forms.aic:24:12 var x : i32 = t28
+    loc ../../testdata/ok/717_for_forms.aic:25:22 let t29 : void = call print_println(x)
+    loc ../../testdata/ok/717_for_forms.aic:24:5 br forpost23
+  forpost23:
+    loc ../../testdata/ok/717_for_forms.aic:24:5 let t30 : usize = binop + i__, const 1
+    loc ../../testdata/ok/717_for_forms.aic:24:5 store i__, t30
+    loc ../../testdata/ok/717_for_forms.aic:24:5 br forhead21
+  fordone24:
+    loc ../../testdata/ok/717_for_forms.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/717_for_forms.aic:3:1 ret 
+}

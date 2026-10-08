@@ -1,0 +1,3 @@
+testdata/err/359_derive_compare_conflict.aic:4:1: error: a derived method collides with an explicit one
+    P.compare
+    fix: @derive(Compare) generates compare(other) -> i32; drop the explicit method or the capability

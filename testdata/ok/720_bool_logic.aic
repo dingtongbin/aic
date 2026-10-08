@@ -1,0 +1,13 @@
+import print
+
+func main() {
+    print.println(true && false)
+    print.println(true || false)
+    print.println(!true)
+    print.println(1 < 2)
+    print.println(2 <= 2)
+    print.println(3 > 4)
+    print.println(4 >= 4)
+    print.println(1 == 1)
+    print.println(1 != 1)
+}

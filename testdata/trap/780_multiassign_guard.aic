@@ -1,0 +1,21 @@
+import print
+
+// L4 trap 锚点：**存储点 ⑤（多返回解构接收）必须插守卫**（核心设计 §五 R3 的存储点清单）。
+// 块内调用返回的对象写进块外声明的槽 ⇒ 弹出后悬垂。此前 `checkMultiAssign` 从不插守卫，
+// 实测静默读到别的对象（区域复用内存）。
+class Buf {
+    var n i32
+}
+
+func mk(n i32) -> (Buf, Buf) {
+    return Buf{n: n}, Buf{n: n + 1}
+}
+
+func main() {
+    var a Buf = nil
+    var b Buf = nil
+    region {
+        a, b = mk(7) // 存储点 ⑤：接收变量更浅 ⇒ 守卫（limit = aic_depth − Delta）
+    }
+    print.println(999) // 不可达
+}

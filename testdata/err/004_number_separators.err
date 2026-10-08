@@ -1,0 +1,6 @@
+testdata/err/004_number_separators.aic:2:15: error: the digit separator _ must sit between digits
+    '_' at a digit boundary
+    fix: write 0x00ff / 0b1010 / 1_000_000; _ may not lead, trail, or repeat
+testdata/err/004_number_separators.aic:3:15: error: the digit separator _ must sit between digits
+    '_' at a digit boundary
+    fix: write 0x00ff / 0b1010 / 1_000_000; _ may not lead, trail, or repeat

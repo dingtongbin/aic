@@ -1,0 +1,71 @@
+import print
+
+// N9 锚点：接口嵌入 = **并集**（槽位 = 嵌入接口槽位 + 自身方法，按声明序）。
+// 不是继承：无覆盖、无层次、无默认实现。
+interface Reader {
+    func read() -> str
+}
+
+interface Writer {
+    func write(s str) -> i32
+}
+
+// 嵌入 + 自身方法混排：槽位序 = read, write, close（按声明序）
+interface ReadWriter {
+    Reader
+    Writer
+    func close() -> bool
+}
+
+// 先嵌入后声明方法：槽位序 = read, extra
+interface ReaderExtra {
+    Reader
+    func extra() -> i32
+}
+
+// 同一接口被两处嵌入（并集去重：read 只占一个槽位）
+interface Both {
+    Reader
+    ReadWriter
+}
+
+class File {
+    var name str
+    var written i32
+
+    func read() -> str {
+        return this.name
+    }
+
+    func write(s str) -> i32 {
+        this.written = this.written + 1
+        return this.written
+    }
+
+    func close() -> bool {
+        return true
+    }
+
+    func extra() -> i32 {
+        return 7
+    }
+}
+
+func describe(r Reader) -> str {
+    return r.read()
+}
+
+func main() {
+    var f = File{name: "data", written: 0}
+    // 结构化满足：File 同时满足 Reader / Writer / ReadWriter / ReaderExtra / Both
+    var rw ReadWriter = f
+    print.println(rw.read())
+    print.println(rw.write("x"))
+    print.println(rw.close())
+    print.println(describe(f))
+    var re ReaderExtra = f
+    print.println(re.read())
+    print.println(re.extra())
+    var b Both = f
+    print.println(b.read())
+}

@@ -1,0 +1,12 @@
+import print
+
+func main() {
+    var xs i32[] = [3, 1, 2]
+    print.println(xs.len())
+    xs.append(4)
+    print.println(xs.len())
+    for var i usize = 0; i < xs.len(); i = i + 1 {
+        print.println(xs[i])
+    }
+    print.println(xs.isEmpty())
+}

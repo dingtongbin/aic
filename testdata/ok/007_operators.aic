@@ -1,0 +1,8 @@
+import print
+
+func main() {
+    var a = 1 + 2 * 3 - 4 / 2 % 5
+    var b = a == 1 || a != 2 && a <= 3 || a >= 4
+    var c = a << 1
+    print.println("operators ok")
+}

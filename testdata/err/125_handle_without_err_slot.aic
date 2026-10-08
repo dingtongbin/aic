@@ -1,0 +1,6 @@
+func f() -> i32 {
+    handle err {
+        return 0
+    }
+    return 1
+}

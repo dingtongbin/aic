@@ -1,0 +1,13 @@
+// 目录即包：本文件与 util.aic 同属包 util，共享一个命名空间与 import 集合
+// （核心设计 §四：包内符号一次导入全局可用，故此处不再重复 import base）。
+func Origin() -> base.Point {
+    return base.Point{x: 1, y: 2}
+}
+
+func LimitPlus() -> i32 {
+    return base.Limit + 1
+}
+
+func Label() -> str {
+    return base.Tag()
+}

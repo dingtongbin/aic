@@ -1,0 +1,27 @@
+import print
+
+func main() {
+    var xs i32[] = [10, 20, 30]
+    for x in xs {
+        print.println(x)
+    }
+    for i, x in xs {
+        print.println(i)
+        print.println(x)
+    }
+    for i in 0..3 {
+        print.println(i)
+    }
+    var n i32 = 3
+    var i i32 = 0
+    for i < n {
+        print.println("cond")
+        i = i + 1
+    }
+    for var j i32 = 0; j < 2; j += 1 {
+        print.println("cstyle")
+    }
+    for _, x in xs {
+        print.println(x)
+    }
+}

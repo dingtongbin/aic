@@ -1,0 +1,84 @@
+air v1 module ok
+func ok_twice(a:i32, out:chan[i32]) {
+  entry:
+    loc ../../testdata/ok/742_scope_spawn.aic:7:16 let t1 : i32 = binop * a, const 2
+    loc ../../testdata/ok/742_scope_spawn.aic:7:13 let t2 : void = call chan_i32_send(out, t1)
+    loc ../../testdata/ok/742_scope_spawn.aic:6:1 br exit
+  exit:
+    loc ../../testdata/ok/742_scope_spawn.aic:6:1 ret 
+}
+func ok_tagged(n:i32, tag:str, nums:chan[i32], tags:chan[str]) {
+  entry:
+    loc ../../testdata/ok/742_scope_spawn.aic:11:14 let t1 : void = call chan_i32_send(nums, n)
+    loc ../../testdata/ok/742_scope_spawn.aic:12:14 let t2 : void = call chan_str_send(tags, tag)
+    loc ../../testdata/ok/742_scope_spawn.aic:10:1 br exit
+  exit:
+    loc ../../testdata/ok/742_scope_spawn.aic:10:1 ret 
+}
+func ok_compute(a:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/742_scope_spawn.aic:15:1 var ret0 : i32
+    loc ../../testdata/ok/742_scope_spawn.aic:16:14 let t1 : i32 = binop * a, const 2
+    loc ../../testdata/ok/742_scope_spawn.aic:16:5 store ret0, t1
+    loc ../../testdata/ok/742_scope_spawn.aic:16:5 br exit
+  exit:
+    loc ../../testdata/ok/742_scope_spawn.aic:15:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/742_scope_spawn.aic:20:18 let t1 : void = call print_println(const "start")
+    loc ../../testdata/ok/742_scope_spawn.aic:23:36 let t2 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/742_scope_spawn.aic:23:5 var a : chan[i32] = t2
+    loc ../../testdata/ok/742_scope_spawn.aic:24:36 let t3 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/742_scope_spawn.aic:24:5 var b : chan[i32] = t3
+    loc ../../testdata/ok/742_scope_spawn.aic:25:5 region.enter sc4
+    loc ../../testdata/ok/742_scope_spawn.aic:26:20 let t5 : void = call ok_twice(const 1, a)
+    loc ../../testdata/ok/742_scope_spawn.aic:27:20 let t6 : void = call ok_twice(const 2, b)
+    loc ../../testdata/ok/742_scope_spawn.aic:25:5 region.exit
+    loc ../../testdata/ok/742_scope_spawn.aic:29:24 let t7 : (i32, bool) = call chan_i32_recv(a)
+    loc ../../testdata/ok/742_scope_spawn.aic:29:5 let t8 : i32 = multi.extract t7, 0
+    loc ../../testdata/ok/742_scope_spawn.aic:29:9 var x : i32 = t8
+    loc ../../testdata/ok/742_scope_spawn.aic:29:5 let t9 : bool = multi.extract t7, 1
+    loc ../../testdata/ok/742_scope_spawn.aic:29:12 var xok : bool = t9
+    loc ../../testdata/ok/742_scope_spawn.aic:30:24 let t10 : (i32, bool) = call chan_i32_recv(b)
+    loc ../../testdata/ok/742_scope_spawn.aic:30:5 let t11 : i32 = multi.extract t10, 0
+    loc ../../testdata/ok/742_scope_spawn.aic:30:9 var y : i32 = t11
+    loc ../../testdata/ok/742_scope_spawn.aic:30:5 let t12 : bool = multi.extract t10, 1
+    loc ../../testdata/ok/742_scope_spawn.aic:30:12 var yok : bool = t12
+    loc ../../testdata/ok/742_scope_spawn.aic:31:18 let t13 : void = call print_println(xok)
+    loc ../../testdata/ok/742_scope_spawn.aic:32:18 let t14 : void = call print_println(yok)
+    loc ../../testdata/ok/742_scope_spawn.aic:33:18 let t15 : void = call print_println(x)
+    loc ../../testdata/ok/742_scope_spawn.aic:34:18 let t16 : void = call print_println(y)
+    loc ../../testdata/ok/742_scope_spawn.aic:37:20 let lit17 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/742_scope_spawn.aic:37:20 let t18 : void = call list.append[i32](lit17, const 5)
+    loc ../../testdata/ok/742_scope_spawn.aic:37:20 let t19 : void = call list.append[i32](lit17, const 6)
+    loc ../../testdata/ok/742_scope_spawn.aic:37:5 var xs : i32[] = lit17
+    loc ../../testdata/ok/742_scope_spawn.aic:38:39 let t20 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/742_scope_spawn.aic:38:5 var nums : chan[i32] = t20
+    loc ../../testdata/ok/742_scope_spawn.aic:39:39 let t21 : chan[str] = call chan_new_str()
+    loc ../../testdata/ok/742_scope_spawn.aic:39:5 var tags : chan[str] = t21
+    loc ../../testdata/ok/742_scope_spawn.aic:40:5 region.enter sc22
+    loc ../../testdata/ok/742_scope_spawn.aic:41:24 let t23 : i32 = elem elem xs, const 0, const 0
+    loc ../../testdata/ok/742_scope_spawn.aic:41:21 let t24 : void = call ok_tagged(t23, const "from-slice", nums, tags)
+    loc ../../testdata/ok/742_scope_spawn.aic:40:5 region.exit
+    loc ../../testdata/ok/742_scope_spawn.aic:43:27 let t25 : (i32, bool) = call chan_i32_recv(nums)
+    loc ../../testdata/ok/742_scope_spawn.aic:43:5 let t26 : i32 = multi.extract t25, 0
+    loc ../../testdata/ok/742_scope_spawn.aic:43:9 var n : i32 = t26
+    loc ../../testdata/ok/742_scope_spawn.aic:43:5 let t27 : bool = multi.extract t25, 1
+    loc ../../testdata/ok/742_scope_spawn.aic:43:12 var nok : bool = t27
+    loc ../../testdata/ok/742_scope_spawn.aic:44:28 let t28 : (str, bool) = call chan_str_recv(tags)
+    loc ../../testdata/ok/742_scope_spawn.aic:44:5 let t29 : str = multi.extract t28, 0
+    loc ../../testdata/ok/742_scope_spawn.aic:44:9 var tg : str = t29
+    loc ../../testdata/ok/742_scope_spawn.aic:44:5 let t30 : bool = multi.extract t28, 1
+    loc ../../testdata/ok/742_scope_spawn.aic:44:13 var tok : bool = t30
+    loc ../../testdata/ok/742_scope_spawn.aic:45:18 let t31 : void = call print_println(n)
+    loc ../../testdata/ok/742_scope_spawn.aic:46:18 let t32 : void = call print_println(tg)
+    loc ../../testdata/ok/742_scope_spawn.aic:47:18 let t33 : void = call print_println(nok)
+    loc ../../testdata/ok/742_scope_spawn.aic:48:18 let t34 : void = call print_println(tok)
+    loc ../../testdata/ok/742_scope_spawn.aic:50:26 let t35 : i32 = call ok_compute(const 21)
+    loc ../../testdata/ok/742_scope_spawn.aic:50:18 let t36 : void = call print_println(t35)
+    loc ../../testdata/ok/742_scope_spawn.aic:51:18 let t37 : void = call print_println(const "end")
+    loc ../../testdata/ok/742_scope_spawn.aic:19:1 br exit
+  exit:
+    loc ../../testdata/ok/742_scope_spawn.aic:19:1 ret 
+}

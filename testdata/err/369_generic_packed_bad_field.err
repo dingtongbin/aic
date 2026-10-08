@@ -1,0 +1,6 @@
+testdata/err/369_generic_packed_bad_field.aic:7:5: error: @packed field type is not on the whitelist
+    field r has type err.Ref
+    fix: @packed fields allow basic types / str / nested @packed / [T;N] / payload-free enums only; use a plain class for references and containers (core design §4)
+testdata/err/369_generic_packed_bad_field.aic:11:22: error: the class has no such field
+    Bad.r
+    fix: see the class declaration for its fields; unlisted fields take their zero value

@@ -1,0 +1,34 @@
+import print
+
+// N4 锚点（编译期反射的第二半）：内省原语在**编译期**求值，**运行期零元数据**
+// （不生成类型表、不生成 vtable 之外的东西）。
+//   typeName(T)    -> str
+//   sizeOf(T)      -> i32（标量/句柄折成常量；@packed / [T;N] 用 C 的 sizeof 现算）
+//   isValueType(T) -> bool（是否有区域头）
+@packed
+class Pair {
+    var a i32
+    var b i32
+}
+
+class Node {
+    var v i32
+}
+
+// 常量位也能用（const 折叠）：类型名/尺寸/值性都是编译期事实。
+const PAIR_NAME str = typeName(Pair)
+const NODE_IS_VALUE bool = isValueType(Node)
+const I64_SIZE i32 = sizeOf(i64)
+
+func main() {
+    print.println(PAIR_NAME)
+    print.println(NODE_IS_VALUE)
+    print.println(I64_SIZE)
+    print.println(typeName(i32))
+    print.println(typeName(Node))
+    print.println(isValueType(Pair))
+    print.println(isValueType(str))
+    print.println(sizeOf(i32))
+    print.println(sizeOf(Pair))
+    print.println(sizeOf(usize))
+}

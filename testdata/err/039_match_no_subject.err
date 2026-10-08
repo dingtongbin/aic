@@ -1,0 +1,6 @@
+testdata/err/039_match_no_subject.aic:3:11: error: expression is missing or incomplete
+    got PUNCT {
+    fix: add an expression: a name, a literal, or a call; keep `()` and `[]` balanced
+testdata/err/039_match_no_subject.aic:7:1: error: missing `{`
+    got end of file (EOF)
+    fix: match is missing `{`

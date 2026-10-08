@@ -1,0 +1,57 @@
+air v1 module ok
+type ok_User = struct
+    0:id:i64
+    1:email:str
+    2:active:bool
+func ok_label(u:ok_User*) -> str {
+  entry:
+    loc ../../testdata/ok/755_string_interp.aic:14:1 var ret0 : str
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t1 : str = const "user="
+    loc ../../testdata/ok/755_string_interp.aic:15:18 let t2 : i64 = field u, 0
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t3 : str = call str_fromI64(t2)
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t4 : str = binop + t1, t3
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t5 : str = const " mail="
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t6 : str = binop + t4, t5
+    loc ../../testdata/ok/755_string_interp.aic:15:30 let t7 : str = field u, 1
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t8 : str = binop + t6, t7
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t9 : str = const " active="
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t10 : str = binop + t8, t9
+    loc ../../testdata/ok/755_string_interp.aic:15:47 let t11 : bool = field u, 2
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t12 : str = call str_fromBool(t11)
+    loc ../../testdata/ok/755_string_interp.aic:15:12 let t13 : str = binop + t10, t12
+    loc ../../testdata/ok/755_string_interp.aic:15:5 store ret0, t13
+    loc ../../testdata/ok/755_string_interp.aic:15:5 br exit
+  exit:
+    loc ../../testdata/ok/755_string_interp.aic:14:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/755_string_interp.aic:19:13 let obj1 : ok_User* = alloc task(ok_User)
+    loc ../../testdata/ok/755_string_interp.aic:19:18 store field obj1, 0, const 42
+    loc ../../testdata/ok/755_string_interp.aic:19:26 store field obj1, 1, const "a@b.c"
+    loc ../../testdata/ok/755_string_interp.aic:19:42 store field obj1, 2, const true
+    loc ../../testdata/ok/755_string_interp.aic:19:5 var u : ok_User* = obj1
+    loc ../../testdata/ok/755_string_interp.aic:20:24 let t2 : str = call ok_label(u)
+    loc ../../testdata/ok/755_string_interp.aic:20:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/755_string_interp.aic:21:5 var n : i32 = const 7
+    loc ../../testdata/ok/755_string_interp.aic:22:5 var f : f64 = const 1.5
+    loc ../../testdata/ok/755_string_interp.aic:23:5 var s : str = const "raw"
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t4 : str = const "n="
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t5 : i64 = conv sext n
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t6 : str = call str_fromI64(t5)
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t7 : str = binop + t4, t6
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t8 : str = const " f="
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t9 : str = binop + t7, t8
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t10 : str = call str_fromF64(f)
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t11 : str = binop + t9, t10
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t12 : str = const " s="
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t13 : str = binop + t11, t12
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t14 : str = binop + t13, s
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t15 : str = const " brace=} open={ done"
+    loc ../../testdata/ok/755_string_interp.aic:24:19 let t16 : str = binop + t14, t15
+    loc ../../testdata/ok/755_string_interp.aic:24:18 let t17 : void = call print_println(t16)
+    loc ../../testdata/ok/755_string_interp.aic:25:18 let t18 : void = call print_println(const "literal={{}}")
+    loc ../../testdata/ok/755_string_interp.aic:18:1 br exit
+  exit:
+    loc ../../testdata/ok/755_string_interp.aic:18:1 ret 
+}

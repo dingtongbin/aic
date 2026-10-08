@@ -1,0 +1,6 @@
+import print
+
+// N8 负例：所在函数没有 Err 位 ⇒ errdefer 永远不会执行 = 死代码。
+func f() {
+    errdefer print.println("never runs")
+}

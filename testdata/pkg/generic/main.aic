@@ -1,0 +1,11 @@
+import print
+import util
+import base
+
+func main() {
+    var a = base.Pick(21)
+    print.println(util.Twice(a))
+    var b = base.Pick(0)
+    print.println(util.Twice(b))
+    print.println(util.Through(base.Point{x: 2, y: 3}))
+}

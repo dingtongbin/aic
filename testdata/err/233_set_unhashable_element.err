@@ -1,0 +1,6 @@
+testdata/err/233_set_unhashable_element.aic:2:11: error: the set element type is not hashable
+    i32[]
+    fix: elements allow numeric / bool / str / payload-free enum / @packed only
+testdata/err/233_set_unhashable_element.aic:2:31: error: set.new() has no target type
+    the right-hand type cannot be inferred
+    fix: write the element type in the declaration: var s set[i32] = set.new() (core design §2.2)

@@ -1,0 +1,41 @@
+// str 基础面的测试（v2 面：func testXxx + testing.eq/gt/lt 三参）。
+import str
+import testing
+
+func testStrLenIsBytes() {
+    // "héllo" 是 5 个码点、6 个字节：len 数字节，codepoints 数码点。
+    testing.eq("héllo".len(), 6, "len counts bytes")
+    testing.eq(str.codepoints("héllo").len(), 5, "codepoints counts code points")
+}
+
+func testStrPredicates() {
+    testing.eq(str.startsWith("hello", "he"), true, "startsWith")
+    testing.eq(str.endsWith("hello", "lo"), true, "endsWith")
+    testing.eq(str.indexOf("hello", "ll"), 2, "indexOf finds a substring")
+    testing.eq(str.indexOf("hello", "z"), -1, "indexOf miss = -1")
+}
+
+func testStrSplitSub() {
+    var parts = str.split("a,b,c", ",")
+    testing.eq(parts.len(), 3, "split yields three parts")
+    testing.eq(parts[0], "a", "first part")
+    testing.eq(parts[2], "c", "last part")
+    testing.eq(str.sub("abcdef", 1, 4), "bcd", "sub is half-open")
+}
+
+func testStrConvert() {
+    testing.eq(str.fromI64(42), "42", "fromI64")
+    testing.eq(str.fromF64(2.5), "2.5", "fromF64")
+    var v, err = str.toI64("-13")
+    testing.eq(err.code, 0, "toI64 parses")
+    testing.eq(v, -13, "toI64 value")
+}
+
+func testStrUtf8() {
+    var cp, size = str.utf8At("héllo", 1)
+    testing.gt(size, 1, "é is multi-byte")
+    testing.eq(size, 2, "é is two bytes")
+    var cp0, size0 = str.utf8At("abc", 0)
+    testing.eq(size0, 1, "ascii is one byte")
+    testing.eq(cp0, 97, "code point of a")
+}

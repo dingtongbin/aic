@@ -1,0 +1,11 @@
+import print
+
+func main() {
+    var a i32 = 5
+    var b = a > 1
+    var c = a == 5
+    var d = a != 5
+    var e = a <= 5 && a >= 5
+    var f = a < 1 || c
+    print.println("compare ok")
+}

@@ -1,0 +1,22 @@
+import print
+
+// L3 trap 锚点：两个任务**互相等待**对方的通道 ⇒ 全体阻塞 = 死锁。
+// 运行时的死锁判定 = "所有存活任务都停在无超时的等待上"（§七 / §16 N6）：
+// 当场 trap（位置 = 等待点），绝不静默挂死。串行与并行两种模式都必须 trap。
+func waiter(ch chan[i32]) {
+    var v, ok = ch.recv() // 等主任务发，而主任务也在等它
+    print.println(v)
+    print.println(ok)
+}
+
+func main() {
+    var fromTask chan[i32] = chan[i32].new()
+    var toTask chan[i32] = chan[i32].new()
+    scope {
+        spawn waiter(fromTask)
+        var v, ok = toTask.recv() // 双向死等
+        print.println(v)
+        print.println(ok)
+    }
+    print.println(999)
+}

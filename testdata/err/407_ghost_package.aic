@@ -1,0 +1,9 @@
+import json
+import print
+
+// L4 err 锚点：**幽灵包**（注册了名字但一个成员都没有）在 import 位就报"尚未实现"。
+// 此前 `import json` 过 check、直到调用成员才报"包内无此函数"，使用者会以为包存在、
+// 只是自己拼错了成员名。
+func main() {
+    print.println(1)
+}

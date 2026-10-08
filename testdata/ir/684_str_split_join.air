@@ -1,0 +1,16 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/684_str_split_join.aic:5:26 let t1 : str[] = call str_split(const "a,b,c", const ",")
+    loc ../../testdata/ok/684_str_split_join.aic:5:5 var parts : str[] = t1
+    loc ../../testdata/ok/684_str_split_join.aic:6:28 let t2 : usize = call list_str_len(parts)
+    loc ../../testdata/ok/684_str_split_join.aic:6:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/684_str_split_join.aic:7:24 let t4 : str = elem elem parts, const 0, const 0
+    loc ../../testdata/ok/684_str_split_join.aic:7:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/684_str_split_join.aic:8:28 let t6 : str[] = call str_split(const "", const ",")
+    loc ../../testdata/ok/684_str_split_join.aic:8:41 let t7 : usize = call list_str_len(t6)
+    loc ../../testdata/ok/684_str_split_join.aic:8:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/684_str_split_join.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/684_str_split_join.aic:4:1 ret 
+}

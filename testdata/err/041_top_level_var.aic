@@ -1,0 +1,4 @@
+var counter i32 = 0
+
+func main() {
+}

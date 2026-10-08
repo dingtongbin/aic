@@ -1,0 +1,9 @@
+import print
+import str
+
+func main() {
+    print.println("abc".len())
+    print.println("héllo".len())
+    print.println(str.codepoints("héllo").len())
+    print.println(str.codepoints("中文").len())
+}

@@ -1,0 +1,11 @@
+import print
+
+func main() {
+    var a i32 = 10
+    var b i32 = 3
+    var c = a + b * 2 - 1
+    var d = a / b
+    var e = a % b
+    var f i64 = i64(a) * i64(b)
+    print.println("arith ok")
+}

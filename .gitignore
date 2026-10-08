@@ -1,0 +1,22 @@
+# 构建产物（aic 二进制与 C 编译中间物）
+/bin/
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# Go 测试 / 覆盖率产物
+*.test
+coverage.json
+
+# Python 缓存（门禁脚本 scripts/*.py）
+__pycache__/
+*.pyc
+
+# 编辑器与系统杂项
+.DS_Store
+.idea/
+.vscode/
+*.swp

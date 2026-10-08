@@ -1,0 +1,10 @@
+import str
+
+// 摘要行：lines/words/bytes（跨包调用 str 包与参数格式化）。
+func Summary(lines i64, words i64, bytes i64) -> str {
+    var a = str.concat(str.fromI64(lines), " lines, ")
+    var b = str.concat(a, str.fromI64(words))
+    var c = str.concat(b, " words, ")
+    var d = str.concat(c, str.fromI64(bytes))
+    return str.concat(d, " bytes")
+}

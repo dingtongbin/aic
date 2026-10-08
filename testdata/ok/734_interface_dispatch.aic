@@ -1,0 +1,70 @@
+import print
+
+interface Shape {
+    func area() -> i32
+    func name() -> str
+}
+
+class Square {
+    var side i32
+
+    func area() -> i32 {
+        return this.side * this.side
+    }
+
+    func name() -> str {
+        return "square"
+    }
+}
+
+class Rect {
+    var w i32
+    var h i32
+
+    func area() -> i32 {
+        return this.w * this.h
+    }
+
+    func name() -> str {
+        return "rect"
+    }
+}
+
+@packed
+class Dot {
+    var n i32
+
+    func area() -> i32 {
+        return this.n
+    }
+
+    func name() -> str {
+        return "dot"
+    }
+}
+
+func describe(s Shape) -> str {
+    return s.name()
+}
+
+func total(xs Shape[]) -> i32 {
+    var sum i32 = 0
+    for i, s in xs {
+        sum += s.area()
+    }
+    return sum
+}
+
+func main() {
+    var a = Square{side: 3}
+    var b = Rect{w: 2, h: 5}
+    var c = Dot{n: 7}
+    var s Shape = a
+    print.println(s.area())
+    print.println(describe(b))
+    print.println(describe(c))
+    print.println(c.area())
+    var xs Shape[] = [a, b, c]
+    print.println(total(xs))
+    print.println(s.name())
+}

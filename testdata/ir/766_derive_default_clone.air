@@ -1,0 +1,47 @@
+air v1 module ok
+type ok_Point = struct packed
+    0:x:i32
+    1:y:i32
+type ok_Session = struct
+    0:id:i64
+    1:name:str
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/766_derive_default_clone.aic:21:26 let t1 : ok_Point = call ok_Point_default()
+    loc ../../testdata/ok/766_derive_default_clone.aic:21:5 var z : ok_Point = t1
+    loc ../../testdata/ok/766_derive_default_clone.aic:22:20 let t2 : i32 = field z, 0
+    loc ../../testdata/ok/766_derive_default_clone.aic:22:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/766_derive_default_clone.aic:23:20 let t4 : i32 = field z, 1
+    loc ../../testdata/ok/766_derive_default_clone.aic:23:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/766_derive_default_clone.aic:26:13 let obj6 : ok_Point = alloc task(ok_Point)
+    loc ../../testdata/ok/766_derive_default_clone.aic:26:19 store field obj6, 0, const 3
+    loc ../../testdata/ok/766_derive_default_clone.aic:26:25 store field obj6, 1, const 4
+    loc ../../testdata/ok/766_derive_default_clone.aic:26:5 var p : ok_Point = obj6
+    loc ../../testdata/ok/766_derive_default_clone.aic:27:20 let t7 : ok_Point = call ok_Point_clone(p)
+    loc ../../testdata/ok/766_derive_default_clone.aic:27:5 var q : ok_Point = t7
+    loc ../../testdata/ok/766_derive_default_clone.aic:28:20 let t8 : i32 = field q, 0
+    loc ../../testdata/ok/766_derive_default_clone.aic:28:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/766_derive_default_clone.aic:29:20 let t10 : i32 = field q, 1
+    loc ../../testdata/ok/766_derive_default_clone.aic:29:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/766_derive_default_clone.aic:30:28 let t12 : i32 = call ok_Point_compare(p, q)
+    loc ../../testdata/ok/766_derive_default_clone.aic:30:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/766_derive_default_clone.aic:33:13 let obj14 : ok_Session* = alloc task(ok_Session)
+    loc ../../testdata/ok/766_derive_default_clone.aic:33:21 store field obj14, 0, const 7
+    loc ../../testdata/ok/766_derive_default_clone.aic:33:28 store field obj14, 1, const "s"
+    loc ../../testdata/ok/766_derive_default_clone.aic:33:5 var s : ok_Session* = obj14
+    loc ../../testdata/ok/766_derive_default_clone.aic:34:28 let t15 : ok_Session* = call ok_Session_default()
+    loc ../../testdata/ok/766_derive_default_clone.aic:34:5 var d : ok_Session* = t15
+    loc ../../testdata/ok/766_derive_default_clone.aic:35:20 let t16 : i64 = field d, 0
+    loc ../../testdata/ok/766_derive_default_clone.aic:35:18 let t17 : void = call print_println(t16)
+    loc ../../testdata/ok/766_derive_default_clone.aic:36:20 let t18 : str = field d, 1
+    loc ../../testdata/ok/766_derive_default_clone.aic:36:18 let t19 : void = call print_println(t18)
+    loc ../../testdata/ok/766_derive_default_clone.aic:37:20 let t20 : ok_Session* = call ok_Session_clone(s)
+    loc ../../testdata/ok/766_derive_default_clone.aic:37:5 var t : ok_Session* = t20
+    loc ../../testdata/ok/766_derive_default_clone.aic:38:20 let t21 : i64 = field t, 0
+    loc ../../testdata/ok/766_derive_default_clone.aic:38:18 let t22 : void = call print_println(t21)
+    loc ../../testdata/ok/766_derive_default_clone.aic:39:20 let t23 : str = field t, 1
+    loc ../../testdata/ok/766_derive_default_clone.aic:39:18 let t24 : void = call print_println(t23)
+    loc ../../testdata/ok/766_derive_default_clone.aic:19:1 br exit
+  exit:
+    loc ../../testdata/ok/766_derive_default_clone.aic:19:1 ret 
+}

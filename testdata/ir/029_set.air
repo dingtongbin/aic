@@ -1,0 +1,43 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/029_set.aic:4:29 let t1 : set[i32] = call set_new_i32()
+    loc ../../testdata/ok/029_set.aic:4:5 var s : set[i32] = t1
+    loc ../../testdata/ok/029_set.aic:5:10 let t2 : void = call set_i32_add(s, const 3)
+    loc ../../testdata/ok/029_set.aic:6:10 let t3 : void = call set_i32_add(s, const 1)
+    loc ../../testdata/ok/029_set.aic:7:10 let t4 : void = call set_i32_add(s, const 3)
+    loc ../../testdata/ok/029_set.aic:8:10 let t5 : void = call set_i32_add(s, const 2)
+    loc ../../testdata/ok/029_set.aic:9:24 let t6 : usize = call set_i32_len(s)
+    loc ../../testdata/ok/029_set.aic:9:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/029_set.aic:10:24 let t8 : bool = call set_i32_has(s, const 1)
+    loc ../../testdata/ok/029_set.aic:10:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/029_set.aic:11:24 let t10 : bool = call set_i32_has(s, const 9)
+    loc ../../testdata/ok/029_set.aic:11:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/029_set.aic:12:5 var i : usize = const 0
+    loc ../../testdata/ok/029_set.aic:13:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/029_set.aic:13:18 let t12 : usize = call set_i32_len(s)
+    loc ../../testdata/ok/029_set.aic:13:11 let t13 : bool = cmp < i, t12
+    loc ../../testdata/ok/029_set.aic:13:5 cbr t13, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/029_set.aic:14:27 let t14 : i32 = call set_i32_at(s, i)
+    loc ../../testdata/ok/029_set.aic:14:22 let t15 : void = call print_println(t14)
+    loc ../../testdata/ok/029_set.aic:15:15 let t16 : usize = binop + i, const 1
+    loc ../../testdata/ok/029_set.aic:15:11 store i, t16
+    loc ../../testdata/ok/029_set.aic:13:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/029_set.aic:13:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/029_set.aic:18:33 let t17 : set[str] = call set_new_str()
+    loc ../../testdata/ok/029_set.aic:18:5 var names : set[str] = t17
+    loc ../../testdata/ok/029_set.aic:19:14 let t18 : void = call set_str_add(names, const "b")
+    loc ../../testdata/ok/029_set.aic:20:14 let t19 : void = call set_str_add(names, const "a")
+    loc ../../testdata/ok/029_set.aic:21:14 let t20 : void = call set_str_add(names, const "b")
+    loc ../../testdata/ok/029_set.aic:22:28 let t21 : usize = call set_str_len(names)
+    loc ../../testdata/ok/029_set.aic:22:18 let t22 : void = call print_println(t21)
+    loc ../../testdata/ok/029_set.aic:23:28 let t23 : bool = call set_str_has(names, const "a")
+    loc ../../testdata/ok/029_set.aic:23:18 let t24 : void = call print_println(t23)
+    loc ../../testdata/ok/029_set.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/029_set.aic:3:1 ret 
+}

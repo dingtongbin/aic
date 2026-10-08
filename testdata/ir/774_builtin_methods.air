@@ -1,0 +1,59 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/774_builtin_methods.aic:7:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/774_builtin_methods.aic:7:20 let t2 : void = call list.append[i32](lit1, const 1)
+    loc ../../testdata/ok/774_builtin_methods.aic:7:20 let t3 : void = call list.append[i32](lit1, const 2)
+    loc ../../testdata/ok/774_builtin_methods.aic:7:20 let t4 : void = call list.append[i32](lit1, const 3)
+    loc ../../testdata/ok/774_builtin_methods.aic:7:20 let t5 : void = call list.append[i32](lit1, const 4)
+    loc ../../testdata/ok/774_builtin_methods.aic:7:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/774_builtin_methods.aic:8:14 let t6 : void = call list_i32_remove(xs, const 1)
+    loc ../../testdata/ok/774_builtin_methods.aic:9:25 let t7 : usize = call list_i32_len(xs)
+    loc ../../testdata/ok/774_builtin_methods.aic:9:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/774_builtin_methods.aic:10:21 let t9 : i32 = elem elem xs, const 1, const 1
+    loc ../../testdata/ok/774_builtin_methods.aic:10:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/774_builtin_methods.aic:11:13 let t11 : void = call list_i32_clear(xs)
+    loc ../../testdata/ok/774_builtin_methods.aic:12:29 let t12 : bool = call list_i32_isEmpty(xs)
+    loc ../../testdata/ok/774_builtin_methods.aic:12:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/774_builtin_methods.aic:14:29 let t14 : set[str] = call set_new_str()
+    loc ../../testdata/ok/774_builtin_methods.aic:14:5 var s : set[str] = t14
+    loc ../../testdata/ok/774_builtin_methods.aic:15:10 let t15 : void = call set_str_add(s, const "a")
+    loc ../../testdata/ok/774_builtin_methods.aic:16:10 let t16 : void = call set_str_add(s, const "b")
+    loc ../../testdata/ok/774_builtin_methods.aic:17:24 let t17 : usize = call set_str_len(s)
+    loc ../../testdata/ok/774_builtin_methods.aic:17:18 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/774_builtin_methods.aic:18:12 let t19 : void = call set_str_clear(s)
+    loc ../../testdata/ok/774_builtin_methods.aic:19:24 let t20 : usize = call set_str_len(s)
+    loc ../../testdata/ok/774_builtin_methods.aic:19:18 let t21 : void = call print_println(t20)
+    loc ../../testdata/ok/774_builtin_methods.aic:21:32 let t22 : map[str]i32 = call map_new_str_i32()
+    loc ../../testdata/ok/774_builtin_methods.aic:21:5 var m : map[str]i32 = t22
+    loc ../../testdata/ok/774_builtin_methods.aic:22:10 let t23 : void = call map_str_i32_put(m, const "k", const 7)
+    loc ../../testdata/ok/774_builtin_methods.aic:23:24 let t24 : i32 = call map_str_i32_get(m, const "k")
+    loc ../../testdata/ok/774_builtin_methods.aic:23:18 let t25 : void = call print_println(t24)
+    loc ../../testdata/ok/774_builtin_methods.aic:24:12 let t26 : void = call map_str_i32_clear(m)
+    loc ../../testdata/ok/774_builtin_methods.aic:25:24 let t27 : bool = call map_str_i32_has(m, const "k")
+    loc ../../testdata/ok/774_builtin_methods.aic:25:18 let t28 : void = call print_println(t27)
+    loc ../../testdata/ok/774_builtin_methods.aic:26:24 let t29 : usize = call map_str_i32_len(m)
+    loc ../../testdata/ok/774_builtin_methods.aic:26:18 let t30 : void = call print_println(t29)
+    loc ../../testdata/ok/774_builtin_methods.aic:28:5 var t : str = const "aic"
+    loc ../../testdata/ok/774_builtin_methods.aic:29:28 let t31 : bool = call str_isEmpty(t)
+    loc ../../testdata/ok/774_builtin_methods.aic:29:18 let t32 : void = call print_println(t31)
+    loc ../../testdata/ok/774_builtin_methods.aic:30:5 var e : str = const ""
+    loc ../../testdata/ok/774_builtin_methods.aic:31:28 let t33 : bool = call str_isEmpty(e)
+    loc ../../testdata/ok/774_builtin_methods.aic:31:18 let t34 : void = call print_println(t33)
+    loc ../../testdata/ok/774_builtin_methods.aic:33:44 let t35 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/774_builtin_methods.aic:33:5 var unbounded : chan[i32] = t35
+    loc ../../testdata/ok/774_builtin_methods.aic:34:42 let t36 : chan[i32] = call chan_new_i32(const 2)
+    loc ../../testdata/ok/774_builtin_methods.aic:34:5 var bounded : chan[i32] = t36
+    loc ../../testdata/ok/774_builtin_methods.aic:35:32 let t37 : usize = call chan_i32_cap(unbounded)
+    loc ../../testdata/ok/774_builtin_methods.aic:35:18 let t38 : void = call print_println(t37)
+    loc ../../testdata/ok/774_builtin_methods.aic:36:30 let t39 : usize = call chan_i32_cap(bounded)
+    loc ../../testdata/ok/774_builtin_methods.aic:36:18 let t40 : void = call print_println(t39)
+    loc ../../testdata/ok/774_builtin_methods.aic:38:32 let t41 : bytes = call bytes_fromStr(const "ab")
+    loc ../../testdata/ok/774_builtin_methods.aic:38:5 var b : bytes = t41
+    loc ../../testdata/ok/774_builtin_methods.aic:39:18 let t42 : void = call bytes_appendBytes(b, b)
+    loc ../../testdata/ok/774_builtin_methods.aic:40:26 let t43 : str = call bytes_toStr(b)
+    loc ../../testdata/ok/774_builtin_methods.aic:40:18 let t44 : void = call print_println(t43)
+    loc ../../testdata/ok/774_builtin_methods.aic:6:1 br exit
+  exit:
+    loc ../../testdata/ok/774_builtin_methods.aic:6:1 ret 
+}

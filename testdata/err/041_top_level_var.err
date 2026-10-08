@@ -1,0 +1,6 @@
+testdata/err/041_top_level_var.aic:1:1: error: a top-level var declaration is not allowed (red line 21)
+    a top-level var
+    fix: mutable global state means: create objects inside main and pass them as arguments; for constants write const
+testdata/err/041_top_level_var.aic:1:5: error: a non-declaration statement at the top level
+    got IDENT counter
+    fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)

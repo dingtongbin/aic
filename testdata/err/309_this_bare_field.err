@@ -1,0 +1,3 @@
+testdata/err/309_this_bare_field.aic:5:16: error: a bare name collides with a field: access this class's fields as this.
+    v
+    fix: write this.v (core design §4, red line 3)

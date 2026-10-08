@@ -1,0 +1,20 @@
+import print
+
+// L4 trap 锚点：**defer 实参的界必须 ≤ 函数入口**（核心设计 §五 R5）。
+// 块内对象经变量中转作 defer 实参 = 注册点守卫 trap —— 此前检查器标了 GuardDefer，
+// 但**发射侧没有任何消费者**，守卫从未发出，defer 在函数退出时读已弹出的区域。
+class Buf {
+    var n i32
+}
+
+func use(b Buf) {
+    print.println(b.n)
+}
+
+func main() {
+    region {
+        var t = Buf{n: 7}
+        defer use(t) // 注册点守卫 ⇒ 立即 trap
+    }
+    print.println("end") // 不可达
+}

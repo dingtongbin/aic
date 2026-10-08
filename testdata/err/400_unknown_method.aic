@@ -1,0 +1,7 @@
+import print
+
+// L4 err 锚点：**字面量接收者**上的未知方法必须被检查器拒（此前静默通过、
+// 到 build 阶段才炸出无关诊断 —— check↔build 分叉的根因）。
+func main() {
+    print.println("abc".bogusMethod())
+}

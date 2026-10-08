@@ -1,0 +1,37 @@
+air v1 module ok
+type ok_Color = enum
+    Red
+    Green
+    Blue
+func ok_name(c:ok_Color) -> str {
+  entry:
+    loc ../../testdata/ok/026_match_enum.aic:9:1 var ret0 : str
+    loc ../../testdata/ok/026_match_enum.aic:10:5 let t1 : i32 = enum.tag c
+    loc ../../testdata/ok/026_match_enum.aic:10:5 switch t1 (arm12 arm23 arm34)
+  arm12:
+    loc ../../testdata/ok/026_match_enum.aic:11:18 store ret0, const "red"
+    loc ../../testdata/ok/026_match_enum.aic:11:18 br exit
+  arm23:
+    loc ../../testdata/ok/026_match_enum.aic:12:20 store ret0, const "green"
+    loc ../../testdata/ok/026_match_enum.aic:12:20 br exit
+  arm34:
+    loc ../../testdata/ok/026_match_enum.aic:13:19 store ret0, const "blue"
+    loc ../../testdata/ok/026_match_enum.aic:13:19 br exit
+  exit:
+    loc ../../testdata/ok/026_match_enum.aic:9:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/026_match_enum.aic:18:29 let t1 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/026_match_enum.aic:18:23 let t2 : str = call ok_name(t1)
+    loc ../../testdata/ok/026_match_enum.aic:18:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/026_match_enum.aic:19:29 let t4 : ok_Color = field ok_Color, 1
+    loc ../../testdata/ok/026_match_enum.aic:19:23 let t5 : str = call ok_name(t4)
+    loc ../../testdata/ok/026_match_enum.aic:19:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/026_match_enum.aic:20:29 let t7 : ok_Color = field ok_Color, 2
+    loc ../../testdata/ok/026_match_enum.aic:20:23 let t8 : str = call ok_name(t7)
+    loc ../../testdata/ok/026_match_enum.aic:20:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/026_match_enum.aic:17:1 br exit
+  exit:
+    loc ../../testdata/ok/026_match_enum.aic:17:1 ret 
+}

@@ -1,0 +1,22 @@
+import print
+
+class Buf {
+    var n i32
+}
+
+func use(b Buf) -> i32 {
+    return b.n
+}
+
+func main() -> Err {
+    region {
+        var b = Buf{n: 3}
+        print.println(use(b))
+    }
+    region {
+        region {
+            print.println("nested")
+        }
+    }
+    return Err(0, "")
+}

@@ -1,0 +1,30 @@
+import print
+
+// L4-d 锚点：**接口→接口收窄**当前不受支持，但诊断必须可照做 ——
+// 此前报"type mismatch"并建议 `Area(n)`（一个不存在的转换函数）。
+interface Area {
+    func area() -> i32
+}
+
+interface Named {
+    func area() -> i32
+    func name() -> str
+}
+
+class Sq {
+    var s i32
+
+    func area() -> i32 {
+        return this.s * this.s
+    }
+
+    func name() -> str {
+        return "sq"
+    }
+}
+
+func main() {
+    var n Named = Sq{s: 3}
+    var a Area = n
+    print.println(a.area())
+}

@@ -1,0 +1,15 @@
+import print
+
+// export：以 C 原名零 mangle 直出（§八），白名单 = 基本类型/str/@packed/无数据 enum。
+export func aic_add(a i32, b i32) -> i32 {
+    return a + b
+}
+
+export func aic_scale(x f64) -> f64 {
+    return x * 2.0
+}
+
+func main() {
+    print.println(aic_add(2, 3))
+    print.println(aic_scale(1.5))
+}

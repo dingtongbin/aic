@@ -1,0 +1,3 @@
+testdata/err/373_assert_requires_err.aic:4:21: error: the last result of the `!` operand must be Err
+    plain(1)
+    fix: only a call whose signature ends with Err has an error path; an ordinary call needs no `!`

@@ -1,0 +1,23 @@
+import print
+import os
+
+// F4 锚点：**填满再用**形态（bench 的主导形态）
+//   var xs i32[] = []
+//   for i in 0..n { xs.append(0) }      ⇒ len(xs) = n
+//   for m <= n-1 { xs[m] = xs[m] + 1 }  ⇒ m ≤ n−1 < n = len(xs) ⇒ 检查恒真 → unchecked
+func main() {
+    var n i64 = 8
+    var xs i32[] = []
+    for i in 0..n {
+        xs.append(0)
+    }
+    var m i64 = 0
+    for m <= n - 1 {
+        xs[m] = xs[m] + 1
+        m = m + 1
+    }
+    for i in 0..n {
+        print.println(xs[i])
+    }
+    print.println(xs.len())
+}

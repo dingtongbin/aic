@@ -1,0 +1,19 @@
+import print
+
+class C {
+    var n i32
+}
+
+func g(c C) {
+    print.println(c.n)
+}
+
+func f() {
+    region {
+        defer g(C{n: 1})
+    }
+}
+
+func main() {
+    f()
+}

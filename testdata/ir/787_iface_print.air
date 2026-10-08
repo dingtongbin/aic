@@ -1,0 +1,29 @@
+air v1 module ok
+type ok_Sq = struct
+    0:s:i32
+type ok_Area = iface
+    slot 0:area:() -> (i32)
+func ok_Sq_area(this__:ok_Sq*) -> i32 {
+  entry:
+    loc ../../testdata/ok/787_iface_print.aic:14:5 var ret0 : i32
+    loc ../../testdata/ok/787_iface_print.aic:15:20 let t1 : i32 = field this__, 0
+    loc ../../testdata/ok/787_iface_print.aic:15:29 let t2 : i32 = field this__, 0
+    loc ../../testdata/ok/787_iface_print.aic:15:23 let t3 : i32 = binop * t1, t2
+    loc ../../testdata/ok/787_iface_print.aic:15:9 store ret0, t3
+    loc ../../testdata/ok/787_iface_print.aic:15:9 br exit
+  exit:
+    loc ../../testdata/ok/787_iface_print.aic:14:5 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/787_iface_print.aic:20:18 let obj1 : ok_Sq* = alloc task(ok_Sq)
+    loc ../../testdata/ok/787_iface_print.aic:20:21 store field obj1, 0, const 3
+    loc ../../testdata/ok/787_iface_print.aic:20:18 let t2 : ok_Area = box obj1, ok_Area
+    loc ../../testdata/ok/787_iface_print.aic:20:5 var a : ok_Area = t2
+    loc ../../testdata/ok/787_iface_print.aic:21:25 let t3 : i32 = call.ind a.0()
+    loc ../../testdata/ok/787_iface_print.aic:21:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/787_iface_print.aic:22:18 let t5 : void = call print_println(a)
+    loc ../../testdata/ok/787_iface_print.aic:19:1 br exit
+  exit:
+    loc ../../testdata/ok/787_iface_print.aic:19:1 ret 
+}

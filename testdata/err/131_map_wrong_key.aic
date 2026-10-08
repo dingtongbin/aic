@@ -1,0 +1,6 @@
+import print
+
+func f() {
+    var m map[str]i32 = map.new()
+    m.put(1, 2)
+}

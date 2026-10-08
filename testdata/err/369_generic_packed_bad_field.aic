@@ -1,0 +1,12 @@
+class Ref {
+    var x i32
+}
+
+@packed
+class Bad[T] {
+    var r Ref
+}
+
+func main() {
+    var b = Bad[i32]{r: Ref{x: 1}}
+}

@@ -1,0 +1,26 @@
+// aic:ir-only
+import print
+import str
+
+// N2 字符串插值锚点（核心设计 §16）："id={id}" 形态。
+// 占位符只接受名字/字段访问；数值走与 print 同一套最短往返格式化（红线 20）。
+// IR-ONLY 标记：直译路径已冻结（核心设计 §十七），新特性只在 IR 路径实现。
+class User {
+    var id i64
+    var email str
+    var active bool
+}
+
+func label(u User) -> str {
+    return "user={u.id} mail={u.email} active={u.active}"
+}
+
+func main() {
+    var u = User{id: 42, email: "a@b.c", active: true}
+    print.println(label(u))
+    var n i32 = 7
+    var f f64 = 1.5
+    var s str = "raw"
+    print.println("n={n} f={f} s={s} brace=}} open={{ done")
+    print.println("literal={{}}")
+}

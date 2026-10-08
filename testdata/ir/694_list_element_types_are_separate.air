@@ -1,0 +1,21 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:4:22 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:4:22 let t2 : void = call list.append[i32](lit1, const 1)
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:4:5 var ints : i32[] = lit1
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:5:22 let lit3 : str[] = call list.new[str]()
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:5:22 let t4 : void = call list.append[str](lit3, const "1")
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:5:5 var strs : str[] = lit3
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:6:23 let t5 : i32 = elem elem ints, const 0, const 0
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:6:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:7:23 let t7 : str = elem elem strs, const 0, const 0
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:7:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:8:27 let t9 : usize = call list_i32_len(ints)
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:8:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:9:27 let t11 : usize = call list_str_len(strs)
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:9:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/694_list_element_types_are_separate.aic:3:1 ret 
+}

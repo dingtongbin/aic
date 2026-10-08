@@ -1,0 +1,36 @@
+import print
+import sync
+
+// Mutex 作为字段（值类型）+ 任务里用 channel 回传：T1 串行 L2 下顺序确定。
+class Counter {
+    var n i32
+    var m sync.Mutex
+
+    func bump() {
+        this.m.lock()
+        this.n += 1
+        this.m.unlock()
+    }
+}
+
+func main() {
+    var c = Counter{n: 0, m: sync.Mutex.new()}
+    c.bump()
+    c.bump()
+    print.println(c.n)
+    var m = sync.Mutex.new()
+    m.lock()
+    m.unlock()
+    print.println("locked-once")
+    var out chan[i32] = chan[i32].new()
+    scope {
+        spawn worker(out)
+    }
+    var v, ok = out.recv()
+    print.println(v)
+    print.println(ok)
+}
+
+func worker(ch chan[i32]) {
+    ch.send(7)
+}

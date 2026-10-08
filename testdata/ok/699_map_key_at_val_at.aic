@@ -1,0 +1,12 @@
+import print
+
+func main() {
+    var m map[i32]str = map.new()
+    m.put(7, "seven")
+    m.put(3, "three")
+    print.println(m.len())
+    print.println(m.keyAt(0))
+    print.println(m.valAt(0))
+    print.println(m.keyAt(1))
+    print.println(m.valAt(1))
+}

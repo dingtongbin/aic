@@ -1,0 +1,33 @@
+import print
+
+// L4-e 锚点 2：`map[str]接口` —— 接口值槽是两机器字结构（{data, vt}），
+// 必须有**自己的**运行时实例（与 AIC_LIST_OP(iface, aic_iface) 同款）。
+interface Area {
+    func area() -> i32
+}
+
+class Sq {
+    var s i32
+
+    func area() -> i32 {
+        return this.s * this.s
+    }
+}
+
+class Rect {
+    var w i32
+    var h i32
+
+    func area() -> i32 {
+        return this.w * this.h
+    }
+}
+
+func main() {
+    var m map[str]Area = map.new()
+    m.put("sq", Sq{s: 3})
+    m.put("rect", Rect{w: 2, h: 5})
+    print.println(m.len())
+    print.println(m.get("sq").area())
+    print.println(m.get("rect").area())
+}

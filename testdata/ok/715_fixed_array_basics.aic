@@ -1,0 +1,13 @@
+import print
+
+func main() {
+    var a [i32; 3] = [1, 2, 3]
+    print.println(a.len())
+    print.println(a[0])
+    print.println(a[2])
+    a[1] = 20
+    print.println(a[1])
+    for var i usize = 0; i < a.len(); i = i + 1 {
+        print.println(a[i])
+    }
+}

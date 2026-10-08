@@ -1,0 +1,36 @@
+// 多包示例（T1 验收：examples/文件 IO/多包示例跑通）：入口包 tool 读文件并统计。
+//
+// 结构：tool（入口） → report（格式化） → textutil（计数）
+import print
+import os
+import report
+import textutil
+
+func main() -> Err {
+    var args = os.args()
+    var text str = ""
+    if args.len() >= 2 {
+        var content, err = os.readFile(args[1])
+        if err.code != 0 {
+            print.println(strconcat("tool: ", err.msg))
+            return err
+        }
+        text = content
+    } else {
+        // 无参数 = 读标准输入（门禁无参跑：空输入 → 0 行 0 词 0 字节，确定性）
+        var piped, err = os.readStdin()
+        if err.code != 0 {
+            print.println(strconcat("tool: ", err.msg))
+            return err
+        }
+        text = piped
+    }
+    var lines = textutil.CountLines(text)
+    var words = textutil.CountWords(text)
+    print.println(report.Summary(lines, words, i64(text.len())))
+    return nil
+}
+
+func strconcat(a str, b str) -> str {
+    return a + b
+}

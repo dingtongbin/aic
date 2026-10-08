@@ -1,0 +1,9 @@
+testdata/err/250_interface_method_missing.aic:5:14: error: `implements` is retired: an interface is satisfied structurally by the method signature set
+    implements
+    fix: drop the implements clause: a class that matches the interface signatures satisfies it automatically
+testdata/err/250_interface_method_missing.aic:6:5: error: a top-level var declaration is not allowed (red line 21)
+    a top-level var
+    fix: mutable global state means: create objects inside main and pass them as arguments; for constants write const
+testdata/err/250_interface_method_missing.aic:6:9: error: a non-declaration statement at the top level
+    got IDENT side
+    fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)

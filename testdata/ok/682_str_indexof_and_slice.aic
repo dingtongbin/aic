@@ -1,0 +1,10 @@
+import print
+import str
+
+func main() {
+    print.println(str.indexOf("compiler", "pil"))
+    print.println(str.indexOf("compiler", "zzz"))
+    print.println(str.indexOf("abc", "abc"))
+    print.println(str.sub("compiler", 0, 5))
+    print.println(str.sub("compiler", 4, 8))
+}

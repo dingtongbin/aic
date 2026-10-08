@@ -1,0 +1,10 @@
+func f() -> i32 {
+    return 1
+}
+
+func f() -> i32 {
+    return 2
+}
+
+func main() {
+}

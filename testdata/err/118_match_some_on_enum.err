@@ -1,0 +1,9 @@
+testdata/err/118_match_some_on_enum.aic:7:5: error: match is not exhaustive: missing variant
+    Color.Red
+    fix: add Red arms (exhaustiveness is the point; no wildcards)
+testdata/err/118_match_some_on_enum.aic:8:9: error: the enum has no such variant
+    Color.Some
+    fix: see enum Color declaration
+testdata/err/118_match_some_on_enum.aic:9:9: error: the enum has no such variant
+    Color.None
+    fix: see enum Color declaration

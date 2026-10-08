@@ -1,0 +1,17 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:4:29 let t1 : set[str] = call set_new_str()
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:4:5 var s : set[str] = t1
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:5:10 let t2 : void = call set_str_add(s, const "z")
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:6:10 let t3 : void = call set_str_add(s, const "y")
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:7:23 let t4 : str = call set_str_at(s, const 0)
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:7:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:8:23 let t6 : str = call set_str_at(s, const 1)
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:8:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:9:24 let t8 : usize = call set_str_len(s)
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:9:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/697_set_at_follows_insertion.aic:3:1 ret 
+}

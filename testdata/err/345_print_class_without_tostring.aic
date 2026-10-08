@@ -1,0 +1,10 @@
+import print
+
+class P {
+    var x i32
+}
+
+func main() {
+    var p = P{x: 1}
+    print.println(p)
+}

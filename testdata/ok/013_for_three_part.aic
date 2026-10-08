@@ -1,0 +1,12 @@
+import print
+
+func main() {
+    var total i32 = 0
+    for var i = 0; i < 5; i = i + 1 {
+        total = total + i
+    }
+    for var j = 0; j < 3; j = j + 1 {
+        total = total + 1
+    }
+    print.println("for ok")
+}

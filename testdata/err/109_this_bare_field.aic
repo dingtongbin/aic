@@ -1,0 +1,7 @@
+class Box {
+    var v i32 = 0
+
+    func get() -> i32 {
+        return v
+    }
+}

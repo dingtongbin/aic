@@ -1,0 +1,37 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/014_for_break_continue.aic:4:5 var total : i32 = const 0
+    loc ../../testdata/ok/014_for_break_continue.aic:5:9 var i : i32 = const 0
+    loc ../../testdata/ok/014_for_break_continue.aic:5:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/014_for_break_continue.aic:5:22 let t1 : bool = cmp < i, const 10
+    loc ../../testdata/ok/014_for_break_continue.aic:5:5 cbr t1, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/014_for_break_continue.aic:6:14 let t2 : bool = cmp == i, const 3
+    loc ../../testdata/ok/014_for_break_continue.aic:6:9 cbr t2, then5, else6
+  forpost3:
+    loc ../../testdata/ok/014_for_break_continue.aic:5:34 let t5 : i32 = binop + i, const 1
+    loc ../../testdata/ok/014_for_break_continue.aic:5:30 store i, t5
+    loc ../../testdata/ok/014_for_break_continue.aic:5:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/014_for_break_continue.aic:14:18 let t6 : void = call print_println(const "branch ok")
+    loc ../../testdata/ok/014_for_break_continue.aic:3:1 br exit
+  then5:
+    loc ../../testdata/ok/014_for_break_continue.aic:7:13 br forpost3
+  else6:
+    loc ../../testdata/ok/014_for_break_continue.aic:6:9 br join7
+  join7:
+    loc ../../testdata/ok/014_for_break_continue.aic:9:14 let t3 : bool = cmp == i, const 7
+    loc ../../testdata/ok/014_for_break_continue.aic:9:9 cbr t3, then8, else9
+  then8:
+    loc ../../testdata/ok/014_for_break_continue.aic:10:13 br fordone4
+  else9:
+    loc ../../testdata/ok/014_for_break_continue.aic:9:9 br join10
+  join10:
+    loc ../../testdata/ok/014_for_break_continue.aic:12:23 let t4 : i32 = binop + total, i
+    loc ../../testdata/ok/014_for_break_continue.aic:12:15 store total, t4
+    loc ../../testdata/ok/014_for_break_continue.aic:5:5 br forpost3
+  exit:
+    loc ../../testdata/ok/014_for_break_continue.aic:3:1 ret 
+}

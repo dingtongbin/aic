@@ -1,0 +1,29 @@
+import print
+
+enum Color { Red, Green, Blue }
+
+func name(c Color) -> str {
+    return match c {
+        Color.Red => "red",
+        Color.Green => "green",
+        Color.Blue => "blue",
+    }
+}
+
+func code(c Color) -> i32 {
+    return match c {
+        Color.Red => 1,
+        Color.Green => 2,
+        Color.Blue => 3,
+    }
+}
+
+func main() {
+    print.println(name(Color.Red))
+    print.println(code(Color.Green))
+    match Color.Blue {
+        Color.Red => print.println("r"),
+        Color.Green => print.println("g"),
+        Color.Blue => print.println("b"),
+    }
+}

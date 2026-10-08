@@ -1,0 +1,6 @@
+import print
+
+func main() {
+    var xs i64[] = [i64(1), i64(2)]
+    print.println(xs[5])
+}

@@ -1,0 +1,3 @@
+testdata/err/043_or_pattern.aic:5:13: error: `|` and or-patterns are not part of the v2 surface
+    `|` after a pattern
+    fix: give every pattern its own arm: A => ..., B => ... (exhaustiveness already requires one arm per variant)

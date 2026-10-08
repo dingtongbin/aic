@@ -1,0 +1,70 @@
+air v1 module ok
+func ok_produce(ch:chan[i32], n:i32) {
+  entry:
+    loc ../../testdata/ok/771_pipeline.aic:8:5 var i : i32 = const 0
+    loc ../../testdata/ok/771_pipeline.aic:9:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/771_pipeline.aic:9:11 let t1 : bool = cmp < i, n
+    loc ../../testdata/ok/771_pipeline.aic:9:5 cbr t1, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/771_pipeline.aic:10:16 let t2 : void = call chan_i32_send(ch, i)
+    loc ../../testdata/ok/771_pipeline.aic:11:11 let t4 : i32 = binop + i, const 1
+    loc ../../testdata/ok/771_pipeline.aic:11:11 store i, t4
+    loc ../../testdata/ok/771_pipeline.aic:9:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/771_pipeline.aic:9:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/771_pipeline.aic:7:1 br exit
+  exit:
+    loc ../../testdata/ok/771_pipeline.aic:7:1 ret 
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/771_pipeline.aic:17:37 let t1 : chan[i32] = call chan_new_i32(const 4)
+    loc ../../testdata/ok/771_pipeline.aic:17:5 var ch : chan[i32] = t1
+    loc ../../testdata/ok/771_pipeline.aic:18:5 region.enter sc2
+    loc ../../testdata/ok/771_pipeline.aic:19:22 let t3 : void = call ok_produce(ch, const 4)
+    loc ../../testdata/ok/771_pipeline.aic:18:5 region.exit
+    loc ../../testdata/ok/771_pipeline.aic:21:5 var sum : i32 = const 0
+    loc ../../testdata/ok/771_pipeline.aic:22:5 var k : i32 = const 0
+    loc ../../testdata/ok/771_pipeline.aic:23:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/771_pipeline.aic:23:11 let t4 : bool = cmp < k, const 4
+    loc ../../testdata/ok/771_pipeline.aic:23:5 cbr t4, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/771_pipeline.aic:24:28 let t5 : (i32, bool) = call chan_i32_recv(ch)
+    loc ../../testdata/ok/771_pipeline.aic:24:9 let t6 : i32 = multi.extract t5, 0
+    loc ../../testdata/ok/771_pipeline.aic:24:13 var v : i32 = t6
+    loc ../../testdata/ok/771_pipeline.aic:24:9 let t7 : bool = multi.extract t5, 1
+    loc ../../testdata/ok/771_pipeline.aic:24:16 var ok : bool = t7
+    loc ../../testdata/ok/771_pipeline.aic:25:9 cbr ok, then5, else6
+  forpost3:
+    loc ../../testdata/ok/771_pipeline.aic:23:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/771_pipeline.aic:30:18 let t12 : void = call print_println(sum)
+    loc ../../testdata/ok/771_pipeline.aic:31:25 let t13 : usize = call chan_i32_len(ch)
+    loc ../../testdata/ok/771_pipeline.aic:31:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/771_pipeline.aic:34:42 let t15 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/771_pipeline.aic:34:5 var unbound : chan[i32] = t15
+    loc ../../testdata/ok/771_pipeline.aic:35:17 let t16 : void = call chan_i32_send(unbound, const 7)
+    loc ../../testdata/ok/771_pipeline.aic:36:31 let t17 : (i32, bool) = call chan_i32_recv(unbound)
+    loc ../../testdata/ok/771_pipeline.aic:36:5 let t18 : i32 = multi.extract t17, 0
+    loc ../../testdata/ok/771_pipeline.aic:36:9 var v2 : i32 = t18
+    loc ../../testdata/ok/771_pipeline.aic:36:5 let t19 : bool = multi.extract t17, 1
+    loc ../../testdata/ok/771_pipeline.aic:36:13 var ok2 : bool = t19
+    loc ../../testdata/ok/771_pipeline.aic:37:18 let t20 : void = call print_println(v2)
+    loc ../../testdata/ok/771_pipeline.aic:38:18 let t21 : void = call print_println(ok2)
+    loc ../../testdata/ok/771_pipeline.aic:15:1 br exit
+  then5:
+    loc ../../testdata/ok/771_pipeline.aic:26:17 let t9 : i32 = binop + sum, v
+    loc ../../testdata/ok/771_pipeline.aic:26:17 store sum, t9
+    loc ../../testdata/ok/771_pipeline.aic:25:9 br join7
+  else6:
+    loc ../../testdata/ok/771_pipeline.aic:25:9 br join7
+  join7:
+    loc ../../testdata/ok/771_pipeline.aic:28:11 let t11 : i32 = binop + k, const 1
+    loc ../../testdata/ok/771_pipeline.aic:28:11 store k, t11
+    loc ../../testdata/ok/771_pipeline.aic:23:5 br forpost3
+  exit:
+    loc ../../testdata/ok/771_pipeline.aic:15:1 ret 
+}

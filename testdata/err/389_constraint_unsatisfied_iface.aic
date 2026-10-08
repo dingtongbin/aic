@@ -1,0 +1,22 @@
+interface Shape {
+    func area() -> i32
+}
+
+class Blob {
+    var n i32
+}
+
+// N3 负例：Blob 没有 area() ⇒ 不满足接口约束 Shape。
+func total[T: Shape](xs T[]) -> i32 {
+    var sum i32 = 0
+    for i in 0..xs.len() {
+        sum = sum + xs[i].area()
+    }
+    return sum
+}
+
+func main() {
+    var b = Blob{n: 1}
+    var bs Blob[] = [b]
+    var t = total(bs)
+}

@@ -1,0 +1,50 @@
+import print
+
+// v2：errdefer 退役——defer + 标志位（核心设计 §六回滚模式）。
+// 输出与 v1 逐位一致：错误路径先打印 errdefer 内容再打印 defer 内容。
+func mayFail(n i32) -> (i32, Err) {
+    var failed bool = false
+    defer {
+        if failed {
+            print.println("errdefer ran")
+        }
+        print.println("defer ran")
+    }
+    if n < 0 {
+        failed = true
+        return 0, Err(1, "bad")
+    }
+    return n, nil
+}
+
+func viaCheck(n i32) -> (i32, Err) {
+    var failed bool = false
+    defer {
+        if failed {
+            print.println("errdefer in wrapper")
+        }
+        print.println("defer in wrapper")
+    }
+    var v, err = mayFail(n)
+    if err != nil {
+        print.println("wrapper caught")
+        failed = true
+        return 0, err
+    }
+    return v, nil
+}
+
+func main() {
+    var a, e1 = mayFail(2)
+    print.println(a)
+    print.println(e1.code)
+    var b, e2 = mayFail(-1)
+    print.println(b)
+    print.println(e2.code)
+    var c, e3 = viaCheck(4)
+    print.println(c)
+    print.println(e3.code)
+    var d, e4 = viaCheck(-1)
+    print.println(d)
+    print.println(e4.code)
+}

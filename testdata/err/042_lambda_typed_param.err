@@ -1,0 +1,6 @@
+testdata/err/042_lambda_typed_param.aic:2:16: error: missing `)`
+    got IDENT i32
+    fix: lambda parameter list is missing the closing `)`
+testdata/err/042_lambda_typed_param.aic:2:19: error: expression is missing or incomplete
+    got PUNCT )
+    fix: add an expression: a name, a literal, or a call; keep `()` and `[]` balanced

@@ -1,0 +1,5 @@
+@nonsense
+import str
+
+func main() {
+}

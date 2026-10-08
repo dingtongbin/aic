@@ -1,0 +1,9 @@
+import print
+import lib
+
+// L4 err 锚点（多包）：公开类的 **`_` 前缀成员**是包私有，跨包访问必须被拒
+// （R7 决策一：类型公开不等于它的 `_` 成员公开）。
+func main() {
+    var b = lib.New()
+    print.println(b._hidden)
+}

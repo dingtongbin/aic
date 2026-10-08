@@ -1,0 +1,27 @@
+air v1 module ok
+func ok_divmod(a:i32, b:i32) -> (i32, i32) {
+  entry:
+    loc ../../testdata/ok/017_multi_return.aic:3:1 var ret0 : i32
+    loc ../../testdata/ok/017_multi_return.aic:3:1 var ret1 : i32
+    loc ../../testdata/ok/017_multi_return.aic:4:14 let t1 : i32 = binop / a, b
+    loc ../../testdata/ok/017_multi_return.aic:4:5 store ret0, t1
+    loc ../../testdata/ok/017_multi_return.aic:4:21 let t2 : i32 = binop % a, b
+    loc ../../testdata/ok/017_multi_return.aic:4:5 store ret1, t2
+    loc ../../testdata/ok/017_multi_return.aic:4:5 br exit
+  exit:
+    loc ../../testdata/ok/017_multi_return.aic:3:1 ret ret0, ret1
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/017_multi_return.aic:8:5 var q : i32 = const 0
+    loc ../../testdata/ok/017_multi_return.aic:9:5 var r : i32 = const 0
+    loc ../../testdata/ok/017_multi_return.aic:10:18 let t1 : (i32, i32) = call ok_divmod(const 17, const 5)
+    loc ../../testdata/ok/017_multi_return.aic:10:6 let t2 : i32 = multi.extract t1, 0
+    loc ../../testdata/ok/017_multi_return.aic:10:6 store q, t2
+    loc ../../testdata/ok/017_multi_return.aic:10:6 let t3 : i32 = multi.extract t1, 1
+    loc ../../testdata/ok/017_multi_return.aic:10:6 store r, t3
+    loc ../../testdata/ok/017_multi_return.aic:11:18 let t4 : void = call print_println(const "multi ok")
+    loc ../../testdata/ok/017_multi_return.aic:7:1 br exit
+  exit:
+    loc ../../testdata/ok/017_multi_return.aic:7:1 ret 
+}

@@ -1,0 +1,55 @@
+air v1 module ok
+type ok_Counter = struct
+    0:n:i32
+    1:m:sync_Mutex
+func ok_Counter_bump(this__:ok_Counter*) {
+  entry:
+    loc ../../testdata/ok/772_mutex_shared.aic:11:13 let t1 : sync_Mutex = field this__, 1
+    loc ../../testdata/ok/772_mutex_shared.aic:11:20 let t2 : void = call sync_Mutex_lock(t1)
+    loc ../../testdata/ok/772_mutex_shared.aic:12:16 let t3 : i32 = field this__, 0
+    loc ../../testdata/ok/772_mutex_shared.aic:12:16 let t4 : i32 = binop + t3, const 1
+    loc ../../testdata/ok/772_mutex_shared.aic:12:16 store field this__, 0, t4
+    loc ../../testdata/ok/772_mutex_shared.aic:13:13 let t5 : sync_Mutex = field this__, 1
+    loc ../../testdata/ok/772_mutex_shared.aic:13:22 let t6 : void = call sync_Mutex_unlock(t5)
+    loc ../../testdata/ok/772_mutex_shared.aic:10:5 br exit
+  exit:
+    loc ../../testdata/ok/772_mutex_shared.aic:10:5 ret 
+}
+func ok_work(c:ok_Counter*, times:i32) {
+  entry:
+    loc ../../testdata/ok/772_mutex_shared.aic:18:5 var i : i32 = const 0
+    loc ../../testdata/ok/772_mutex_shared.aic:19:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/772_mutex_shared.aic:19:11 let t1 : bool = cmp < i, times
+    loc ../../testdata/ok/772_mutex_shared.aic:19:5 cbr t1, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/772_mutex_shared.aic:20:15 let t2 : void = call ok_Counter_bump(c)
+    loc ../../testdata/ok/772_mutex_shared.aic:21:11 let t4 : i32 = binop + i, const 1
+    loc ../../testdata/ok/772_mutex_shared.aic:21:11 store i, t4
+    loc ../../testdata/ok/772_mutex_shared.aic:19:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/772_mutex_shared.aic:19:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/772_mutex_shared.aic:17:1 br exit
+  exit:
+    loc ../../testdata/ok/772_mutex_shared.aic:17:1 ret 
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/772_mutex_shared.aic:26:13 let obj1 : ok_Counter* = alloc task(ok_Counter)
+    loc ../../testdata/ok/772_mutex_shared.aic:26:21 store field obj1, 0, const 0
+    loc ../../testdata/ok/772_mutex_shared.aic:26:44 let t2 : sync_Mutex = call sync_Mutex_new()
+    loc ../../testdata/ok/772_mutex_shared.aic:26:27 store field obj1, 1, t2
+    loc ../../testdata/ok/772_mutex_shared.aic:26:5 var c : ok_Counter* = obj1
+    loc ../../testdata/ok/772_mutex_shared.aic:27:5 region.enter sc3
+    loc ../../testdata/ok/772_mutex_shared.aic:28:19 let t4 : void = call ok_work(c, const 100)
+    loc ../../testdata/ok/772_mutex_shared.aic:29:19 let t5 : void = call ok_work(c, const 100)
+    loc ../../testdata/ok/772_mutex_shared.aic:30:19 let t6 : void = call ok_work(c, const 100)
+    loc ../../testdata/ok/772_mutex_shared.aic:31:19 let t7 : void = call ok_work(c, const 100)
+    loc ../../testdata/ok/772_mutex_shared.aic:27:5 region.exit
+    loc ../../testdata/ok/772_mutex_shared.aic:33:20 let t8 : i32 = field c, 0
+    loc ../../testdata/ok/772_mutex_shared.aic:33:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/772_mutex_shared.aic:25:1 br exit
+  exit:
+    loc ../../testdata/ok/772_mutex_shared.aic:25:1 ret 
+}

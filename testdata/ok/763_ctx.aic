@@ -1,0 +1,24 @@
+// aic:ir-only
+import ctx
+import print
+
+// N12 锚点：`Ctx` 约定（核心设计 §16 N12）—— **库级**，语言不特殊对待：
+// 没有隐藏传递、没有隐式参数；handler / 中间件首参是 Ctx 只是框架约定。
+// 类型面在 T-A 落地（签名进检查器），实现随标准库包在 T-C 落地。
+func handler(c ctx.Ctx) -> str {
+    var who, ok = c.get("user")
+    if !ok {
+        return "anonymous"
+    }
+    return who
+}
+
+func middleware(c ctx.Ctx) -> ctx.Ctx {
+    return c.with("trace", "t-1")
+}
+
+func main() {
+    var c = ctx.new()
+    var c2 = middleware(c)
+    print.println(handler(c2))
+}

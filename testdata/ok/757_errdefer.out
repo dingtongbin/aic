@@ -1,0 +1,8 @@
+defer always
+42
+true
+rollback
+defer always
+7
+1
+9

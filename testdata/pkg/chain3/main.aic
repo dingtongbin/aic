@@ -1,0 +1,11 @@
+import print
+import util
+import base
+
+func main() {
+    var p = util.Origin()
+    var q = util.Bump(p)
+    print.println(q.sum())
+    print.println(util.LimitPlus())
+    print.println(util.Label())
+}

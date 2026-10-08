@@ -1,0 +1,15 @@
+import print
+
+// L4 err 锚点：§15.7 规则③ —— **defer 的调用结果没人接**，故有 Err 位的调用不能被 defer
+// （错误永远观察不到）。
+func f(v i32) -> (i32, Err) {
+    if v < 0 {
+        return 0, Err(2, "neg")
+    }
+    return v * 2, nil
+}
+
+func main() {
+    defer f(3)
+    print.println("done")
+}

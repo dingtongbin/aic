@@ -1,0 +1,19 @@
+import print
+
+func main() {
+    var a [i32; 4]
+    print.println(a.len())
+    print.println(a.isEmpty())
+    var i usize = 0
+    var total i32 = 0
+    for i < a.len() {
+        a[i] = i32(i) * 2
+        i = i + 1
+    }
+    i = 0
+    for i < a.len() {
+        total = total + a[i]
+        i = i + 1
+    }
+    print.println(total)
+}

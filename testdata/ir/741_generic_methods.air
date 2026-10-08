@@ -1,0 +1,32 @@
+air v1 module ok
+type ok_Box = struct
+    0:v:TT
+type ok_Pair = struct packed
+    0:a:TA
+    1:b:TB
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/741_generic_methods.aic:30:17 let obj1 : ok_Box*[i32] = alloc task(ok_Box*[i32])
+    loc ../../testdata/ok/741_generic_methods.aic:30:23 store field obj1, 0, const 5
+    loc ../../testdata/ok/741_generic_methods.aic:30:5 var bi : ok_Box*[i32] = obj1
+    loc ../../testdata/ok/741_generic_methods.aic:31:25 let t2 : i32 = call ok_Box_get[i32](bi)
+    loc ../../testdata/ok/741_generic_methods.aic:31:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/741_generic_methods.aic:32:26 let t4 : i32 = call ok_Box_with[i32](bi, const 9)
+    loc ../../testdata/ok/741_generic_methods.aic:32:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/741_generic_methods.aic:33:17 let obj6 : ok_Box*[str] = alloc task(ok_Box*[str])
+    loc ../../testdata/ok/741_generic_methods.aic:33:23 store field obj6, 0, const "boxed"
+    loc ../../testdata/ok/741_generic_methods.aic:33:5 var bs : ok_Box*[str] = obj6
+    loc ../../testdata/ok/741_generic_methods.aic:34:25 let t7 : str = call ok_Box_get[str](bs)
+    loc ../../testdata/ok/741_generic_methods.aic:34:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/741_generic_methods.aic:35:17 let obj9 : ok_Pair[i32,str] = alloc task(ok_Pair[i32,str])
+    loc ../../testdata/ok/741_generic_methods.aic:35:28 store field obj9, 0, const 1
+    loc ../../testdata/ok/741_generic_methods.aic:35:34 store field obj9, 1, const "one"
+    loc ../../testdata/ok/741_generic_methods.aic:35:5 var p : ok_Pair[i32,str] = obj9
+    loc ../../testdata/ok/741_generic_methods.aic:36:25 let t10 : i32 = call ok_Pair_left[i32, str](p)
+    loc ../../testdata/ok/741_generic_methods.aic:36:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/741_generic_methods.aic:37:26 let t12 : str = call ok_Pair_right[i32, str](p)
+    loc ../../testdata/ok/741_generic_methods.aic:37:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/741_generic_methods.aic:29:1 br exit
+  exit:
+    loc ../../testdata/ok/741_generic_methods.aic:29:1 ret 
+}

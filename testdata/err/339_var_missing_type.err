@@ -1,0 +1,6 @@
+testdata/err/339_var_missing_type.aic:3:1: error: expression is missing or incomplete
+    got PUNCT }
+    fix: add an expression: a name, a literal, or a call; keep `()` and `[]` balanced
+testdata/err/339_var_missing_type.aic:4:1: error: missing `}`
+    got end of file (EOF)
+    fix: statement block is missing the closing `}`

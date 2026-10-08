@@ -1,0 +1,49 @@
+// aic:ir-only
+import print
+import time
+
+// N6 `select` 锚点（核心设计 §16）。
+// 三条语义在这里被冻结，且**与选择顺序无关**（每次只有**一个**分支会就绪）：
+//   ① 有值可收 → 走 recv 分支并绑定 (值, true)（时间分支给一个大到不会到点的截止点）；
+//   ② 通道为空但超时已到 → 走 time 分支（time.after(0) = 已到期）；
+//   ③ 通道为空、无超时分支、已无别的存活任务 → 按 §七【O2】recv 得 (零值, false)。
+// 多分支同时就绪时实现取源码序最前者，但**语言不承诺顺序** —— 锚点必须与顺序无关。
+func main() {
+    var ch chan[i32] = chan[i32].new()
+    ch.send(7)
+    select {
+        case v = ch.recv() {
+            print.println(v)
+        }
+        case time.after(10000) {
+            print.println("timeout")
+        }
+    }
+
+    var empty chan[i32] = chan[i32].new()
+    select {
+        case v, ok = empty.recv() {
+            print.println(ok)
+        }
+        case time.after(0) {
+            print.println("timeout2")
+        }
+    }
+
+    // 无超时分支：空通道 + 无别的存活任务 ⇒ O2 的 (零值, false)，不 trap
+    var solo chan[i32] = chan[i32].new()
+    select {
+        case v, ok = solo.recv() {
+            print.println(v)
+            print.println(ok)
+        }
+    }
+
+    // scope.timeout：到点取消该域内全部任务（取消点 = select/recv/send/sleep）
+    scope.timeout(50) {
+        var inner chan[i32] = chan[i32].new()
+        inner.send(9)
+        var got = inner.len()
+        print.println(got)
+    }
+}

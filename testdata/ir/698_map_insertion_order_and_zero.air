@@ -1,0 +1,24 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:4:32 let t1 : map[str]i32 = call map_new_str_i32()
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:4:5 var m : map[str]i32 = t1
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:5:10 let t2 : void = call map_str_i32_put(m, const "one", const 1)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:6:10 let t3 : void = call map_str_i32_put(m, const "two", const 2)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:7:10 let t4 : void = call map_str_i32_put(m, const "one", const 11)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:8:24 let t5 : usize = call map_str_i32_len(m)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:8:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:9:24 let t7 : i32 = call map_str_i32_get(m, const "one")
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:9:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:10:24 let t9 : i32 = call map_str_i32_get(m, const "two")
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:10:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:11:24 let t11 : i32 = call map_str_i32_get(m, const "missing")
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:11:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:12:24 let t13 : bool = call map_str_i32_has(m, const "two")
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:12:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:13:24 let t15 : bool = call map_str_i32_has(m, const "nope")
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:13:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/698_map_insertion_order_and_zero.aic:3:1 ret 
+}

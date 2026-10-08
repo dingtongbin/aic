@@ -1,0 +1,13 @@
+import print
+
+// v2：无顶层 var——可变状态在 main 内创建、经参数传递（核心设计 §四）。
+func bump(n i32) -> i32 {
+    return n + 1
+}
+
+func main() {
+    var counter i32 = 0
+    counter = bump(counter)
+    counter = bump(counter)
+    print.println("state ok")
+}

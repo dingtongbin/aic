@@ -1,0 +1,62 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/743_chan.aic:5:37 let t1 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/743_chan.aic:5:5 var ch : chan[i32] = t1
+    loc ../../testdata/ok/743_chan.aic:6:12 let t2 : void = call chan_i32_send(ch, const 1)
+    loc ../../testdata/ok/743_chan.aic:7:12 let t3 : void = call chan_i32_send(ch, const 2)
+    loc ../../testdata/ok/743_chan.aic:8:25 let t4 : usize = call chan_i32_len(ch)
+    loc ../../testdata/ok/743_chan.aic:8:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/743_chan.aic:9:24 let t6 : (i32, bool) = call chan_i32_recv(ch)
+    loc ../../testdata/ok/743_chan.aic:9:5 let t7 : i32 = multi.extract t6, 0
+    loc ../../testdata/ok/743_chan.aic:9:9 var a : i32 = t7
+    loc ../../testdata/ok/743_chan.aic:9:5 let t8 : bool = multi.extract t6, 1
+    loc ../../testdata/ok/743_chan.aic:9:12 var ok : bool = t8
+    loc ../../testdata/ok/743_chan.aic:10:18 let t9 : void = call print_println(a)
+    loc ../../testdata/ok/743_chan.aic:11:18 let t10 : void = call print_println(ok)
+    loc ../../testdata/ok/743_chan.aic:12:25 let t11 : (i32, bool) = call chan_i32_recv(ch)
+    loc ../../testdata/ok/743_chan.aic:12:5 let t12 : i32 = multi.extract t11, 0
+    loc ../../testdata/ok/743_chan.aic:12:9 var b : i32 = t12
+    loc ../../testdata/ok/743_chan.aic:12:5 let t13 : bool = multi.extract t11, 1
+    loc ../../testdata/ok/743_chan.aic:12:12 var ok2 : bool = t13
+    loc ../../testdata/ok/743_chan.aic:13:18 let t14 : void = call print_println(b)
+    loc ../../testdata/ok/743_chan.aic:14:25 let t15 : (i32, bool) = call chan_i32_recv(ch)
+    loc ../../testdata/ok/743_chan.aic:14:5 let t16 : i32 = multi.extract t15, 0
+    loc ../../testdata/ok/743_chan.aic:14:9 var c : i32 = t16
+    loc ../../testdata/ok/743_chan.aic:14:5 let t17 : bool = multi.extract t15, 1
+    loc ../../testdata/ok/743_chan.aic:14:12 var ok3 : bool = t17
+    loc ../../testdata/ok/743_chan.aic:15:18 let t18 : void = call print_println(c)
+    loc ../../testdata/ok/743_chan.aic:16:18 let t19 : void = call print_println(ok3)
+    loc ../../testdata/ok/743_chan.aic:18:40 let t20 : chan[str] = call chan_new_str()
+    loc ../../testdata/ok/743_chan.aic:18:5 var names : chan[str] = t20
+    loc ../../testdata/ok/743_chan.aic:19:15 let t21 : void = call chan_str_send(names, const "aic")
+    loc ../../testdata/ok/743_chan.aic:20:28 let t22 : (str, bool) = call chan_str_recv(names)
+    loc ../../testdata/ok/743_chan.aic:20:5 let t23 : str = multi.extract t22, 0
+    loc ../../testdata/ok/743_chan.aic:20:9 var s : str = t23
+    loc ../../testdata/ok/743_chan.aic:20:5 let t24 : bool = multi.extract t22, 1
+    loc ../../testdata/ok/743_chan.aic:20:12 var sok : bool = t24
+    loc ../../testdata/ok/743_chan.aic:21:18 let t25 : void = call print_println(s)
+    loc ../../testdata/ok/743_chan.aic:22:18 let t26 : void = call print_println(sok)
+    loc ../../testdata/ok/743_chan.aic:24:38 let t27 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/743_chan.aic:24:5 var out : chan[i32] = t27
+    loc ../../testdata/ok/743_chan.aic:25:5 region.enter sc28
+    loc ../../testdata/ok/743_chan.aic:26:22 let t29 : void = call ok_produce(out)
+    loc ../../testdata/ok/743_chan.aic:25:5 region.exit
+    loc ../../testdata/ok/743_chan.aic:28:26 let t30 : (i32, bool) = call chan_i32_recv(out)
+    loc ../../testdata/ok/743_chan.aic:28:5 let t31 : i32 = multi.extract t30, 0
+    loc ../../testdata/ok/743_chan.aic:28:9 var v : i32 = t31
+    loc ../../testdata/ok/743_chan.aic:28:5 let t32 : bool = multi.extract t30, 1
+    loc ../../testdata/ok/743_chan.aic:28:12 var vok : bool = t32
+    loc ../../testdata/ok/743_chan.aic:29:18 let t33 : void = call print_println(v)
+    loc ../../testdata/ok/743_chan.aic:30:18 let t34 : void = call print_println(vok)
+    loc ../../testdata/ok/743_chan.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/743_chan.aic:3:1 ret 
+}
+func ok_produce(ch:chan[i32]) {
+  entry:
+    loc ../../testdata/ok/743_chan.aic:34:12 let t1 : void = call chan_i32_send(ch, const 42)
+    loc ../../testdata/ok/743_chan.aic:33:1 br exit
+  exit:
+    loc ../../testdata/ok/743_chan.aic:33:1 ret 
+}

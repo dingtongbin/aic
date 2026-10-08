@@ -1,0 +1,35 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:4:29 let t1 : set[i32] = call set_new_i32()
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:4:5 var s : set[i32] = t1
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:5:10 let t2 : void = call set_i32_add(s, const 3)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:6:10 let t3 : void = call set_i32_add(s, const 1)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:7:10 let t4 : void = call set_i32_add(s, const 3)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:8:10 let t5 : void = call set_i32_add(s, const 2)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:9:24 let t6 : usize = call set_i32_len(s)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:9:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:10:24 let t8 : bool = call set_i32_has(s, const 3)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:10:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:11:24 let t10 : bool = call set_i32_has(s, const 9)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:11:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 let t12 : usize = len s
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 var x : usize = const 0
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 let t13 : bool = cmp lt x, t12
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 cbr t13, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 let t14 : i32 = elem s, x
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:9 var x : i32 = t14
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:13:22 let t15 : void = call print_println(x)
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 let t16 : usize = binop + x, const 1
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 store x, t16
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:12:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/696_set_dedup_and_order.aic:3:1 ret 
+}

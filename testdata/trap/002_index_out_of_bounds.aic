@@ -1,0 +1,7 @@
+import print
+
+func main() {
+    var xs i32[] = [1, 2, 3]
+    var i usize = 5
+    print.println(xs[i])
+}

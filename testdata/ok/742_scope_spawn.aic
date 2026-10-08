@@ -1,0 +1,52 @@
+import print
+
+// L3（真并发）：任务真并发执行 ⇒ **锚点必须与调度顺序无关**（核心设计 §七【TLS 决议】；
+// 规划 §23 的并发判据）。故任务只**算并回传**，由主任务 join 后按固定序打印 ——
+// 串行模式与并行模式的 stdout 因此逐位一致。
+func twice(a i32, out chan[i32]) {
+    out.send(a * 2)
+}
+
+func tagged(n i32, tag str, nums chan[i32], tags chan[str]) {
+    nums.send(n)
+    tags.send(tag)
+}
+
+func compute(a i32) -> i32 {
+    return a * 2
+}
+
+func main() {
+    print.println("start")
+
+    // 两个任务各自回传，主任务按固定序收（收的顺序由代码决定，不由调度决定）。
+    var a chan[i32] = chan[i32].new()
+    var b chan[i32] = chan[i32].new()
+    scope {
+        spawn twice(1, a)
+        spawn twice(2, b)
+    }
+    var x, xok = a.recv()
+    var y, yok = b.recv()
+    print.println(xok)
+    print.println(yok)
+    print.println(x)
+    print.println(y)
+
+    // 任务里的实参：**值拷贝、引用按句柄传**（§七）；切片元素也可作实参。
+    var xs i32[] = [5, 6]
+    var nums chan[i32] = chan[i32].new()
+    var tags chan[str] = chan[str].new()
+    scope {
+        spawn tagged(xs[0], "from-slice", nums, tags)
+    }
+    var n, nok = nums.recv()
+    var tg, tok = tags.recv()
+    print.println(n)
+    print.println(tg)
+    print.println(nok)
+    print.println(tok)
+
+    print.println(compute(21))
+    print.println("end")
+}

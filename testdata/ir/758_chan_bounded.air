@@ -1,0 +1,42 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/758_chan_bounded.aic:8:44 let t1 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/758_chan_bounded.aic:8:5 var unbounded : chan[i32] = t1
+    loc ../../testdata/ok/758_chan_bounded.aic:9:19 let t2 : void = call chan_i32_send(unbounded, const 1)
+    loc ../../testdata/ok/758_chan_bounded.aic:10:19 let t3 : void = call chan_i32_send(unbounded, const 2)
+    loc ../../testdata/ok/758_chan_bounded.aic:11:19 let t4 : void = call chan_i32_send(unbounded, const 3)
+    loc ../../testdata/ok/758_chan_bounded.aic:12:32 let t5 : usize = call chan_i32_len(unbounded)
+    loc ../../testdata/ok/758_chan_bounded.aic:12:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/758_chan_bounded.aic:14:42 let t7 : chan[i32] = call chan_new_i32(const 2)
+    loc ../../testdata/ok/758_chan_bounded.aic:14:5 var bounded : chan[i32] = t7
+    loc ../../testdata/ok/758_chan_bounded.aic:15:17 let t8 : void = call chan_i32_send(bounded, const 10)
+    loc ../../testdata/ok/758_chan_bounded.aic:16:17 let t9 : void = call chan_i32_send(bounded, const 20)
+    loc ../../testdata/ok/758_chan_bounded.aic:17:30 let t10 : usize = call chan_i32_len(bounded)
+    loc ../../testdata/ok/758_chan_bounded.aic:17:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/758_chan_bounded.aic:18:30 let t12 : (i32, bool) = call chan_i32_recv(bounded)
+    loc ../../testdata/ok/758_chan_bounded.aic:18:5 let t13 : i32 = multi.extract t12, 0
+    loc ../../testdata/ok/758_chan_bounded.aic:18:9 var a : i32 = t13
+    loc ../../testdata/ok/758_chan_bounded.aic:18:5 let t14 : bool = multi.extract t12, 1
+    loc ../../testdata/ok/758_chan_bounded.aic:18:12 var ok1 : bool = t14
+    loc ../../testdata/ok/758_chan_bounded.aic:19:18 let t15 : void = call print_println(a)
+    loc ../../testdata/ok/758_chan_bounded.aic:20:18 let t16 : void = call print_println(ok1)
+    loc ../../testdata/ok/758_chan_bounded.aic:21:17 let t17 : void = call chan_i32_send(bounded, const 30)
+    loc ../../testdata/ok/758_chan_bounded.aic:22:30 let t18 : usize = call chan_i32_len(bounded)
+    loc ../../testdata/ok/758_chan_bounded.aic:22:18 let t19 : void = call print_println(t18)
+    loc ../../testdata/ok/758_chan_bounded.aic:23:28 let t20 : (i32, bool) = call chan_i32_recv(bounded)
+    loc ../../testdata/ok/758_chan_bounded.aic:23:5 let t21 : i32 = multi.extract t20, 0
+    loc ../../testdata/ok/758_chan_bounded.aic:23:9 var b : i32 = t21
+    loc ../../testdata/ok/758_chan_bounded.aic:23:5 let t22 : bool = multi.extract t20, 1
+    loc ../../testdata/ok/758_chan_bounded.aic:24:28 let t23 : (i32, bool) = call chan_i32_recv(bounded)
+    loc ../../testdata/ok/758_chan_bounded.aic:24:5 let t24 : i32 = multi.extract t23, 0
+    loc ../../testdata/ok/758_chan_bounded.aic:24:9 var c : i32 = t24
+    loc ../../testdata/ok/758_chan_bounded.aic:24:5 let t25 : bool = multi.extract t23, 1
+    loc ../../testdata/ok/758_chan_bounded.aic:25:18 let t26 : void = call print_println(b)
+    loc ../../testdata/ok/758_chan_bounded.aic:26:18 let t27 : void = call print_println(c)
+    loc ../../testdata/ok/758_chan_bounded.aic:27:30 let t28 : usize = call chan_i32_len(bounded)
+    loc ../../testdata/ok/758_chan_bounded.aic:27:18 let t29 : void = call print_println(t28)
+    loc ../../testdata/ok/758_chan_bounded.aic:7:1 br exit
+  exit:
+    loc ../../testdata/ok/758_chan_bounded.aic:7:1 ret 
+}

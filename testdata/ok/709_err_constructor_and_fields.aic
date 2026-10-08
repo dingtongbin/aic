@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var e Err = Err(7, "seven")
+    print.println(e.code)
+    print.println(e.msg)
+    var z Err = nil
+    print.println(z.code)
+    print.println(z.msg)
+}

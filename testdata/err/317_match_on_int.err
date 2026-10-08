@@ -1,0 +1,9 @@
+testdata/err/317_match_on_int.aic:3:9: error: invalid match pattern
+    got KW return
+    fix: a pattern is an enum variant name or a payload binding such as Some(x); true/false/nil are not patterns
+testdata/err/317_match_on_int.aic:3:16: error: missing `=>`
+    got INT 1
+    fix: match arm is missing `=>`
+testdata/err/317_match_on_int.aic:2:5: error: match needs at least one arm
+    match x is empty
+    fix: write every enum variant: match x { A => { ... } B => { ... } }

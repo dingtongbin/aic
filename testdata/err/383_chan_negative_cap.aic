@@ -1,0 +1,3 @@
+func main() {
+    var ch chan[i32] = chan[i32].new(-1)
+}

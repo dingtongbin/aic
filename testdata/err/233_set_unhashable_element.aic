@@ -1,0 +1,3 @@
+func f() {
+    var s set[i32[]] = set.new()
+}

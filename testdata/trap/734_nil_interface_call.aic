@@ -1,0 +1,22 @@
+import print
+
+interface Speaker {
+    func speak() -> str
+}
+
+class Dog {
+    func speak() -> str {
+        return "woof"
+    }
+}
+
+class Cat {
+    func speak() -> str {
+        return "meow"
+    }
+}
+
+func main() {
+    var s Speaker = nil
+    print.println(s.speak())
+}

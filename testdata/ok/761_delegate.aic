@@ -1,0 +1,37 @@
+import print
+
+// N10 锚点：显式委托 `use b B` —— A 提升 B 的方法（a.m() 转发到 a.b.m()）。
+// 字段仍在 A 内声明（局部性不破）；本类同名方法 = 显式实现，优先于提升。
+class Engine {
+    var power i32
+
+    func start() -> i32 {
+        return this.power
+    }
+
+    func stop() -> bool {
+        this.power = 0
+        return true
+    }
+}
+
+class Car {
+    use eng Engine
+
+    var eng Engine
+    var name str
+
+    // 显式实现：同名方法获胜，不静默覆盖（N10）
+    func stop() -> bool {
+        return false
+    }
+}
+
+func main() {
+    var e = Engine{power: 120}
+    var c = Car{eng: e, name: "sedan"}
+    print.println(c.start()) // 提升：转发到 c.eng.start()
+    print.println(c.stop())  // 显式实现：不转发
+    print.println(e.power)
+    print.println(c.name)
+}

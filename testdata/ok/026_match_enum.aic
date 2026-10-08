@@ -1,0 +1,21 @@
+import print
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+func name(c Color) -> str {
+    match c {
+        Red => { return "red" }
+        Green => { return "green" }
+        Blue => { return "blue" }
+    }
+}
+
+func main() {
+    print.println(name(Color.Red))
+    print.println(name(Color.Green))
+    print.println(name(Color.Blue))
+}

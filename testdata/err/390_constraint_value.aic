@@ -1,0 +1,14 @@
+class Box {
+    var n i32
+}
+
+// N3 负例：值性约束 value 拒绝带区域头的引用类型。
+func firstOf[T: value](xs T[]) -> T {
+    return xs[0]
+}
+
+func main() {
+    var b = Box{n: 1}
+    var bs Box[] = [b]
+    var x = firstOf(bs)
+}

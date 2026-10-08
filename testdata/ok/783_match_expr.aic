@@ -1,0 +1,28 @@
+import print
+import option
+
+// L4 审计补锚点：**表达式位 match 的负载绑定**与**未定型字面量分支**。
+// 前者此前报"未声明的名字 x"（检查器在检查分支值之前就恢复了作用域），
+// 后者让整条 match 静默无类型（调用方的 var 声明跟着静默消失）。
+enum Color { Red, Green, Blue }
+
+func pick(o option.Option[i32]) -> i32 {
+    return match o { Some(x) => x, None => 0 }
+}
+
+func name(c Color) -> str {
+    return match c {
+        Color.Red => "red",
+        Color.Green => "green",
+        Color.Blue => "blue",
+    }
+}
+
+func main() {
+    print.println(pick(option.ok(5)))
+    print.println(pick(option.none()))
+    print.println(name(Color.Red))
+    print.println(name(Color.Blue))
+    var n = match option.ok(7) { Some(y) => y, None => 0 }
+    print.println(n)
+}

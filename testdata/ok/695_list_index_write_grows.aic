@@ -1,0 +1,8 @@
+import print
+
+func main() {
+    var xs i32[] = [1]
+    xs[3] = 9
+    print.println(xs.len())
+    print.println(xs[3])
+}

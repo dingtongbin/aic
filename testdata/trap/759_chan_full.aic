@@ -1,0 +1,12 @@
+import print
+
+// N11 trap 锚点：有界 channel 满 = 背压点。
+// 真并发下 send 在此阻塞（§16 N11）；本阶段的串行 L2 无法阻塞，故 trap ——
+// 语义上等价于"生产者无处可去"，绝不静默扩容（那会悄悄吃掉背压）。
+func main() {
+    var ch chan[i32] = chan[i32].new(1)
+    ch.send(1)
+    print.println(ch.len())
+    ch.send(2) // 容量 1 已满 ⇒ trap
+    print.println(999)
+}

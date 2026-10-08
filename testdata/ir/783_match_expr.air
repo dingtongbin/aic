@@ -1,0 +1,79 @@
+air v1 module ok
+type ok_Color = enum
+    Red
+    Green
+    Blue
+func ok_pick(o:option_Option[i32]) -> i32 {
+  entry:
+    loc ../../testdata/ok/783_match_expr.aic:9:1 var ret0 : i32
+    loc ../../testdata/ok/783_match_expr.aic:10:12 var mres1 : i32
+    loc ../../testdata/ok/783_match_expr.aic:10:12 let t2 : i32 = enum.tag o
+    loc ../../testdata/ok/783_match_expr.aic:10:12 switch t2 (arm12 arm23)
+  mjoin1:
+    loc ../../testdata/ok/783_match_expr.aic:10:5 store ret0, mres1
+    loc ../../testdata/ok/783_match_expr.aic:10:5 br exit
+  arm12:
+    loc ../../testdata/ok/783_match_expr.aic:10:22 let t3 : i32 = enum.payload o, 0
+    loc ../../testdata/ok/783_match_expr.aic:10:22 var x : i32 = t3
+    loc ../../testdata/ok/783_match_expr.aic:10:22 store mres1, x
+    loc ../../testdata/ok/783_match_expr.aic:10:22 br mjoin1
+  arm23:
+    loc ../../testdata/ok/783_match_expr.aic:10:36 store mres1, const 0
+    loc ../../testdata/ok/783_match_expr.aic:10:36 br mjoin1
+  exit:
+    loc ../../testdata/ok/783_match_expr.aic:9:1 ret ret0
+}
+func ok_name(c:ok_Color) -> str {
+  entry:
+    loc ../../testdata/ok/783_match_expr.aic:13:1 var ret0 : str
+    loc ../../testdata/ok/783_match_expr.aic:14:12 var mres1 : str
+    loc ../../testdata/ok/783_match_expr.aic:14:12 let t2 : i32 = enum.tag c
+    loc ../../testdata/ok/783_match_expr.aic:14:12 switch t2 (arm12 arm23 arm34)
+  mjoin1:
+    loc ../../testdata/ok/783_match_expr.aic:14:5 store ret0, mres1
+    loc ../../testdata/ok/783_match_expr.aic:14:5 br exit
+  arm12:
+    loc ../../testdata/ok/783_match_expr.aic:15:9 store mres1, const "red"
+    loc ../../testdata/ok/783_match_expr.aic:15:9 br mjoin1
+  arm23:
+    loc ../../testdata/ok/783_match_expr.aic:16:9 store mres1, const "green"
+    loc ../../testdata/ok/783_match_expr.aic:16:9 br mjoin1
+  arm34:
+    loc ../../testdata/ok/783_match_expr.aic:17:9 store mres1, const "blue"
+    loc ../../testdata/ok/783_match_expr.aic:17:9 br mjoin1
+  exit:
+    loc ../../testdata/ok/783_match_expr.aic:13:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/783_match_expr.aic:22:33 let t1 : option_Option[i32] = call option_ok(const 5)
+    loc ../../testdata/ok/783_match_expr.aic:22:23 let t2 : i32 = call ok_pick(t1)
+    loc ../../testdata/ok/783_match_expr.aic:22:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/783_match_expr.aic:23:35 let t4 : option_Option[i32] = call option_none()
+    loc ../../testdata/ok/783_match_expr.aic:23:23 let t5 : i32 = call ok_pick(t4)
+    loc ../../testdata/ok/783_match_expr.aic:23:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/783_match_expr.aic:24:29 let t7 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/783_match_expr.aic:24:23 let t8 : str = call ok_name(t7)
+    loc ../../testdata/ok/783_match_expr.aic:24:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/783_match_expr.aic:25:29 let t10 : ok_Color = field ok_Color, 2
+    loc ../../testdata/ok/783_match_expr.aic:25:23 let t11 : str = call ok_name(t10)
+    loc ../../testdata/ok/783_match_expr.aic:25:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/783_match_expr.aic:26:28 let t13 : option_Option[i32] = call option_ok(const 7)
+    loc ../../testdata/ok/783_match_expr.aic:26:13 var mres14 : i32
+    loc ../../testdata/ok/783_match_expr.aic:26:13 let t15 : i32 = enum.tag t13
+    loc ../../testdata/ok/783_match_expr.aic:26:13 switch t15 (arm12 arm23)
+  mjoin1:
+    loc ../../testdata/ok/783_match_expr.aic:26:5 var n : i32 = mres14
+    loc ../../testdata/ok/783_match_expr.aic:27:18 let t17 : void = call print_println(n)
+    loc ../../testdata/ok/783_match_expr.aic:21:1 br exit
+  arm12:
+    loc ../../testdata/ok/783_match_expr.aic:26:34 let t16 : i32 = enum.payload t13, 0
+    loc ../../testdata/ok/783_match_expr.aic:26:34 var y : i32 = t16
+    loc ../../testdata/ok/783_match_expr.aic:26:34 store mres14, y
+    loc ../../testdata/ok/783_match_expr.aic:26:34 br mjoin1
+  arm23:
+    loc ../../testdata/ok/783_match_expr.aic:26:48 store mres14, const 0
+    loc ../../testdata/ok/783_match_expr.aic:26:48 br mjoin1
+  exit:
+    loc ../../testdata/ok/783_match_expr.aic:21:1 ret 
+}

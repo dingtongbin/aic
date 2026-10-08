@@ -1,0 +1,3 @@
+testdata/err/345_print_class_without_tostring.aic:9:18: error: printing a class needs @derive(ToString)
+    type err.P has no ToString
+    fix: annotate the class with @derive(ToString), or print its fields individually (core design §14)

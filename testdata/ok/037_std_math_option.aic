@@ -1,0 +1,12 @@
+import print
+import math
+import option
+
+func main() {
+    print.println(math.abs(0.0 - 2.5))
+    print.println(math.max(1.5, 2.5))
+    print.println(math.min(3.0, 9.0))
+    print.println(math.floor(2.7))
+    var o = option.ok(5)
+    print.println(option.isSome(o))
+}

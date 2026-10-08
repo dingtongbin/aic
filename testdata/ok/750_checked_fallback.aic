@@ -1,0 +1,25 @@
+import print
+
+// 反例：证明不成立时必须回落带检查形态（红线 13：宁保守插检查，禁错误消除）。
+// ① 循环上界不是字面量（xs.len()）→ 不证明
+// ② 容器在循环体内有变更点（append）→ 长度事实作废 → 不证明
+func main() {
+    var xs i32[] = [1, 2, 3, 4]
+    var total i32 = 0
+    for i in 0..xs.len() {
+        total = total + xs[i]
+    }
+    print.println(total)
+    var ys i32[] = [5, 6]
+    for i in 0..ys.len() {
+        ys[i] = ys[i] + 1
+    }
+    for i in 0..ys.len() {
+        print.println(ys[i])
+    }
+    var zs i32[] = [7]
+    for i in 0..1 {
+        zs.append(i32(i))
+    }
+    print.println(zs.len())
+}

@@ -1,0 +1,11 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/019_str_len.aic:4:5 var s : str = const "hello"
+    loc ../../testdata/ok/019_str_len.aic:5:18 let t1 : usize = call str_len(s)
+    loc ../../testdata/ok/019_str_len.aic:5:5 var n : usize = t1
+    loc ../../testdata/ok/019_str_len.aic:6:18 let t2 : void = call print_println(const "str ok")
+    loc ../../testdata/ok/019_str_len.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/019_str_len.aic:3:1 ret 
+}

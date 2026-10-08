@@ -1,0 +1,27 @@
+import print
+
+func note(tag str) {
+    print.println(tag)
+}
+
+// v2：errdefer 退役——标志位 + defer，仅错误路径打印。
+func f(fail bool) -> Err {
+    var failed bool = false
+    defer {
+        if failed {
+            note("cleanup")
+        }
+    }
+    if fail {
+        failed = true
+        return Err(1, "boom")
+    }
+    return nil
+}
+
+func main() {
+    var a = f(false)
+    print.println(a.code)
+    var b = f(true)
+    print.println(b.code)
+}

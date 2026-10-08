@@ -1,0 +1,43 @@
+import print
+import os
+import str
+
+// B1 数值核 · 素数筛（Eratosthenes，默认上限 1e8）。
+// 与 benches/c/b1_sieve.c 同构：同一个 bool 数组、同样的标记次序。
+func sieve(limit usize, composite bool[]) {
+    var p usize = 2
+    for p * p <= limit {
+        if composite[p] == false {
+            var m usize = p * p
+            for m <= limit {
+                composite[m] = true
+                m = m + p
+            }
+        }
+        p = p + 1
+    }
+}
+
+func main() -> Err {
+    var limit usize = 100000000
+    var args = os.args()
+    if args.len() >= 2 {
+        var v, e = str.toI64(args[1])
+        if e.code == 0 {
+            limit = usize(v)
+        }
+    }
+    var composite bool[] = []
+    for i in 0..limit + 1 {
+        composite.append(false)
+    }
+    sieve(limit, composite)
+    var count i64 = 0
+    for i in 2..limit + 1 {
+        if composite[i] == false {
+            count = count + 1
+        }
+    }
+    print.println(count)
+    return nil
+}

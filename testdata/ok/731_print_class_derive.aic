@@ -1,0 +1,32 @@
+import print
+
+@derive(ToString)
+class Point {
+    var x i32
+    var y i32
+}
+
+@packed
+@derive(ToString)
+class Pair {
+    var a i32
+    var b i32
+}
+
+@derive(ToString)
+class Line {
+    var from Point
+    var to Point
+    var label str
+}
+
+func main() {
+    var p = Point{x: 1, y: 2}
+    print.println(p)
+    var q = Point{x: 3, y: 4}
+    print.println(Line{from: p, to: q, label: "seg"})
+    var w = Pair{a: 7, b: 8}
+    print.println(w)
+    var xs Point[] = [p, q]
+    print.println(xs)
+}

@@ -1,0 +1,11 @@
+import print
+import option
+
+// L4 审计补锚点：`Some(未定型字面量)` 必须能定型（此前整条声明静默消失，
+// 只剩下游"undeclared name"的级联诊断）。
+func main() {
+    var o option.Option[i32] = Some(9)
+    print.println(option.isSome(o))
+    var p option.Option[i32] = option.none()
+    print.println(option.isSome(p))
+}

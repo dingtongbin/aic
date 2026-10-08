@@ -1,0 +1,49 @@
+air v1 module ok
+type ok_Size = struct packed
+    0:w:i32
+    1:h:i32
+type ok_Shape = enum
+    Circle(i32)
+    Rect(ok_Size)
+func ok_area(s:ok_Shape) -> i32 {
+  entry:
+    loc ../../testdata/ok/790_enum_packed_payload.aic:12:1 var ret0 : i32
+    loc ../../testdata/ok/790_enum_packed_payload.aic:13:12 var mres1 : i32
+    loc ../../testdata/ok/790_enum_packed_payload.aic:13:12 let t2 : i32 = enum.tag s
+    loc ../../testdata/ok/790_enum_packed_payload.aic:13:12 switch t2 (arm12 arm23)
+  mjoin1:
+    loc ../../testdata/ok/790_enum_packed_payload.aic:13:5 store ret0, mres1
+    loc ../../testdata/ok/790_enum_packed_payload.aic:13:5 br exit
+  arm12:
+    loc ../../testdata/ok/790_enum_packed_payload.aic:14:9 let t3 : i32 = enum.payload s, 0
+    loc ../../testdata/ok/790_enum_packed_payload.aic:14:9 var r : i32 = t3
+    loc ../../testdata/ok/790_enum_packed_payload.aic:14:30 let t4 : i32 = binop * r, r
+    loc ../../testdata/ok/790_enum_packed_payload.aic:14:34 let t5 : i32 = binop * t4, const 3
+    loc ../../testdata/ok/790_enum_packed_payload.aic:14:9 store mres1, t5
+    loc ../../testdata/ok/790_enum_packed_payload.aic:14:9 br mjoin1
+  arm23:
+    loc ../../testdata/ok/790_enum_packed_payload.aic:15:9 let t6 : ok_Size = enum.payload s, 1
+    loc ../../testdata/ok/790_enum_packed_payload.aic:15:9 var sz : ok_Size = t6
+    loc ../../testdata/ok/790_enum_packed_payload.aic:15:29 let t7 : i32 = field sz, 0
+    loc ../../testdata/ok/790_enum_packed_payload.aic:15:36 let t8 : i32 = field sz, 1
+    loc ../../testdata/ok/790_enum_packed_payload.aic:15:32 let t9 : i32 = binop * t7, t8
+    loc ../../testdata/ok/790_enum_packed_payload.aic:15:9 store mres1, t9
+    loc ../../testdata/ok/790_enum_packed_payload.aic:15:9 br mjoin1
+  exit:
+    loc ../../testdata/ok/790_enum_packed_payload.aic:12:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/790_enum_packed_payload.aic:20:36 let t1 : ok_Shape = call Shape_Circle(const 2)
+    loc ../../testdata/ok/790_enum_packed_payload.aic:20:23 let t2 : i32 = call ok_area(t1)
+    loc ../../testdata/ok/790_enum_packed_payload.aic:20:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:35 let obj4 : ok_Size = alloc task(ok_Size)
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:40 store field obj4, 0, const 3
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:46 store field obj4, 1, const 4
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:34 let t5 : ok_Shape = call Shape_Rect(obj4)
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:23 let t6 : i32 = call ok_area(t5)
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/790_enum_packed_payload.aic:19:1 br exit
+  exit:
+    loc ../../testdata/ok/790_enum_packed_payload.aic:19:1 ret 
+}

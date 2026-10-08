@@ -1,0 +1,42 @@
+import print
+
+// L4-g 锚点：**Err 的 cause 链**（§16 N5 ④）。`Err(code,msg)` 建无链错误；
+// `Err.wrap(code,msg,cause)` 把内层错误挂成 cause —— 节点**拷贝进当前区域**，
+// 所以挂在栈上临时量上也是安全的（见运行时 aic_err_wrap）。
+// 读 `cause` 要过判空闸：无 cause 时读它 = null dereference trap（§九），不是静默读到垃圾。
+func load(name str) -> (i32, Err) {
+    if name == "bad" {
+        return 0, Err(2, "file not found")
+    }
+    if name == "hash" {
+        return 0, Err(3, "checksum mismatch")
+    }
+    return 42, nil
+}
+
+func parse(name str) -> (i32, Err) {
+    var v, e = load(name)
+    if e != nil {
+        return 0, Err.wrap(10, "parse failed", e)
+    }
+    return v, nil
+}
+
+func run(name str) -> (i32, Err) {
+    var v, e = parse(name)
+    if e != nil {
+        return 0, Err.wrap(20, "run failed", e)
+    }
+    return v, nil
+}
+
+func main() {
+    var v, e = run("ok")
+    print.println(v)
+    var v2, e2 = run("bad")
+    print.println(e2.code)
+    print.println(e2.msg)
+    print.println(e2.cause.msg)
+    var v3, e3 = run("hash")
+    print.println(e3.cause.cause.msg)
+}

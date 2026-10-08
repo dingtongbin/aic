@@ -1,0 +1,7 @@
+func g() -> i32 {
+    return 1
+}
+
+func f() {
+    var x = check g()
+}

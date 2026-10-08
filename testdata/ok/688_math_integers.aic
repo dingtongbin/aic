@@ -1,0 +1,9 @@
+import print
+import math
+
+func main() {
+    print.println(math.abs(f64(0) - 9))
+    print.println(math.abs(f64(9)))
+    print.println(math.min(2, 8))
+    print.println(math.max(2, 8))
+}

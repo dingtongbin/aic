@@ -1,0 +1,19 @@
+import print
+
+func main() {
+    var m map[str]i32 = map.new()
+    m.put("one", 1)
+    m.put("two", 2)
+    m.put("one", 11)
+    print.println(m.len())
+    print.println(m.get("one"))
+    print.println(m.get("two"))
+    print.println(m.has("three"))
+    print.println(m.get("three"))
+    var i usize = 0
+    for i < m.len() {
+        print.println(m.keyAt(i))
+        print.println(m.valAt(i))
+        i = i + 1
+    }
+}

@@ -1,0 +1,7 @@
+import print
+
+func main() {
+    var a i64 = 7
+    var b i64 = 0
+    print.println(a % b)
+}

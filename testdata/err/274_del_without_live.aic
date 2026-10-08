@@ -1,0 +1,4 @@
+func main() {
+    var x i32 = 1
+    del x
+}

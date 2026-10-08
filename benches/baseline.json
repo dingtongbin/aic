@@ -1,0 +1,48 @@
+{
+  "cases": {
+    "B1-matmul": {
+      "aic_ms": 759.643,
+      "c_ms": 347.701,
+      "aic_median_ms": 902.504,
+      "c_median_ms": 420.334,
+      "ratio": 2.1848,
+      "ratio_med": 2.1471,
+      "arg": "512",
+      "aic_size": 172671,
+      "c_size": 114571
+    },
+    "B1-sieve": {
+      "aic_ms": 1685.802,
+      "c_ms": 805.402,
+      "aic_median_ms": 1764.614,
+      "c_median_ms": 826.135,
+      "ratio": 2.0931,
+      "ratio_med": 2.136,
+      "arg": "100000000",
+      "aic_size": 171650,
+      "c_size": 114571
+    },
+    "B2-json": {
+      "aic_ms": 13.093,
+      "c_ms": 7.776,
+      "aic_median_ms": 14.151,
+      "c_median_ms": 8.938,
+      "ratio": 1.6838,
+      "ratio_med": 1.5833,
+      "arg": "D:\\githubproject\\aic\\aic-src\\build\\bench\\bench_json_input.json",
+      "aic_size": 173921,
+      "c_size": 115775
+    },
+    "B4-graph": {
+      "aic_ms": 30.824,
+      "c_ms": 74.062,
+      "aic_median_ms": 36.345,
+      "c_median_ms": 81.274,
+      "ratio": 0.4162,
+      "ratio_med": 0.4472,
+      "arg": "1000000",
+      "aic_size": 170976,
+      "c_size": 114397
+    }
+  }
+}

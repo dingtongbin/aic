@@ -1,0 +1,36 @@
+import print
+
+enum Kind {
+    Low,
+    High
+}
+
+@packed
+@derive(Compare, Hash)
+class Score {
+    var n i32
+    var tag str
+}
+
+@derive(Compare, Hash)
+class Item {
+    var id i32
+    var name str
+    var score Score
+    var kind Kind
+    var ok bool
+}
+
+func main() {
+    var a = Item{id: 1, name: "alpha", score: Score{n: 3, tag: "x"}, kind: Kind.Low, ok: true}
+    var b = Item{id: 1, name: "alpha", score: Score{n: 3, tag: "x"}, kind: Kind.Low, ok: true}
+    var c = Item{id: 2, name: "alpha", score: Score{n: 3, tag: "x"}, kind: Kind.Low, ok: true}
+    print.println(a.compare(b))
+    print.println(a.compare(c))
+    print.println(c.compare(a))
+    print.println(a.hash() == b.hash())
+    print.println(a.hash() == c.hash())
+    var s1 = Score{n: 1, tag: "b"}
+    var s2 = Score{n: 1, tag: "a"}
+    print.println(s2.compare(s1))
+}

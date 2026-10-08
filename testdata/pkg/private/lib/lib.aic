@@ -1,0 +1,9 @@
+// 包 lib：helper 小写开头 = **包私有**（核心设计 §四：首字符 A-Z 才跨包可见）。
+// 同包内的调用完全合法 —— 私有只对跨包引用生效。
+func helper() -> str {
+    return "private"
+}
+
+func Used() -> str {
+    return helper()
+}

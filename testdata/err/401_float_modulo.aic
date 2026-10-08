@@ -1,0 +1,7 @@
+import print
+
+// L4 err 锚点：取余 % 只对整数成立（浮点要显式 math.fmod）—— 此前检查器放行、
+// 发射出非法的 C（gcc: invalid operands to binary %）。
+func main() {
+    print.println(5.5 % 2.0)
+}

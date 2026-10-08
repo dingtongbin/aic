@@ -1,0 +1,3 @@
+testdata/err/272_defer_complex_argument.aic:13:17: error: a block-local object cannot be a defer argument (it would outlive the block)
+    object created at depth 1
+    fix: create the object outside the block, or pass a value type (core design §5 R5)

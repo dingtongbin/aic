@@ -1,0 +1,11 @@
+import print
+
+func main() {
+    var n i32 = 0
+    for var i i32 = 0; i < 3; i = i + 1 {
+        for var j i32 = 0; j < 3; j = j + 1 {
+            n = n + 1
+        }
+    }
+    print.println(n)
+}

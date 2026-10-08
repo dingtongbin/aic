@@ -1,0 +1,28 @@
+import print
+
+// N11 锚点：`chan[T].new(cap)` = 有界缓冲；`new()` = 无界。
+//   ① 无界：send 永不因容量失败；
+//   ② 有界：容量内正常收发，满即**背压点**（真并发下阻塞，本阶段串行 L2 下 trap）；
+//   ③ len() 报告当前排队数。
+func main() {
+    var unbounded chan[i32] = chan[i32].new()
+    unbounded.send(1)
+    unbounded.send(2)
+    unbounded.send(3)
+    print.println(unbounded.len())
+
+    var bounded chan[i32] = chan[i32].new(2)
+    bounded.send(10)
+    bounded.send(20)
+    print.println(bounded.len())
+    var a, ok1 = bounded.recv()
+    print.println(a)
+    print.println(ok1)
+    bounded.send(30) // 出队一个再入队：容量内
+    print.println(bounded.len())
+    var b, _ = bounded.recv()
+    var c, _ = bounded.recv()
+    print.println(b)
+    print.println(c)
+    print.println(bounded.len())
+}

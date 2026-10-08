@@ -1,0 +1,18 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:4:20 let t1 : Err = call Err(const 7, const "seven")
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:4:5 var e : Err = t1
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:5:20 let t2 : i32 = field e, 0
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:5:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:6:20 let t4 : str = field e, 1
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:6:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:7:5 var z : Err = nil
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:8:20 let t6 : i32 = field z, 0
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:8:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:9:20 let t8 : str = field z, 1
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:9:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/709_err_constructor_and_fields.aic:3:1 ret 
+}

@@ -1,0 +1,14 @@
+import print
+
+// N4 err 锚点：fieldsOf 只对类有意义，variantsOf 只对枚举有意义 —— 用错必须点名纠正。
+enum Shape {
+    Dot, Line(i32)
+}
+
+comptime {
+    const N = fieldsOf(Shape).len
+}
+
+func main() {
+    print.println(N)
+}

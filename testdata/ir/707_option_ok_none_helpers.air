@@ -1,0 +1,20 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:5:22 let t1 : option_Option[i32] = call option_ok(const 5)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:5:5 var a : option_Option[i32] = t1
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:6:43 let t2 : option_Option[i32] = call option_none()
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:6:5 var b : option_Option[i32] = t2
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:7:32 let t3 : bool = call option_isSome(a)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:7:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:8:32 let t5 : bool = call option_isSome(b)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:8:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:9:33 let t7 : bool = call option_isSome(b)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:9:19 let t8 : bool = unop ! t7
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:9:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:10:32 let t10 : i32 = call option_unwrap(a)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:10:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/707_option_ok_none_helpers.aic:4:1 ret 
+}

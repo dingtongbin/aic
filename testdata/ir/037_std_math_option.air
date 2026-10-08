@@ -1,0 +1,20 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/037_std_math_option.aic:6:32 let t1 : f64 = binop - const 0.0, const 2.5
+    loc ../../testdata/ok/037_std_math_option.aic:6:27 let t2 : f64 = call math_abs(t1)
+    loc ../../testdata/ok/037_std_math_option.aic:6:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/037_std_math_option.aic:7:27 let t4 : f64 = call math_max(const 1.5, const 2.5)
+    loc ../../testdata/ok/037_std_math_option.aic:7:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/037_std_math_option.aic:8:27 let t6 : f64 = call math_min(const 3.0, const 9.0)
+    loc ../../testdata/ok/037_std_math_option.aic:8:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/037_std_math_option.aic:9:29 let t8 : f64 = call math_floor(const 2.7)
+    loc ../../testdata/ok/037_std_math_option.aic:9:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/037_std_math_option.aic:10:22 let t10 : option_Option[i32] = call option_ok(const 5)
+    loc ../../testdata/ok/037_std_math_option.aic:10:5 var o : option_Option[i32] = t10
+    loc ../../testdata/ok/037_std_math_option.aic:11:32 let t11 : bool = call option_isSome(o)
+    loc ../../testdata/ok/037_std_math_option.aic:11:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/037_std_math_option.aic:5:1 br exit
+  exit:
+    loc ../../testdata/ok/037_std_math_option.aic:5:1 ret 
+}
