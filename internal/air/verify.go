@@ -351,6 +351,9 @@ func instUses(in Inst) []string {
 		}
 	case *DeferInit:
 		return v.Vals
+	case *Spawn:
+		// spawn 的实参同样是使用点（在 spawn 点求值，V2 的使用前定义覆盖它们）。
+		return v.Vals
 	case *TrapIfErr:
 		return []string{v.Err}
 	case *SelWait:
@@ -372,7 +375,8 @@ func placeUses(p Place) []string {
 	case *FieldPlace:
 		return placeUses(v.Base)
 	case *StrViewPlace:
-		return placeUses(v.Base)
+		// Lo/Hi 是值名：漏了它们，未定义边界的视图就查不出来（V2 的使用前定义）。
+		return append([]string{v.Lo, v.Hi}, placeUses(v.Base)...)
 	}
 	return nil
 }
@@ -405,6 +409,8 @@ func rhsUses(r RHS) []string {
 		return placeUses(v.Place)
 	case *StrViewRHS:
 		return []string{v.Base, v.Lo, v.Hi}
+	case *AddrRHS:
+		return []string{v.Val}
 	case *MultiExtract:
 		return []string{v.Val}
 	case *EnumTag:

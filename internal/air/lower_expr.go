@@ -105,6 +105,14 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 				Rhs: &FieldRHS{Place: &VarPlace{Name: l.ty(en)}, Idx: idx}, Loc: LocOf(v.Pos)})
 			return t, nil
 		}
+		// **跨包常量**（`base.Limit`）：常量是字面量，AIR 里也是字面量（与
+		// 本包常量同口径：不占运行时存储）。基座是 import 的包名 —— 走字段路径
+		// 会把它当对象成员（chain3 实测：字段下标解析失败）。
+		if id, isID := v.X.(*parse.Ident); isID && l.info != nil {
+			if sym, ok := l.info.Consts[id.Name+"."+v.Name]; ok && sym != nil {
+				return constText(sym.Const), nil
+			}
+		}
 		// **接收者的 place** + 本字段下标 —— 不能写 `place(v)`：那已经是一次
 		// `field base, idx` 的 place，再套一层 `FieldRHS{Place: 它, Idx: idx}` 就成了
 		// `field (field x, i), i`（**读两次字段**）。此前 AIR 的每个字段读都被降成双层，
@@ -114,10 +122,35 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 			return "", err
 		}
 		t := l.tmp("t")
-		idx, _ := l.fieldIndex(v)
+		idx, ok := l.fieldIndex(v)
+		if !ok {
+			return "", fmt.Errorf("air: cannot resolve the field index of %s (receiver type unknown, line %d)",
+				exprFieldText(v), parse.ExprPos(v).Line)
+		}
 		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: l.tyOf(v), Rhs: &FieldRHS{Place: pl, Idx: idx}, Loc: LocOf(v.Pos)})
 		return t, nil
 	case *parse.Index:
+		// str 视图 `s[lo..hi]`：显式化成 StrViewRHS（零拷贝 + 运行期边界检查）。
+		// 曾经这里直接走 place()，StrViewPlace 又把 Lo/Hi 丢掉 ⇒ emit 只剩一个裸基座，
+		// "视图未发射"其实是"视图的边界在降级时被丢了"（720 实测）。
+		if v.End != nil {
+			base, err := l.value(v.X)
+			if err != nil {
+				return "", err
+			}
+			lo, err := l.value(v.Index)
+			if err != nil {
+				return "", err
+			}
+			hi, err := l.value(v.End)
+			if err != nil {
+				return "", err
+			}
+			t := l.tmp("t")
+			l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: "str",
+				Rhs: &StrViewRHS{Base: base, Lo: lo, Hi: hi}, Loc: LocOf(v.Pos)})
+			return t, nil
+		}
 		pl, err := l.place(v)
 		if err != nil {
 			return "", err
@@ -577,15 +610,54 @@ func (l *lowerer) composite(v *parse.CompositeLit) (string, error) {
 	}
 	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: obj, Ty: objTy + ptr,
 		Rhs: &Alloc{Kind: kind, Ty: objTy}, Loc: LocOf(v.Pos)})
-	for i, f := range v.Fields {
-		val, err := l.value(f.Value)
-		if err != nil {
-			return "", err
+	// 字段存储：下标 = **类声明序**（不是字面量里的位置 —— `Point{y:2, x:1}`
+	// 按位置写会静默把 y 存进 x 的槽）。未列出的字段 = 零值（§二.3）：区域分配
+	// 不清零（只复位 bump 指针），不显式存零 = 新对象读到该内存上一个对象的
+	// 残留 —— 716/752 实测（`Log{}` 的 s/n 是垃圾，`this.s + t` 拿垃圾长度
+	// 去分配，只在特定内存布局下不炸）。这是 soundness 洞不是性能问题。
+	// 泛型**实例**（`Box[i32]{…}`）的类型是 Instance，字段表在基类上（类型按
+	// 实例实参代换）—— 782 实测：只认 Class 会把 instance 的存储整段跳过。
+	cl, isCl := types.IsClass(l.typeOf(v))
+	if !isCl {
+		if inst, isInst := l.typeOf(v).(*types.Instance); isInst {
+			cl, isCl = types.IsClass(inst.Base)
 		}
-		l.cur.Insts = append(l.cur.Insts, &Store{
-			Place: &FieldPlace{Base: &VarPlace{Name: obj}, Idx: i},
-			Val:   val, Loc: LocOf(f.Pos),
-		})
+	}
+	if isCl {
+		listed := map[string]parse.Expr{}
+		for _, f := range v.Fields {
+			listed[f.Name] = f.Value
+		}
+		for i := range cl.Fields {
+			fd := cl.Fields[i]
+			place := &FieldPlace{Base: &VarPlace{Name: obj}, Idx: i}
+			valExpr, has := listed[fd.Name]
+			if !has {
+				l.cur.Insts = append(l.cur.Insts, &Store{
+					Place: place, Val: "nil", Loc: LocOf(v.Pos), // emit 按目标字段类型取零值
+				})
+				continue
+			}
+			val, err := l.value(valExpr)
+			if err != nil {
+				return "", err
+			}
+			l.cur.Insts = append(l.cur.Insts, &Store{
+				Place: place, Val: val, Loc: LocOf(v.Pos),
+			})
+		}
+	} else {
+		// 非类/实例（理论上到不了）：保守按字面量位置存，至少不丢写入。
+		for i, f := range v.Fields {
+			val, err := l.value(f.Value)
+			if err != nil {
+				return "", err
+			}
+			l.cur.Insts = append(l.cur.Insts, &Store{
+				Place: &FieldPlace{Base: &VarPlace{Name: obj}, Idx: i},
+				Val:   val, Loc: LocOf(f.Pos),
+			})
+		}
 	}
 	return obj, nil
 }
@@ -600,7 +672,13 @@ func (l *lowerer) place(e parse.Expr) (Place, error) {
 		if err != nil {
 			return nil, err
 		}
-		idx, _ := l.fieldIndex(v)
+		idx, ok := l.fieldIndex(v)
+		if !ok {
+			// 下标取不到 = 接收者类型不在检查产物里（记录缺陷），绝不能默认 0：
+			// 那会把 `this.b = 2` 静默写进字段 a（752 实测，红线 23）。
+			return nil, fmt.Errorf("air: cannot resolve the field index of %s (receiver type unknown, line %d)",
+				exprFieldText(v), parse.ExprPos(v).Line)
+		}
 		return &FieldPlace{Base: base, Idx: idx}, nil
 	case *parse.Index:
 		base, err := l.basePlace(v.X)
@@ -608,7 +686,16 @@ func (l *lowerer) place(e parse.Expr) (Place, error) {
 			return nil, err
 		}
 		if v.End != nil {
-			return &StrViewPlace{Base: base}, nil
+			// 视图的 place 形态：Lo/Hi 必须带着（丢了边界 = 丢了语义，720 实测）。
+			lo, err := l.value(v.Index)
+			if err != nil {
+				return nil, err
+			}
+			hi, err := l.value(v.End)
+			if err != nil {
+				return nil, err
+			}
+			return &StrViewPlace{Base: base, Lo: lo, Hi: hi}, nil
 		}
 		idx, err := l.value(v.Index)
 		if err != nil {
@@ -619,6 +706,18 @@ func (l *lowerer) place(e parse.Expr) (Place, error) {
 		return &VarPlace{Name: "this__"}, nil
 	}
 	return nil, fmt.Errorf("air: not an lvalue (%T at line %d)", e, parse.ExprPos(e).Line)
+}
+
+// exprFieldText 渲染字段访问的源码形态（诊断用：与 types 的 exprText 同规则，
+// 但 air 不依赖 types 的未导出实现 —— 各写一份渲染会让两边的文案分叉）。
+func exprFieldText(v *parse.Field) string {
+	switch b := v.X.(type) {
+	case *parse.ThisExpr:
+		return "this." + v.Name
+	case *parse.Ident:
+		return b.Name + "." + v.Name
+	}
+	return v.Name
 }
 
 // basePlace 取字段/下标访问的基址 place：不是 lvalue（如调用结果）时先把值物化成
@@ -738,7 +837,12 @@ func tyText(t types.Type) string {
 	case *types.MutexT:
 		return "sync_Mutex"
 	case *types.Instance:
-		out := tyText(v.Base)
+		// 基类的引用标记 `*` 属于**最外层**：`ok_Box[i32]*`。写成 `ok_Box*[i32]`
+		// （星号嵌在实例实参中间）会让 emit 侧所有「尾部判 `*`」的规则失效：
+		// `b.v` 被发成 `.` 而不是 `->`、链式字段类型解析直接落空（740 实测）。
+		base := tyText(v.Base)
+		ref := strings.HasSuffix(base, "*")
+		out := strings.TrimSuffix(base, "*")
 		for i, a := range v.Args {
 			if i == 0 {
 				out += "["
@@ -747,7 +851,11 @@ func tyText(t types.Type) string {
 			}
 			out += tyText(a)
 		}
-		return out + "]"
+		out += "]"
+		if ref {
+			out += "*"
+		}
+		return out
 	case *types.FuncT:
 		out := "fn("
 		for i, p := range v.Params {
@@ -757,6 +865,18 @@ func tyText(t types.Type) string {
 			out += tyText(p)
 		}
 		return out + ")->" + tyText(v.Result)
+	case *types.MultiType:
+		// 多返回值的类型文本必须是 **AIR 文本的元组**（`(trap_Buf*, trap_Buf*)`）：
+		// 走 t.String() 会把点号形态（`trap.Buf`）带进类型表键，emit 的
+		// irRetNameOf 查不到映射（780 实测）。
+		out := "("
+		for i, e := range v.Elems {
+			if i > 0 {
+				out += ", "
+			}
+			out += tyText(e)
+		}
+		return out + ")"
 	case *types.TypeParam:
 		return "T" + v.Name
 	}

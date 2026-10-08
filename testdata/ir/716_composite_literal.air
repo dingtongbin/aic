@@ -8,15 +8,16 @@ type ok_Point = struct
 func ok_main() {
   entry:
     loc ../../testdata/ok/716_composite_literal.aic:14:13 let obj1 : ok_Point* = alloc task(ok_Point)
-    loc ../../testdata/ok/716_composite_literal.aic:14:19 store field obj1, 0, const 1
-    loc ../../testdata/ok/716_composite_literal.aic:14:25 store field obj1, 1, const 2
+    loc ../../testdata/ok/716_composite_literal.aic:14:13 store field obj1, 0, const 1
+    loc ../../testdata/ok/716_composite_literal.aic:14:13 store field obj1, 1, const 2
     loc ../../testdata/ok/716_composite_literal.aic:14:5 var p : ok_Point* = obj1
     loc ../../testdata/ok/716_composite_literal.aic:15:13 let obj2 : ok_Point* = alloc task(ok_Point)
-    loc ../../testdata/ok/716_composite_literal.aic:15:19 store field obj2, 0, const 5
+    loc ../../testdata/ok/716_composite_literal.aic:15:13 store field obj2, 0, const 5
+    loc ../../testdata/ok/716_composite_literal.aic:15:13 store field obj2, 1, nil
     loc ../../testdata/ok/716_composite_literal.aic:15:5 var q : ok_Point* = obj2
     loc ../../testdata/ok/716_composite_literal.aic:16:13 let obj3 : ok_Line* = alloc task(ok_Line)
-    loc ../../testdata/ok/716_composite_literal.aic:16:18 store field obj3, 0, p
-    loc ../../testdata/ok/716_composite_literal.aic:16:24 store field obj3, 1, q
+    loc ../../testdata/ok/716_composite_literal.aic:16:13 store field obj3, 0, p
+    loc ../../testdata/ok/716_composite_literal.aic:16:13 store field obj3, 1, q
     loc ../../testdata/ok/716_composite_literal.aic:16:5 var l : ok_Line* = obj3
     loc ../../testdata/ok/716_composite_literal.aic:17:20 let t4 : i32 = field p, 0
     loc ../../testdata/ok/716_composite_literal.aic:17:18 let t5 : void = call print_println(t4)

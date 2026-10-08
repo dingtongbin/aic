@@ -103,14 +103,14 @@ func ok_total(xs:ok_Shape[]) -> i32 {
 func ok_main() {
   entry:
     loc ../../testdata/ok/734_interface_dispatch.aic:59:13 let obj1 : ok_Square* = alloc task(ok_Square)
-    loc ../../testdata/ok/734_interface_dispatch.aic:59:20 store field obj1, 0, const 3
+    loc ../../testdata/ok/734_interface_dispatch.aic:59:13 store field obj1, 0, const 3
     loc ../../testdata/ok/734_interface_dispatch.aic:59:5 var a : ok_Square* = obj1
     loc ../../testdata/ok/734_interface_dispatch.aic:60:13 let obj2 : ok_Rect* = alloc task(ok_Rect)
-    loc ../../testdata/ok/734_interface_dispatch.aic:60:18 store field obj2, 0, const 2
-    loc ../../testdata/ok/734_interface_dispatch.aic:60:24 store field obj2, 1, const 5
+    loc ../../testdata/ok/734_interface_dispatch.aic:60:13 store field obj2, 0, const 2
+    loc ../../testdata/ok/734_interface_dispatch.aic:60:13 store field obj2, 1, const 5
     loc ../../testdata/ok/734_interface_dispatch.aic:60:5 var b : ok_Rect* = obj2
     loc ../../testdata/ok/734_interface_dispatch.aic:61:13 let obj3 : ok_Dot = alloc task(ok_Dot)
-    loc ../../testdata/ok/734_interface_dispatch.aic:61:17 store field obj3, 0, const 7
+    loc ../../testdata/ok/734_interface_dispatch.aic:61:13 store field obj3, 0, const 7
     loc ../../testdata/ok/734_interface_dispatch.aic:61:5 var c : ok_Dot = obj3
     loc ../../testdata/ok/734_interface_dispatch.aic:62:19 let t4 : ok_Shape = box a, ok_Shape
     loc ../../testdata/ok/734_interface_dispatch.aic:62:5 var s : ok_Shape = t4

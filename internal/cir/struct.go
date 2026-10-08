@@ -79,7 +79,10 @@ type folder struct {
 	sym     string
 	byLabel map[string]*air.Block
 	order   []string // 声明序（剩余块/标签块的确定性发射序）
-	preds   map[string]map[string]bool
+	// links 记录"某层 if 的两支已close 进它、线性链应当继续穿过的汇合点"
+	// （多前驱块默认不许内联进链 —— 见 fold 的停步规则）。
+	links      map[string]bool
+	preds      map[string]map[string]bool
 	done    map[string]bool
 	labeled map[string]bool // 被 goto 引用的块（要发 label）
 	inlined map[string]bool // 内容被内联到各分支的块（只剩 ret 的 exit）
@@ -99,6 +102,7 @@ func buildFunc(f *air.Func) (*Func, error) {
 		preds: map[string]map[string]bool{}, done: map[string]bool{},
 		labeled: map[string]bool{}, inlined: map[string]bool{}, emittedLabel: map[string]bool{},
 		reserve: map[string]int{}, edges: map[[2]string]bool{},
+		links:   map[string]bool{},
 	}
 	for _, b := range f.Blocks {
 		fl.byLabel[b.Label] = b
@@ -198,6 +202,16 @@ func (fl *folder) fold(start string) ([]Stmt, string, string, error) {
 		if fl.done[cur] || fl.reserve[cur] > 0 {
 			return out, cur, pendFrom, nil
 		}
+		// **汇合点不内联进线性链**：多个前驱且自带指令的块是被多条路径共享的
+		// 代码。折进第一条到达它的链 ⇒ 只有那条路径执行它，其余路径只剩 goto
+		// 却没有标签（tool 实测：join3 被 then 支折走，else 支的 goto 悬空）。
+		// 例外：① 本层 if 已把两支 close 进它（links 登记）；② 出口块（零指令，
+		// 由 close 的 inlineExit 处理）；③ 链的起点（调用方刚折完 if 正续进来）。
+		if cur != start && len(fl.preds[cur]) > 1 && len(fl.byLabel[cur].Insts) > 0 &&
+			!fl.isLoopHead(cur) && !fl.isLoopPost(cur) &&
+			!(fl.links[cur] && !fl.labeled[cur]) {
+			return out, cur, pendFrom, nil
+		}
 		if pendFrom != "" {
 			// 上一条 `br cur` 靠文字顺序落空 ⇒ 物化。
 			fl.edges[[2]string{pendFrom, cur}] = true
@@ -208,6 +222,13 @@ func (fl *folder) fold(start string) ([]Stmt, string, string, error) {
 			return nil, "", "", fmt.Errorf("block %s not found", cur)
 		}
 		fl.done[cur] = true
+		// 经 links 豁免内联的多前驱汇合点：先发标签。后到的路径会 goto 到这里
+		// （C 的标签可以位于块内，goto 跳进来合法；未使用的标签在无 -Wall 的
+		// 构建下也无警告）。
+		if len(fl.preds[cur]) > 1 && len(b.Insts) > 0 && !fl.emittedLabel[cur] {
+			out = append(out, &Label{Name: cur, Loc: b.Loc})
+			fl.emittedLabel[cur] = true
+		}
 		stmts, next, err := fl.foldBlock(b)
 		if err != nil {
 			return nil, "", "", err
@@ -319,12 +340,12 @@ func (fl *folder) foldInsts(b *air.Block, insts []air.Inst) ([]Stmt, error) {
 				// 跨块 region：交给块级 span 折叠
 				return nil, fmt.Errorf("region span crosses blocks (unsupported shape yet)")
 			}
-			inner, err := fl.foldInsts(b, insts[i+1:end])
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, &Region{Body: inner, Loc: v.Loc})
-			i = end
+		inner, err := fl.foldInsts(b, insts[i+1:end])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, &Region{Body: inner, Scope: v.Scope, Loc: v.Loc})
+		i = end
 		case *air.RegionExit:
 			return nil, fmt.Errorf("region.exit without enter in block %s", b.Label)
 		default:
@@ -392,6 +413,73 @@ func (fl *folder) foldTerm(b *air.Block) (string, []Stmt, error) {
 		return fl.foldSwitch(t)
 	}
 	return "", nil, fmt.Errorf("%s: unsupported terminator %T", b.Label, b.Term)
+}
+
+
+// --- 干跑探测（foldIfPlain 的汇合点判定）------------------------------------
+//
+// 为什么需要：if 的两支停在同一块时，那块就是本层的汇合点 —— 必须**在折之前**
+// 知道它（reserve + links 登记），否则第一支会把汇合点内联掉，第二支只剩一个
+// 没有标签的 goto（sieve 实测：then 支穿过整个内层循环才落到 join7，简单的
+// brTarget 判据看不出来）。判定方法 = 干跑：快照全部可变状态 → 折一支 → 看停点
+// → 恢复。fold 是确定性的，干跑与真折行为一致。
+
+type folderSnap struct {
+	done         map[string]bool
+	labeled      map[string]bool
+	inlined      map[string]bool
+	emittedLabel map[string]bool
+	links        map[string]bool
+	reserve      map[string]int
+	edges        map[[2]string]bool
+	loops        []loopCtx
+}
+
+func (fl *folder) snapshot() *folderSnap {
+	cp := func(m map[string]bool) map[string]bool {
+		out := make(map[string]bool, len(m))
+		for k, v := range m {
+			out[k] = v
+		}
+		return out
+	}
+	cpI := func(m map[string]int) map[string]int {
+		out := make(map[string]int, len(m))
+		for k, v := range m {
+			out[k] = v
+		}
+		return out
+	}
+	cpE := func(m map[[2]string]bool) map[[2]string]bool {
+		out := make(map[[2]string]bool, len(m))
+		for k, v := range m {
+			out[k] = v
+		}
+		return out
+	}
+	return &folderSnap{
+		done: cp(fl.done), labeled: cp(fl.labeled), inlined: cp(fl.inlined),
+		emittedLabel: cp(fl.emittedLabel), links: cp(fl.links),
+		reserve: cpI(fl.reserve), edges: cpE(fl.edges),
+		loops: append([]loopCtx{}, fl.loops...),
+	}
+}
+
+func (fl *folder) restore(sp *folderSnap) {
+	fl.done, fl.labeled, fl.inlined = sp.done, sp.labeled, sp.inlined
+	fl.emittedLabel, fl.links, fl.reserve, fl.edges = sp.emittedLabel, sp.links, sp.reserve, sp.edges
+	fl.loops = sp.loops
+}
+
+// dryStop 干跑折一条链，返回它停在哪（出错 = 空串；状态完全恢复）。
+func (fl *folder) dryStop(start string) string {
+	sp := fl.snapshot()
+	_, stop, _, err := fl.fold(start)
+	fl.restore(sp)
+	if err != nil {
+		return ""
+	}
+	return stop
 }
 
 // foldIf 折条件分支：识别 for（forhead 形状）、if/else、以及 if 无 else 三种形态。
@@ -467,6 +555,14 @@ func (fl *folder) foldIfPlain(headBlk *air.Block, t *air.Cbr) (string, []Stmt, e
 			join = a
 		}
 	}
+	// brTarget 只认"两支的终结符都是简单 br 同一块"。一支穿过内层循环/嵌套 if
+	// 才落到汇合点时它看不出来（sieve：then → 内层 for → join7，else → join7）
+	// ⇒ 干跑探测两支的真实停点：相同 ⇒ 那就是汇合点。
+	if join == "" {
+		if ts, es := fl.dryStop(t.Then), fl.dryStop(t.Else); ts != "" && ts == es {
+			join = ts
+		}
+	}
 	if join != "" {
 		// **折分支期间 reserve 汇合点**：否则第一个到达它的分支会把它折走，
 		// 另一支的边就丢了（791/701 的实测形态）。
@@ -490,7 +586,34 @@ func (fl *folder) foldIfPlain(headBlk *air.Block, t *air.Cbr) (string, []Stmt, e
 			return "", nil, err
 		}
 	}
+	if join != "" {
+		fl.links[join] = true
+	}
 	return join, []Stmt{&If{Cond: t.Cond, Then: thenStmts, Else: elseStmts, Loc: t.Loc}}, nil
+}
+
+// isLoopHead 报告一个块是不是循环头（forhead 形状：then=forbody/else=fordone）。
+// 循环头的多前驱是**结构性的**（入口边 + post 回边），不是待停下的汇合点 ——
+// 线性链从块外走进循环头正是"进入循环"的合法形态。
+func (fl *folder) isLoopHead(lbl string) bool {
+	b := fl.byLabel[lbl]
+	if b == nil {
+		return false
+	}
+	cbr, ok := b.Term.(*air.Cbr)
+	return ok && isForShape(cbr)
+}
+
+// isLoopPost 报告一个块是不是某个循环的 post（终结符是 `br <循环头>`）。
+// post 的多前驱同样结构性（体尾 + 内层循环出口等），链走进去应由 foldTerm 折成
+// continue（回边），不是 goto。
+func (fl *folder) isLoopPost(lbl string) bool {
+	b := fl.byLabel[lbl]
+	if b == nil {
+		return false
+	}
+	br, ok := b.Term.(*air.Br)
+	return ok && fl.isLoopHead(br.Label)
 }
 
 // isScopeStart 报告一个标签是不是 air 的词法块起点（`scopeN`，不是 `scopeendM`）。

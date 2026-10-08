@@ -93,9 +93,11 @@ type Switch struct {
 }
 
 // Region 是一个 region 块（进入/退出显式成对，V3.1 在 air 层已保证）。
+// Scope = `scope { }` 任务域（退出 join spawn 的任务），非 Scope = `region { }` 内存区域。
 type Region struct {
-	Body []Stmt
-	Loc  air.Loc
+	Body  []Stmt
+	Scope bool
+	Loc   air.Loc
 }
 
 // Scope 是一个**词法块**（源码里的 `{ … }`；air 里是 scopeN → scopeendM 这一对块）。

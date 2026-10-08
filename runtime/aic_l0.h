@@ -206,6 +206,15 @@ AIC_COLD_NORETURN void aic_trap_ctx(aic_trap_code code, const char *file, int li
     do { if ((handle) == NULL) \
          aic_trap(AIC_TRAP_ZERO_CONTAINER_WRITE, file, line); } while (0)
 
+/* 定长数组下标（§二.3：`[T;N]` 内联值，越界 trap；004/112 锚点）。
+ * 形态 = 内联比较 + cold 不返回报告（§10.4 第 1 条），**左值可用**（读与写同一形态：
+ * 三目两端同为左值 ⇒ 整个表达式是左值，`AT(a) = v` 合法）。
+ * n == 0 时 `i < n` 恒假 ⇒ 只可能走 trap 分支，`(p)[0]` 是死代码（不执行，
+ * 只为让两支同型）；下标值在 AIR 里恒为无副作用的临时量（V 系规则），双求值安全。 */
+#define AIC_ARRAY_AT(p, n, i, file, line) \
+    (*((aic_usize)(i) < (aic_usize)(n) ? &(p)[i] \
+     : (aic_trap(AIC_TRAP_INDEX_OUT_OF_BOUNDS, file, line), &(p)[0])))
+
 /* 存储点守卫的发射形态（§五 R3 + §10.4 第 1 条）：**内联比较 + cold 不返回报告**。
  * emit 在每个被标守卫的存储点生成 AIC_GUARD(obj, limit, file, line)；
  * 形态定义在 aic_guard.h（H10 断言对象：产物里不得出现通用外部调用形态）。

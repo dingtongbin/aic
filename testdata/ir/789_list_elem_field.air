@@ -6,10 +6,10 @@ func ok_main() {
     loc ../../testdata/ok/789_list_elem_field.aic:10:20 let lit1 : ok_Buf*[] = call list.new[ok_Buf*]()
     loc ../../testdata/ok/789_list_elem_field.aic:10:5 var xs : ok_Buf*[] = lit1
     loc ../../testdata/ok/789_list_elem_field.aic:11:15 let obj2 : ok_Buf* = alloc task(ok_Buf)
-    loc ../../testdata/ok/789_list_elem_field.aic:11:19 store field obj2, 0, const 7
+    loc ../../testdata/ok/789_list_elem_field.aic:11:15 store field obj2, 0, const 7
     loc ../../testdata/ok/789_list_elem_field.aic:11:14 let t3 : void = call list_Box_append(xs, obj2)
     loc ../../testdata/ok/789_list_elem_field.aic:12:15 let obj4 : ok_Buf* = alloc task(ok_Buf)
-    loc ../../testdata/ok/789_list_elem_field.aic:12:19 store field obj4, 0, const 9
+    loc ../../testdata/ok/789_list_elem_field.aic:12:15 store field obj4, 0, const 9
     loc ../../testdata/ok/789_list_elem_field.aic:12:14 let t5 : void = call list_Box_append(xs, obj4)
     loc ../../testdata/ok/789_list_elem_field.aic:13:24 let t6 : i32 = field elem xs, const 0, 0
     loc ../../testdata/ok/789_list_elem_field.aic:13:18 let t7 : void = call print_println(t6)

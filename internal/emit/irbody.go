@@ -52,9 +52,12 @@ func (p *IRProg) Add(sym string, f *cir.Func) error {
 	return nil
 }
 
+// resetUsed 清空消费记录（两遍发射的各一遍开头调用：used 是"本遍"的记账，
+// 跨遍残留会把第二遍要发的函数体误判成已消费）。
+func (p *IRProg) resetUsed() { p.used = map[string]bool{} }
+
 // verifyAllUsed 报告有没有没被任何签名消费的函数体（符号对不上 = 编译器 bug）。
-func (p *IRProg) verifyAllUsed() error {
-	var orphans []string
+func (p *IRProg) verifyAllUsed() error {	var orphans []string
 	for sym := range p.Bodies {
 		if !p.used[sym] {
 			orphans = append(orphans, sym)
@@ -118,6 +121,14 @@ func (c *Ctx) buildIRTypeTab() {
 			return
 		}
 		tab[text] = t
+		// 与 noteNamedPkg 同一条约定（那里有注释）：**不带 `*` 的裸文本**也要登记 ——
+		// 分配点（`alloc task(ok_Box[i32])`）与字段宿主解析用的是对象类型本身。
+		// 泛型实例此前只有带 `*` 的键，宿主查表落空 ⇒ 字段名掉成 `_0`（740 实测）。
+		if bare := strings.TrimSuffix(text, "*"); bare != "" && bare != text {
+			if _, seen := tab[bare]; !seen {
+				tab[bare] = t
+			}
+		}
 		switch v := t.(type) {
 		case *types.Slice:
 			note(v.Elem)
@@ -348,7 +359,30 @@ func (c *Ctx) irCText(text string) (string, error) {
 	if t, ok := c.irTab[text]; ok {
 		return c.cTypeName(t), nil
 	}
+	// **指针类型文本** `<base>*`（AddrRHS 的 let / 按引用形参）：C 类型 = 基类型
+	// 的 C 名 + ` *`。类引用文本自带 `*`（已在 irTab 里先命中），这里是标量槽
+	// 地址那段（`bool*` → `bool *`）。
+	if base, isPtr := splitPtrText(text); isPtr {
+		ct, err := c.irCText(base)
+		if err != nil {
+			return "", err
+		}
+		return ct + " *", nil
+	}
 	return "", fmt.Errorf("emit(IR): no C mapping for the type text %q", text)
+}
+
+// splitPtrText 拆「指针类型文本」`<base>*`（仅对**标量/容器**基座有意义：
+// 类引用文本本身就以 `*` 结尾且已在 irTab 里，走到这里是 `bool*` 这种）。
+func splitPtrText(text string) (string, bool) {
+	if !strings.HasSuffix(text, "*") {
+		return "", false
+	}
+	base := strings.TrimSuffix(text, "*")
+	if base == "" {
+		return "", false
+	}
+	return base, true
 }
 
 // irDeclText 是「带声明子」的 C 声明（[T;N] 与函数指针的 C 语法要求名字写在中间）。
@@ -368,6 +402,14 @@ func (c *Ctx) irDeclText(text, name string) (string, error) {
 	}
 	if t, ok := c.irTab[text]; ok {
 		return c.cTypeDecl(t, name), nil
+	}
+	// 指针类型文本（`bool*`）：`<基类型> *<name>`（AddrRHS 的 let 与 defer 上下文字段）。
+	if base, isPtr := splitPtrText(text); isPtr {
+		ct, err := c.irCText(base)
+		if err != nil {
+			return "", err
+		}
+		return ct + " *" + name, nil
 	}
 	return "", fmt.Errorf("emit(IR): no C declaration for the type text %q", text)
 }
@@ -488,6 +530,12 @@ func (c *Ctx) irSlotVal(val, slotTy string) (string, error) {
 
 // irConst 把 AIR 的字面量文本翻成 C 字面量。
 func (c *Ctx) irConst(lit string) string {
+	// **函数符号常量**（`const ok_lambda1`：lambda 提升体的引用、函数名作值）：
+	// C 名必须是 aic_<pkg>_<name>，裸符号在 C 侧没有定义（718 实测）。
+	// 两条值路径（irVal 的 const 分支与 Let 的 Const RHS）都汇到这里，故只此一处。
+	if name, ok, _ := c.irFuncRefCName(lit); ok {
+		return name
+	}
 	switch lit {
 	case "true", "false":
 		return lit
@@ -571,6 +619,39 @@ func (c *Ctx) irCNameOf(pkg string, sig *types.FuncSig) string {
 	return MangleFunc(c.ownerPkg(pkg), sig.Recv, sig.Name)
 }
 
+// irFuncRefCName 把一个**函数符号常量**翻成 C 函数名。
+// 判据 = 该符号在调用表或 IR 体表里登记过（lambda 提升体 / 函数名作值都用这个
+// 形态）；两表都没有就不是函数引用（普通字面量照原样走 irConst）。
+func (c *Ctx) irFuncRefCName(lit string) (string, bool, error) {
+	if lit == "" || strings.ContainsAny(lit, " \t\"") {
+		return "", false, nil
+	}
+	_, inCall := c.irCall[lit]
+	_, inBodies := c.ir.Bodies[lit]
+	if !inCall && !inBodies {
+		return "", false, nil
+	}
+	pkg, name := c.splitSymPkg(lit)
+	if name == "" {
+		return "", true, fmt.Errorf("emit(IR): cannot resolve the function symbol %q", lit)
+	}
+	return MangleFunc(c.ownerPkg(pkg), "", name), true, nil
+}
+
+// irFuncCName 定函数体的 C 符号名（三源同表）：
+//  ① 实例符号 `<base>[args]` ⇒ 实例名（调用点 irCallee 同一规则）；
+//  ② extern/export ⇒ 零 mangle 原名；
+//  ③ 其余 ⇒ 签名表（包名 + 接收者 + 名）。
+// lambda 提升体走 ③：合成签名时 Name 取符号尾段、无接收者。
+func (c *Ctx) irFuncCName(sym string, sig *types.FuncSig) string {
+	if strings.Contains(sym, "[") {
+		if inst, ok := c.irInstCName(sym); ok {
+			return inst
+		}
+	}
+	return c.irCNameOf(c.pkg(), sig)
+}
+
 // buildIRCallMap 建「IR 符号 → C 符号」表：用户函数、方法、泛型函数实例。
 func (c *Ctx) buildIRCallMap() {
 	m := map[string]string{}
@@ -608,12 +689,34 @@ func (c *Ctx) buildIRCallMap() {
 
 // irCallee 给一个 IR 调用符号定 C 符号：先查签名表，再按泛型实例的机械规则拼
 // （实例方法调用点没有单独的签名登记）。运行时/内建不走这里（见 irBuiltinCall）。
-func (c *Ctx) irCallee(sym string) (string, error) {
+//
+// **带 TypeArgs 的调用是实例调用**：键 = `<sym>[<T1>, …]`（air.FuncInstSym 的拼法）。
+// 直接拿裸 sym 查表会命中泛型**模板**自己的那一项（`info.Funcs` 里模板也在册），
+// 于是所有实例都链到 `aic_ok_id` 这一个符号 —— 原型发的是实例名、定义也缺实例后缀，
+// 最后 C 侧"隐式声明 + 重复定义"（740 实测）。
+func (c *Ctx) irCallee(sym string, typeArgs []string) (string, error) {
+	if len(typeArgs) > 0 {
+		key := sym + "[" + strings.Join(typeArgs, ", ") + "]"
+		if name, ok := c.irCall[key]; ok {
+			return name, nil
+		}
+		if name, ok := c.irInstCName(key); ok {
+			return name, nil
+		}
+		return "", fmt.Errorf("emit(IR): no monomorphized instance for %s (the checker and the IR disagree — compiler bug, not a source error)", key)
+	}
 	if name, ok := c.irCall[sym]; ok {
 		return name, nil
 	}
 	if name, ok := c.irInstCName(sym); ok {
 		return name, nil
+	}
+	// **IR 提升体**（defer 块形 / lambda）：签名表里没有，但 IR 体表里有 ——
+	// 符号 = `<pkg>_<name>`，按同一张 mangling 表拼（035/718 实测）。
+	if _, ok := c.ir.Bodies[sym]; ok {
+		if pkg, name := c.splitSymPkg(sym); name != "" {
+			return MangleFunc(c.ownerPkg(pkg), "", name), nil
+		}
 	}
 	return "", fmt.Errorf("emit(IR): cannot resolve the call symbol %q to a C symbol", sym)
 }
@@ -756,6 +859,69 @@ func (c *Ctx) emitIRFuncs(u *Unit) error {
 	return nil
 }
 
+// emitIRLambdaFuncs 发射 lambda 提升出来的静态函数体。
+//
+// 为什么单独一遍：lambda 在 AST 里不是 Decl（是表达式），emitIRFuncs 走
+// File.Decls 找不到它们；而 IR 体表里有（air.lambdaExpr 提升成模块 Func，
+// Flags 带 "static"）。漏了这条，`const ok_lambda1` 引用一个没有定义的函数
+// （718 实测：C 层隐式声明）。
+func (c *Ctx) emitIRLambdaFuncs() error {
+	for _, sym := range c.irLambdaSyms() {
+		name := sym
+		if i := strings.LastIndexByte(sym, '_'); i > 0 && i+1 < len(sym) {
+			// 形参/返回类型在 IR 体里（实例上下文已代换），签名表里没有这些函数 ——
+			// 合成一份只带名字的签名（存储类 static 由 Flags 表达）。
+			name = sym[i+1:]
+		}
+		if err := c.irOneFunc(sym, &types.FuncSig{Name: name}, parse.Pos{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// emitIRLambdaProtos 发 lambda 提升体的原型：C 要求先声明后使用，而原型段
+// （emitProtos）只走签名表 —— 签名表里没有这些函数，故单独发（718 实测：
+// `aic_ok_lambda1` 在 main 里先被引用，定义在文件末尾）。
+func (c *Ctx) emitIRLambdaProtos() error {
+	for _, sym := range c.irLambdaSyms() {
+		f := c.ir.Bodies[sym]
+		retCT, err := c.irRetCT(f)
+		if err != nil {
+			return err
+		}
+		params, err := c.irParamList(f)
+		if err != nil {
+			return err
+		}
+		name := sym
+		if i := strings.LastIndexByte(sym, '_'); i > 0 && i+1 < len(sym) {
+			name = sym[i+1:]
+		}
+		c.line("static %s %s(%s);", retCT, c.irFuncCName(sym, &types.FuncSig{Name: name}), params)
+	}
+	return nil
+}
+
+// irLambdaSyms 取全部待发射的 lambda 提升体符号（IR 体表 + static 标记 + 本遍
+// 未消费；排序保 H2 确定性）。
+func (c *Ctx) irLambdaSyms() []string {
+	var syms []string
+	for sym, f := range c.ir.Bodies {
+		if c.ir.used[sym] {
+			continue
+		}
+		for _, fl := range f.Flags {
+			if fl == "static" {
+				syms = append(syms, sym)
+				break
+			}
+		}
+	}
+	sort.Strings(syms)
+	return syms
+}
+
 // emitIRInstFuncs 发射泛型实例的函数体（函数实例 + 泛型类的方法实例）。
 func (c *Ctx) emitIRInstFuncs(u *Unit) error {
 	for _, e := range c.funcInsts {
@@ -842,7 +1008,8 @@ func (c *Ctx) irOneFunc(sym string, sig *types.FuncSig, pos parse.Pos) error {
 	if err != nil {
 		return err
 	}
-	c.irCollectTemps(f.Body)
+	c.irCollectTemps(f)
+	c.irBindRefParams(f)
 	if err := c.irEmitDeferTrampolines(f, st); err != nil {
 		return err
 	}
@@ -854,8 +1021,12 @@ func (c *Ctx) irOneFunc(sym string, sig *types.FuncSig, pos parse.Pos) error {
 	if c.isMain(sig) {
 		store = "static " // 入口只被文件末尾的 C wrapper 调用（与直译路径一致）
 	}
+	// **实例体的 C 符号必须带实例后缀**：irCNameOf(sig) 只会给模板名（`aic_ok_id`），
+	// 三个实例会互相覆盖、调用点链到错符号（740 实测：原型有后缀、定义没有）。
+	// lambda 提升体同理：合成签名只带尾段名，包名从符号拆（irFuncCName 三源同表）。
+	cName := c.irFuncCName(sym, sig)
 	c.srcLine(pos)
-	c.line("%s%s %s(%s) {", store, retCT, c.irCNameOf(c.pkg(), sig), params)
+	c.line("%s%s %s(%s) {", store, retCT, cName, params)
 	if st != nil && st.stack != "" {
 		c.line("    aic_defer_stack %s = AIC_DEFER_STACK_EMPTY;", st.stack)
 	}
@@ -870,10 +1041,14 @@ func (c *Ctx) irOneFunc(sym string, sig *types.FuncSig, pos parse.Pos) error {
 	return nil
 }
 
-// irCollectTemps 预登记函数体里全部临时量/局部量的类型。
+// irCollectTemps 预登记函数体里全部临时量/局部量的类型（形参也在内：它们不是
+// 体里的 let/var，但体与 trampoline 都要按形参类型定位实参）。
 // 必须在发 trampoline 之前跑：defer 站点的上下文结构体要用实参类型，而那些实参
 // 是函数体里后出现的 let（`defer note(tag)` 的 tag 由注册点绑定）。
-func (c *Ctx) irCollectTemps(list []cir.Stmt) {
+func (c *Ctx) irCollectTemps(f *cir.Func) {
+	for _, p := range f.Params {
+		c.irTemps[p.Name] = p.Ty
+	}
 	var walk func([]cir.Stmt)
 	walk = func(ls []cir.Stmt) {
 		for _, s := range ls {
@@ -905,7 +1080,7 @@ func (c *Ctx) irCollectTemps(list []cir.Stmt) {
 			}
 		}
 	}
-	walk(list)
+	walk(f.Body)
 }
 
 // irRetCT 是 IR 函数体的 C 返回类型（0 = void，1 = 该类型，多 = 合成返回结构）。
@@ -919,21 +1094,53 @@ func (c *Ctx) irRetCT(f *cir.Func) (string, error) {
 	return c.irRetNameOf(f.Rets)
 }
 
-// irParamList 是 IR 函数体的 C 形参表。
+// irParamList 是 IR 函数体的 C 形参表（**纯函数**：不登记 irTemps —— 原型与体
+// 两处都调它，副作用会让原型段就把名字写进当遍的类型表）。
+//
+// **按引用形参**（Param.Ref，defer 块形提升体的捕获槽）：C 侧声明为
+// `Ty *name__p`，体内对 name 的每个引用都经别名表变成 `(*name__p)` ——
+// 出口读到的是调用方变量槽的最终值（035/713 锚点）。
 func (c *Ctx) irParamList(f *cir.Func) (string, error) {
 	parts := make([]string, 0, len(f.Params))
 	for _, p := range f.Params {
+		ct, err := c.irCText(p.Ty)
+		if err != nil {
+			return "", err
+		}
+		if p.Ref {
+			parts = append(parts, ct+" *"+p.Name+"__p")
+			continue
+		}
 		decl, err := c.irDeclText(p.Ty, p.Name)
 		if err != nil {
 			return "", err
 		}
 		parts = append(parts, decl)
-		c.irTemps[p.Name] = p.Ty
 	}
 	if len(parts) == 0 {
 		return "void", nil
 	}
 	return strings.Join(parts, ", "), nil
+}
+
+// irBindRefParams 把按引用形参的名字绑成 `(*name__p)`（体内读写都经它）。
+// 必须在体发射之前、作用域已重置之后调用。
+func (c *Ctx) irBindRefParams(f *cir.Func) {
+	for _, p := range f.Params {
+		if !p.Ref {
+			continue
+		}
+		c.irBindAlias(p.Name, "(*"+p.Name+"__p)", p.Ty)
+	}
+}
+
+// irBindAlias 直接在当前作用域绑一个「AIR 名 → C 左值文本」的别名
+// （irBind 会给冲突名换新标识符；这里要的就是任意的 C 左值形态）。
+func (c *Ctx) irBindAlias(name, cname, ty string) {
+	if len(c.irScopes) == 0 {
+		c.irScopes = append(c.irScopes, map[string]irBinding{})
+	}
+	c.irScopes[len(c.irScopes)-1][name] = irBinding{cname: cname, ty: ty}
 }
 
 // ---------------------------------------------------------------------------
@@ -996,11 +1203,24 @@ func (c *Ctx) irStmt(s cir.Stmt, ind string) error {
 			}
 			c.line("%s    if (!(%s)) break;", ind, cond)
 		}
+		// 体里的**遮蔽声明**必须关进迭代块：`for x in xs` 的元素绑定与索引变量同名
+		//（同一个 AIR 名），C 里两条声明若在同一块，Post 的 `x = x + 1` 指到元素
+		// 变量上（693 实测：str + 1 类型冲突；696 死循环同源）。Post 在迭代块**之后**
+		// 发射，看到的仍是索引变量。
+		iterScope := c.irBodyShadows(v.Body)
+		if iterScope {
+			c.line("%s    {", ind)
+			c.irPushScope()
+		}
 		c.irLoopPost = append(c.irLoopPost, loopPost{hasCont: needLabel, label: label})
 		err := c.irStmts(v.Body, ind+"    ")
 		c.irLoopPost = c.irLoopPost[:len(c.irLoopPost)-1]
 		if err != nil {
 			return err
+		}
+		if iterScope {
+			c.irPopScope()
+			c.line("%s    }", ind)
 		}
 		if needLabel {
 			c.line("%s%s: ;", ind, label)
@@ -1036,6 +1256,31 @@ func (c *Ctx) irStmt(s cir.Stmt, ind string) error {
 		c.line("%s}", ind)
 		return nil
 	case *cir.Region:
+		if v.Scope {
+			// `scope { }` = 任务域（不是内存区域）：调度器 scope + 区域层，
+			// 退出 join 全部 spawn 的任务（L3 真并发；742/772/773 锚点）。
+			// spawn 站点在体内，故 scope 变量名要进栈供它们取用。
+			c.srcLine(v.Loc.Pos(c.Path))
+			c.need("l2")
+			name := c.tmp("scope")
+			c.line("%saic_scope %s;", ind, name)
+			c.line("%saic_scope_enter(&%s);", ind, name)
+			c.line("%saic_region_push(%s, %d);", ind, cstr(c.locFile(v.Loc)), locLine(v.Loc))
+			c.line("%s{", ind)
+			c.irPushScope()
+			savedScope := c.irScopeCur
+			c.irScopeCur = name
+			err := c.irStmts(v.Body, ind+"    ")
+			c.irScopeCur = savedScope
+			c.irPopScope()
+			if err != nil {
+				return err
+			}
+			c.line("%s}", ind)
+			c.line("%saic_region_pop();", ind)
+			c.line("%saic_scope_exit(&%s);", ind, name)
+			return nil
+		}
 		c.srcLine(v.Loc.Pos(c.Path))
 		c.line("%saic_region_push(%s, %d);", ind, cstr(c.locFile(v.Loc)), locLine(v.Loc))
 		c.line("%s{", ind)
@@ -1150,6 +1395,67 @@ func (c *Ctx) irHasContinue(list []cir.Stmt) bool {
 	return false
 }
 
+// irBodyShadows 报告循环体顶层是否有**遮蔽声明**（var/let 的名字已在外层作用域
+// 可见）。只查顶层：嵌套 if/for/switch 里的声明本来就落在自己的 C 块里，不影响
+// Post 的名字解析。
+func (c *Ctx) irBodyShadows(list []cir.Stmt) bool {
+	for _, s := range list {
+		leaf, ok := s.(*cir.Leaf)
+		if !ok {
+			continue
+		}
+		var name string
+		switch in := leaf.In.(type) {
+		case *air.Var:
+			name = in.Name
+		case *air.Let:
+			name = in.Tmp
+		default:
+			continue
+		}
+		// 外层已有同名绑定（索引变量/外层局部）= 本循环体内再次声明会遮蔽它。
+		if c.irName(name) != "" && c.irName(name) == name && c.irBound(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// irBound 报告一个名字是否已在**任意**作用域绑定（含外层）。
+func (c *Ctx) irBound(name string) bool {
+	for i := len(c.irScopes) - 1; i >= 0; i-- {
+		if _, ok := c.irScopes[i][name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// irIsIntText 报告 AIR 类型文本是不是整型（除法查零只对整型：浮点除零是
+// IEEE inf/nan，不是语言错误）。名字表与 BasicCName 同源。
+func irIsIntText(text string) bool {
+	switch text {
+	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize":
+		return true
+	}
+	return false
+}
+
+// irIntWidth 取整型的位宽（移位计数上界；usize 固定 64 位，§十 N13）。
+func irIntWidth(text string) (int, bool) {
+	switch text {
+	case "i8", "u8":
+		return 8, true
+	case "i16", "u16":
+		return 16, true
+	case "i32", "u32":
+		return 32, true
+	case "i64", "u64", "usize":
+		return 64, true
+	}
+	return 0, false
+}
+
 // irCond 取条件表达式的 C 文本（条件在 IR 里必然是单个值名/字面量）。
 func (c *Ctx) irCond(cond string) (string, error) {
 	if cond == "" {
@@ -1230,14 +1536,150 @@ func (c *Ctx) irLeaf(in air.Inst, ind string) error {
 		return nil
 	case *air.TrapIfErr:
 		return fmt.Errorf("emit(IR): trap.if.err is not emitted yet (line %d)", v.Line)
+	case *air.Spawn:
+		return c.irSpawn(v, ind)
 	case *air.SelWait:
 		return c.irSelWait(v, ind)
 	}
 	return fmt.Errorf("emit(IR): unsupported instruction %T", in)
 }
 
+// irSpawn 发一次 spawn：实参装进**类型化**上下文块 + 登记薄 thunk（定义在
+// TU 末尾、原型在原型段）+ aic_scope_spawn。thunk 与被调符号的解析都按 IR 给
+// 的东西来（不查 AST）；块字段带真实类型，比 void* 槽的往返更直白。
+func (c *Ctx) irSpawn(v *air.Spawn, ind string) error {
+	if c.irScopeCur == "" {
+		return fmt.Errorf("emit(IR): spawn outside a scope (line %d)", v.Loc.Line)
+	}
+	callee, err := c.irCallee(v.Callee, v.TypeArgs)
+	if err != nil {
+		return err
+	}
+	ctxName := fmt.Sprintf("aic_spctx_%d", c.irSpawnSeq)
+	trName := fmt.Sprintf("aic_spth_%d", c.irSpawnSeq)
+	c.irSpawnSeq++
+	// 实参类型先收集：上下文块的**定义**在文件作用域（原型段，第二遍按第一遍的
+	// 登记发），这里只发使用点（块内声明变量 + 填字段 + spawn 调用）。
+	// 曾经把结构体定义发在函数体内 —— thunk 在 TU 末尾，看不见它（742/773 实测
+	// "storage size isn't known"）。
+	argTys := make([]string, 0, len(v.Vals))
+	for i, val := range v.Vals {
+		ty := c.irValTy(val)
+		if ty == "" || ty == "void" {
+			return fmt.Errorf("emit(IR): spawn argument %d has no known type (line %d)", i, v.Loc.Line)
+		}
+		argTys = append(argTys, ty)
+	}
+	tmp := fmt.Sprintf("aic_sp_%d", c.irSpawnSeq)
+	c.srcLine(v.Loc.Pos(c.Path))
+	// 上下文块必须走 **aic_task_env（堆）**：运行时的任务出口会 free(env)
+	// （aic_l2.c 的 aic_task_entry 尾部），栈变量 = 堆损坏（0xC0000374，742/773 实测）。
+	c.line("%sstruct %s *%s = (struct %s *)aic_task_env(sizeof(struct %s));", ind, ctxName, tmp, ctxName, ctxName)
+	for i, val := range v.Vals {
+		init, err := c.irSlotVal(val, argTys[i])
+		if err != nil {
+			return err
+		}
+		c.line("%s%s->f%d = %s;", ind, tmp, i, init)
+	}
+	c.need("l2")
+	// aic_scope_spawn 的 ABI = (scope*, thunk, env) 三参（runtime/aic_l2.h）——
+	// 没有 file/line 形参（多传两个 = C 直接拒）。
+	c.line("%saic_scope_spawn(&%s, %s, %s);", ind, c.irScopeCur, trName, tmp)
+	c.irSpawns = append(c.irSpawns, irSpawnSite{trName: trName, ctxName: ctxName, callee: callee, nargs: len(v.Vals), argTys: argTys})
+	return nil
+}
+
+// irSpawnSite 是一个已登记的 spawn 站点（上下文块 + thunk 的名字与被调符号）。
+type irSpawnSite struct {
+	trName  string
+	ctxName string
+	callee  string
+	nargs   int
+	argTys  []string
+}
+
+// emitIRSpawnCtxStructs 发 spawn 上下文块的**定义**（文件作用域、原型段）：
+// 使用点（块内 var）与 thunk（TU 末尾）都要求在它们之前见到完整定义。
+func (c *Ctx) emitIRSpawnCtxStructs() error {
+	for _, s := range c.irSpawns {
+		fields := make([]string, 0, len(s.argTys))
+		for i, ty := range s.argTys {
+			decl, err := c.irDeclText(ty, fmt.Sprintf("f%d", i))
+			if err != nil {
+				return err
+			}
+			fields = append(fields, decl+";")
+		}
+		c.line("struct %s { %s };", s.ctxName, strings.Join(fields, " "))
+	}
+	if len(c.irSpawns) > 0 {
+		c.line("")
+	}
+	return nil
+}
+
+// emitIRSpawnProtos 发 spawn thunk 的原型（原型段：C 要求先声明后使用）。
+// 站点表来自第一遍（seed）——本遍的原型段跑在函数体之前，站点还没被发现。
+func (c *Ctx) emitIRSpawnProtos() {
+	for _, s := range c.irSpawns {
+		c.line("static void %s(void *);", s.trName)
+	}
+	if len(c.irSpawns) > 0 {
+		c.line("")
+	}
+}
+
+// emitIRSpawnBodies 发 spawn thunk 的定义（函数体段之后：取上下文块字段直调）。
+func (c *Ctx) emitIRSpawnBodies() {
+	for _, s := range c.irSpawns {
+		args := make([]string, 0, s.nargs)
+		for i := 0; i < s.nargs; i++ {
+			args = append(args, fmt.Sprintf("c__->f%d", i))
+		}
+		c.line("static void %s(void *raw) {", s.trName)
+		c.line("    struct %s *c__ = (struct %s *)raw;", s.ctxName, s.ctxName)
+		c.line("    (void)(%s(%s));", s.callee, strings.Join(args, ", "))
+		c.line("}")
+		c.line("")
+	}
+}
+
 func (c *Ctx) irLet(v *air.Let, ind string) error {
 	c.irPendingTy, c.irPendingLoc = v.Ty, v.Loc
+	// **chan recv 的原生结果结构 → AIR 多值结构**：两者布局逐位相同（_0/_1），
+	// 但 C 不允许结构体间强转 —— tcc 当扩展收下、gcc/clang 直接拒
+	// （742 实测：五配置的 H3 在 gcc 配置下是潜伏的坑）。故拆两条语句：
+	// 先接原生值，再按字段逐一搬进目标结构（无 double-eval：原生值先落临时量）。
+	if nativeTy, ok := c.irChanRecvNativeTy(v.Rhs); ok {
+		if elems, isMulti := splitMultiText(v.Ty); isMulti {
+			expr, err := c.irRHS(v.Rhs)
+			c.irPendingTy, c.irPendingLoc = "", air.Loc{}
+			if err != nil {
+				return err
+			}
+			tmp := c.tmp("cr")
+			c.srcLine(v.Loc.Pos(c.Path))
+			c.line("%s%s %s = %s;", ind, nativeTy, tmp, expr)
+			fields := make([]string, 0, len(elems))
+			for i := range elems {
+				fields = append(fields, fmt.Sprintf("._%d = %s._%d", i, tmp, i))
+			}
+			ct, err := c.irDeclText(v.Ty, v.Tmp)
+			if err != nil {
+				return err
+			}
+			// 目标结构的 C 名 = irRetNameOf（合成返回结构的那张表），**不是
+			// AIR 类型文本**（`(i32, bool)` 不是 C 类型名，773 实测）。
+			stName, err := c.irRetNameOf(elems)
+			if err != nil {
+				return err
+			}
+			c.line("%s%s = ((%s){ %s });", ind, ct, stName, strings.Join(fields, ", "))
+			c.irTemps[v.Tmp] = v.Ty
+			return nil
+		}
+	}
 	rhs, err := c.irRHS(v.Rhs)
 	c.irPendingTy, c.irPendingLoc = "", air.Loc{}
 	if err != nil {
@@ -1276,7 +1718,11 @@ func (c *Ctx) irVar(v *air.Var, ind string) error {
 			c.line("%smemcpy((void *)%s, (const void *)%s, sizeof(%s));", ind, cname, c.irVal(v.Init), cname)
 			return nil
 		}
+		// 初值按本变量的类型求值（Option 零值/字面量定型都靠它）——与 irLet 同口径。
+		savedTy, savedLoc := c.irPendingTy, c.irPendingLoc
+		c.irPendingTy, c.irPendingLoc = v.Ty, v.Loc
 		init, err := c.irSlotVal(v.Init, v.Ty)
+		c.irPendingTy, c.irPendingLoc = savedTy, savedLoc
 		if err != nil {
 			return err
 		}
@@ -1291,6 +1737,29 @@ func (c *Ctx) irVar(v *air.Var, ind string) error {
 	return nil
 }
 
+// irChanRecvNativeTy 报告 let 的右值是不是 chan recv 调用，是则给出**运行时原生
+// 结果结构**的 C 名（`aic_chan_<S>_recv_t`；布局与 AIR 的多值结构逐位相同，
+// 但类型不同，强转非法）。判据只认符号形态（与 irChanCall 同一张解析）。
+func (c *Ctx) irChanRecvNativeTy(r air.RHS) (string, bool) {
+	call, ok := r.(*air.Call)
+	if !ok {
+		return "", false
+	}
+	rest := strings.TrimPrefix(strings.TrimPrefix(call.Sym, "chan."), "chan_")
+	parts := strings.Split(rest, "_")
+	// 与 irChanCall 同一张解析：op 可以在前（recv_i32）也可以在后（i32_recv）。
+	suf := ""
+	switch {
+	case len(parts) == 2 && parts[0] == "recv":
+		suf = parts[1]
+	case len(parts) == 2 && parts[1] == "recv":
+		suf = parts[0]
+	default:
+		return "", false
+	}
+	return "aic_chan_" + suf + "_recv_t", true
+}
+
 // irZero 是某类型的 C 零值（核心设计 §二.3）。
 func (c *Ctx) irZero(text string) (string, error) {
 	t, ok := c.irTab[text]
@@ -1303,6 +1772,14 @@ func (c *Ctx) irZero(text string) (string, error) {
 	if types.IsArray(t) {
 		// 数组不能整体赋值/转换：零值是初始化器 `{0}`（只在定义处合法）。
 		return "{0}", nil
+	}
+	// **Option 实例**是结构体（{tag, union}）：零值 = None 标签，不是标量 0
+	// （`o = 0` 在 C 里直接非法；`func Pick(n) -> Option[i32]` 的返回槽
+	// 走这里，generic 语料实测）。
+	if _, isOpt := types.IsOptionInstance(t); isOpt {
+		ct := c.cTypeName(t)
+		_, none := optionTags(ct)
+		return fmt.Sprintf("((%s){ .tag = %s })", ct, none), nil
 	}
 	return c.zeroValue(t), nil
 }
@@ -1375,39 +1852,45 @@ func (c *Ctx) irListElemStore(v *air.Store, ind string) (string, bool, error) {
 func (c *Ctx) irGuard(v *air.Store, val, place, ind string) error {
 	file := cstr(c.locFile(v.Loc))
 	line := locLine(v.Loc)
+	host, _ := c.irHostBase(v.Place)
+	return c.irGuardLimit(v.Limit, val, place, ind, file, line, host)
+}
+
+// irGuardLimit 发一次存储点守卫（limit 文法 = fnentry｜depth｜depth-N｜host）。
+// Store 的守卫与 DeferInit 实参的注册点守卫共用同一张翻译表（§五 R3/R5）——
+// 高阶部分只换"被守的值"与"宿主是什么"。hostExpr = 宿主对象的 C 表达式
+// （host 限制定理要读**宿主区域**的深度；空 = 拿不到宿主，按当前深度兜底）。
+func (c *Ctx) irGuardLimit(limit, val, what, ind, file string, line int, hostExpr string) error {
 	switch {
-	case v.Limit == "fnentry":
+	case limit == "fnentry":
 		c.guards.Kept++
 		c.guards.Return++
 		c.line("%sAIC_GUARD(%s, 0u, %s, %d); /* 返回点: 界 ≤ 入口 */", ind, val, file, line)
 		return nil
-	case v.Limit == "depth":
+	case limit == "depth":
 		c.guards.Kept++
 		c.guards.Store++
-		c.line("%sAIC_GUARD(%s, aic_depth, %s, %d); /* 存储点 %s */", ind, val, file, line, place)
+		c.line("%sAIC_GUARD(%s, aic_depth, %s, %d); /* 存储点 %s */", ind, val, file, line, what)
 		return nil
-	case strings.HasPrefix(v.Limit, "depth-"):
+	case strings.HasPrefix(limit, "depth-"):
 		c.guards.Kept++
 		c.guards.Store++
 		c.line("%sAIC_GUARD(%s, (aic_depth - %su), %s, %d); /* 存储点 %s */",
-			ind, val, strings.TrimPrefix(v.Limit, "depth-"), file, line, place)
+			ind, val, strings.TrimPrefix(limit, "depth-"), file, line, what)
 		return nil
-	case v.Limit == "host":
-		host, ok := c.irHostBase(v.Place)
-		if !ok {
-			// 宿主是形参派生但存储点不在对象内部（形参槽本身）：界就是当前深度。
-			c.guards.Kept++
-			c.guards.Store++
-			c.line("%sAIC_GUARD(%s, aic_depth, %s, %d); /* 存储点 %s */", ind, val, file, line, place)
-			return nil
-		}
+	case limit == "host":
 		c.guards.Kept++
 		c.guards.Store++
+		if hostExpr == "" {
+			// 宿主是形参派生但存储点不在对象内部（形参槽本身）：界就是当前深度。
+			c.line("%sAIC_GUARD(%s, aic_depth, %s, %d); /* 存储点 %s */", ind, val, file, line, what)
+			return nil
+		}
 		c.line("%sAIC_GUARD(%s, aic_region_depth_of(%s->hdr.reg), %s, %d); /* 存储点 %s */",
-			ind, val, host, file, line, place)
+			ind, val, hostExpr, file, line, what)
 		return nil
 	}
-	return fmt.Errorf("emit(IR): unknown guard limit %q", v.Limit)
+	return fmt.Errorf("emit(IR): unknown guard limit %q", limit)
 }
 
 // irHostBase 取存储点的宿主对象表达式（字段/下标存的宿主 = 该 place 的基座）。
@@ -1567,7 +2050,7 @@ func (c *Ctx) irEmitDeferTrampolines(f *cir.Func, st *irDeferState) error {
 			}
 			call = s
 		} else {
-			callee, err := c.irCallee(di.Callee)
+			callee, err := c.irCallee(di.Callee, di.TypeArgs)
 			if err != nil {
 				return err
 			}
@@ -1599,7 +2082,16 @@ func (c *Ctx) irDeferInit(v *air.DeferInit, ind string) error {
 	c.srcLine(v.Loc.Pos(c.Path))
 	c.line("%sstruct %s %s;", ind, ctxName, tmp)
 	for i, val := range v.Vals {
-		c.line("%s%s.f%d = %s;", ind, tmp, i, c.irVal(val))
+		init := c.irVal(val)
+		// 注册点守卫（§五 R5：defer 实参的界 ≤ 函数入口）：先守后存 ——
+		// 块内对象作实参时必须在那一点就 trap，不能等退出时读已弹出的区域（781）。
+		if i < len(v.Limits) && v.Limits[i] != "" {
+			if err := c.irGuardLimit(v.Limits[i], init, "defer arg "+strconv.Itoa(i), ind,
+				cstr(c.locFile(v.Loc)), locLine(v.Loc), ""); err != nil {
+				return err
+			}
+		}
+		c.line("%s%s.f%d = %s;", ind, tmp, i, init)
 	}
 	c.line("%saic_defer_push_copy_ex(&%s, %s, &%s, sizeof(%s), %d, %s, %d);",
 		ind, st.stack, trName, tmp, tmp, onerr, cstr(c.locFile(v.Loc)), locLine(v.Loc))
@@ -1630,11 +2122,23 @@ func (c *Ctx) irDeferRun(ind string) {
 func (c *Ctx) irRHS(r air.RHS) (string, error) {
 	switch v := r.(type) {
 	case *air.Const:
+		// 裸 `None` 在**有类型的槽位**上 = Option 零值构造（形态取决于实例，
+		// 706 实测：实参位不给定目标类型就发不出 C）。irPendingTy 就是 let/var
+		// 的槽位类型；不是 Option 实例时仍按普通常量走（由调用方兜疵）。
+		if v.Lit == "None" && c.irPendingTy != "" {
+			if t, ok := c.irTab[c.irPendingTy]; ok {
+				if _, isOpt := types.IsOptionInstance(t); isOpt {
+					return c.irOptionCtor("None", nil)
+				}
+			}
+		}
 		return c.irConst(v.Lit), nil
 	case *air.TmpRef:
-		return v.Name, nil
+		// 临时量的值：可能是字面量（`tmp const "ab"`：基座物化的常见形态，
+		// 113 实测直接返回原名会把 `const ` 前缀漏进 C），故按值路径转。
+		return c.irVal(v.Name), nil
 	case *air.VarRef:
-		return v.Name, nil
+		return c.irVal(v.Name), nil
 	case *air.Nil:
 		zero, err := c.irZero(v.Ty)
 		if err != nil {
@@ -1647,6 +2151,24 @@ func (c *Ctx) irRHS(r air.RHS) (string, error) {
 		// 时把 `i + 1` 误发成 concat（693 语料实测）。
 		if v.Op == "+" && c.irValTy(v.A) == "str" && c.irValTy(v.B) == "str" {
 			return fmt.Sprintf("aic_str_concat(%s, %s, %d)", c.parenVal(v.A), c.parenVal(v.B), locLine(c.irPendingLoc)), nil
+		}
+		// 整数除法/取模的除零 = trap（§一：C 里是 UB；浮点除零 = IEEE inf，不查）。
+		// 形态 = 内联比较 + cold 不返回报告（§10.4 第 1 条）；除数双侧求值安全
+		// （AIR 的值名恒无副作用，V 系规则）。108/109 锚点。
+		if (v.Op == "/" || v.Op == "%") && irIsIntText(c.irValTy(v.B)) {
+			return fmt.Sprintf("(%s == 0 ? (aic_trap(AIC_TRAP_DIVIDE_BY_ZERO, %s, %d), 0) : %s %s %s)",
+				c.parenVal(v.B), cstr(c.locFile(c.irPendingLoc)), locLine(c.irPendingLoc),
+				c.parenVal(v.A), v.Op, c.parenVal(v.B)), nil
+		}
+		// 移位计数越界 = trap（§一：计数 ≥ 左操作数位宽或有符号负计数在 C 里都是 UB；
+		// 此前静默算出 0 —— "静默算错"级缺陷，778 锚点）。形态同上：内联比较 + cold。
+		if v.Op == "<<" || v.Op == ">>" {
+			if w, ok := irIntWidth(c.irValTy(v.A)); ok {
+				return fmt.Sprintf("((%s) < 0 || (%s) >= %d ? (aic_trap(AIC_TRAP_SHIFT_RANGE, %s, %d), 0) : %s %s %s)",
+					c.parenVal(v.B), c.parenVal(v.B), w,
+					cstr(c.locFile(c.irPendingLoc)), locLine(c.irPendingLoc),
+					c.parenVal(v.A), v.Op, c.parenVal(v.B)), nil
+			}
 		}
 		if v.Op == "==" || v.Op == "!=" {
 			if c.irValTy(v.A) == "str" || c.irValTy(v.B) == "str" {
@@ -1669,9 +2191,28 @@ func (c *Ctx) irRHS(r air.RHS) (string, error) {
 	case *air.CallInd:
 		return c.irCallInd(v)
 	case *air.Closure:
-		return "", fmt.Errorf("emit(IR): closures are not emitted yet (N1 `closure %s`)", v.Sym)
+		// 纯 lambda（无捕获）= 静态函数指针：值就是被提升函数的 C 名。
+		// 按值捕获的闭包值 = {fn, env} 两字结构（N1），随 756 一起做 —— 现在
+		// 明确报错而不是发半截（红线 23）。
+		if len(v.Env) > 0 {
+			return "", fmt.Errorf("emit(IR): capturing closures are not emitted yet (N1 `closure %s` captures %d values)", v.Sym, len(v.Env))
+		}
+		name, ok, err := c.irFuncRefCName(v.Sym)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", fmt.Errorf("emit(IR): the lifted lambda %q has no C function (the checker and the IR disagree)", v.Sym)
+		}
+		return name, nil
 	case *air.CallClosure:
-		return "", fmt.Errorf("emit(IR): closure calls are not emitted yet (N1 `call.closure`)")
+		// 闭包值调用：C 的函数指针调用就是 `f(args)`（纯形态）。捕获形态同理
+		// 在 Closure 处已被拒。
+		args := make([]string, 0, len(v.Args))
+		for _, a := range v.Args {
+			args = append(args, c.irVal(a))
+		}
+		return fmt.Sprintf("%s(%s)", c.irVal(v.Val), strings.Join(args, ", ")), nil
 	case *air.Alloc:
 		return c.irAlloc(v)
 	case *air.SizeOf:
@@ -1687,7 +2228,14 @@ func (c *Ctx) irRHS(r air.RHS) (string, error) {
 	case *air.LenRHS:
 		return c.irLen(v)
 	case *air.StrViewRHS:
-		return "", fmt.Errorf("emit(IR): str views are not emitted yet")
+		return c.irStrView(v)
+	case *air.AddrRHS:
+		// 取地址（defer 块形按引用捕获的注册点）：C 的 `&x`。
+		// 空值名 = 内部不一致，直接报错而不是发 `&`。
+		if v.Val == "" {
+			return "", fmt.Errorf("emit(IR): addr needs a value")
+		}
+		return "&" + c.irVal(v.Val), nil
 	case *air.MultiExtract:
 		return fmt.Sprintf("%s._%d", v.Val, v.Idx), nil
 	case *air.EnumTag:
@@ -1813,20 +2361,24 @@ func (c *Ctx) irConv(v *air.Conv) (string, error) {
 }
 
 func (c *Ctx) irAlloc(v *air.Alloc) (string, error) {
-	// AIR 的 Alloc.Ty 是"被分配的对象类型"（非 @packed 类不带 `*`），
-	// 故分配尺寸取**结构体**、返回表达式取**指针**。
-	base, err := c.irCText(v.Ty)
-	if err != nil {
-		return "", err
+	// AIR 的 Alloc.Ty 是**对象类型**（普通类按约定不带引用后缀 `*`），而 irTab 的键
+	// 是语义类型文本（普通类带 `*`）⇒ 先按原样查，查不到按约定补 `*` 再查
+	// （740 实测：`ok_Box[i32]` 直接查表必然落空）。
+	t, ok := c.irTab[v.Ty]
+	if !ok && !strings.HasSuffix(v.Ty, "*") {
+		t, ok = c.irTab[v.Ty+"*"]
 	}
+	if !ok {
+		return "", fmt.Errorf("emit(IR): no C mapping for the allocated type %q", v.Ty)
+	}
+	base := c.cTypeName(t)
 	// **@packed 类是值类型**：没有堆对象可分配，`alloc` 在这里的语义就是"造一个值"，
 	// 发零值复合字面量（后续 `store field` 就地写字段）。曾经这里无条件发指针转换，
 	// `aic_ok_Pair obj6 = (aic_ok_Pair *)aic_alloc_hdr(…)` 被 C 直接拒绝
-	// （invalid initializer；731/733 实测）。判据 = 类的 Packed 位（与类型定义同源）。
-	if t, ok := c.irTab[v.Ty]; ok {
-		if cl, isCl := types.IsClass(t); isCl && cl.Packed {
-			return fmt.Sprintf("((%s){0})", base), nil
-		}
+	// （invalid initializer；731/733 实测）。判据 = 类的 Packed 位（与类型定义同源；
+	// 泛型实例的 Packed 位在**基类**上 —— 实例本身不是 Class）。
+	if cl, isCl := classOfType(t); isCl && cl.Packed {
+		return fmt.Sprintf("((%s){0})", base), nil
 	}
 	elem, ptr := base, base
 	if strings.HasSuffix(base, "*") {
@@ -1988,17 +2540,49 @@ func (c *Ctx) findVariantBySym(sym string) (*types.Enum, types.Variant, bool) {
 	return nil, types.Variant{}, false
 }
 
+// classOf 按类型文本取背后的类（泛型实例走基类；@packed 位在基类上）。
+func (c *Ctx) classOf(text string) (*types.Class, bool) {
+	t, ok := c.irTab[text]
+	if !ok {
+		return nil, false
+	}
+	return classOfType(t)
+}
+
+// classOfType 取语义类型背后的类（Instance → 基类）。
+func classOfType(t types.Type) (*types.Class, bool) {
+	if cl, isCl := types.IsClass(t); isCl {
+		return cl, true
+	}
+	if inst, isInst := t.(*types.Instance); isInst {
+		if cl, isCl := types.IsClass(inst.Base); isCl {
+			return cl, true
+		}
+	}
+	return nil, false
+}
+
+// fieldTypeOfText 取字段在语义层的类型（泛型实例按实参代换后的那种）。
+func fieldTypeOfText(cl *types.Class, args []types.Type, idx int) (types.Type, bool) {
+	if cl == nil || idx < 0 || idx >= len(cl.Fields) {
+		return nil, false
+	}
+	ft := cl.Fields[idx].Type
+	if len(args) > 0 && len(cl.TypeParams) == len(args) {
+		ft = types.Subst(ft, cl.TypeParams, args)
+	}
+	return ft, true
+}
+
 // irFieldName 取字段的 C 名：具名类 = 字段名（ABI 冻结，声明序下标 → 名字），
 // 元组/多返回结构 = `_<下标>`。
 func (c *Ctx) irFieldName(p air.Place, idx int) (string, error) {
 	host := c.irPlaceTy(p)
-	if t, ok := c.irTab[host]; ok {
-		if cl, isCl := types.IsClass(t); isCl {
-			if idx >= 0 && idx < len(cl.Fields) {
-				return cl.Fields[idx].Name, nil
-			}
-			return "", fmt.Errorf("emit(IR): field %d is out of range for %s", idx, cl.Name)
+	if cl, ok := c.classOf(host); ok {
+		if idx >= 0 && idx < len(cl.Fields) {
+			return cl.Fields[idx].Name, nil
 		}
+		return "", fmt.Errorf("emit(IR): field %d is out of range for %s", idx, cl.Name)
 	}
 	if strings.HasPrefix(host, "Err") || host == "Err" {
 		switch idx {
@@ -2040,8 +2624,17 @@ func (c *Ctx) irPlaceTy(p air.Place) string {
 			return ""
 		}
 		if t, ok := c.irTab[base]; ok {
-			if cl, isCl := types.IsClass(t); isCl && v.Idx >= 0 && v.Idx < len(cl.Fields) {
-				return air.TyText(cl.Fields[v.Idx].Type)
+			if cl, isCl := types.IsClass(t); isCl {
+				if ft, has := fieldTypeOfText(cl, nil, v.Idx); has {
+					return air.TyText(ft)
+				}
+			}
+			if inst, isInst := t.(*types.Instance); isInst {
+				if cl, isCl := types.IsClass(inst.Base); isCl {
+					if ft, has := fieldTypeOfText(cl, inst.Args, v.Idx); has {
+						return air.TyText(ft)
+					}
+				}
 			}
 		}
 		return ""
@@ -2093,8 +2686,17 @@ func (c *Ctx) irElemRead(hostPlace air.Place, base, idx string) (string, error) 
 		c.need("l1")
 		return fmt.Sprintf("aic_list_get_%s(%s, %s, %s, 0)", suf, base, idx, cstr(c.Path)), nil
 	case strings.HasPrefix(host, "["):
+		// 定长数组：下标带越界 trap（AIC_ARRAY_AT：内联比较 + cold 报告；
+		// 左值形态 ⇒ 读写同一表达式，004/112 锚点）。长度来自类型文本常量。
+		if n, ok := arrayLenOfText(host); ok {
+			return fmt.Sprintf("AIC_ARRAY_AT(%s, %s, %s, %s, 0)", base, strconv.Itoa(n), idx, cstr(c.Path)), nil
+		}
 		return fmt.Sprintf("%s[%s]", base, idx), nil
-	case host == "str" || host == "bytes":
+	case host == "str":
+		// str 的字节 = aic_str_at（带越界 trap；bytes 才是 list_u8 槽位，见下一分支）。
+		c.need("l1")
+		return fmt.Sprintf("aic_str_at(%s, %s, %s, 0)", base, idx, cstr(c.Path)), nil
+	case host == "bytes":
 		// str/bytes 的下标 = 第 i 个字节（字节语义，§十四）。
 		c.need("l1")
 		return fmt.Sprintf("aic_list_get_u8((aic_list_u8 *)%s, %s, %s, 0)", base, idx, cstr(c.Path)), nil
@@ -2153,8 +2755,9 @@ func (c *Ctx) irLen(v *air.LenRHS) (string, error) {
 			return strings.TrimSuffix(host[i+1:], "]"), nil
 		}
 	case host == "str":
-		c.need("l0")
-		return fmt.Sprintf("aic_str_len(%s)", base), nil
+		// str 的长度是 aic_str 结构体的字段（运行时没有 aic_str_len 函数）：
+		// 发调用会在 C 层"隐式声明"（025 实测）。
+		return fmt.Sprintf("(%s).len", base), nil
 	case host == "bytes":
 		c.need("l1")
 		return fmt.Sprintf("aic_bytes_len(%s)", base), nil
@@ -2163,8 +2766,11 @@ func (c *Ctx) irLen(v *air.LenRHS) (string, error) {
 		if !ok {
 			return "", fmt.Errorf("emit(IR): no runtime map instance for %q", host)
 		}
+		// 运行时的拼法是 `aic_map_len_<KS>_<VS>`（len 在前，与 put/get 的
+		// `aic_map_put_<KS>_<VS>` 不同）—— 照 irMapCall 的同一张表拆，别自己拼。
+		kvs := strings.TrimPrefix(name, "aic_map_")
 		c.need("l1")
-		return fmt.Sprintf("%s_len(%s)", name, base), nil
+		return fmt.Sprintf("aic_map_len_%s(%s)", kvs, base), nil
 	case strings.HasPrefix(host, "set["):
 		t, ok := c.irTab[host]
 		if !ok {
@@ -2351,7 +2957,7 @@ func (c *Ctx) irCallExpr(v *air.Call) (string, error) {
 	if s, ok, err := c.irVariantCall(v.Sym, args); ok || err != nil {
 		return s, err
 	}
-	name, err := c.irCallee(v.Sym)
+	name, err := c.irCallee(v.Sym, v.TypeArgs)
 	if err != nil {
 		return "", err
 	}
@@ -2456,6 +3062,9 @@ func (c *Ctx) irBuiltinCall(sym string, args []string, vals []string, loc air.Lo
 	case strings.HasPrefix(sym, "bytes_"):
 		s, err := c.irBytesCall(sym, args, file, ln)
 		return s, true, err
+	case strings.HasPrefix(sym, "os_"):
+		s, err := c.irOSCall(sym, args, file, ln)
+		return s, true, err
 	case strings.HasPrefix(sym, "str_"):
 		s, err := c.irStrCall(sym, args, file, ln)
 		return s, true, err
@@ -2468,7 +3077,19 @@ func (c *Ctx) irBuiltinCall(sym string, args []string, vals []string, loc air.Lo
 	case sym == "ctx_new" || strings.HasPrefix(sym, "ctx_"):
 		return "", true, fmt.Errorf("emit(IR): the `ctx` package has no runtime implementation yet (%s)", sym)
 	case sym == "opaque_compare":
-		return "", true, fmt.Errorf("emit(IR): opaque_compare has no runtime implementation yet")
+		// N3：Ord 能力约束在**标量/str** 上的 compare = 语言级三态比较
+		//（`[T: Ord]` 的 a.compare(b)，T = i32 时无用户方法可调）。
+		// str 走运行时的 aic_str_cmp（字节序 + 长度序）；数值发 C 三元式
+		//（< 与 > 对同一对值各求值一次是安全的：两侧都是纯读）。
+		if len(args) != 2 {
+			return "", true, fmt.Errorf("emit(IR): opaque_compare takes the receiver and one argument")
+		}
+		if c.irValTy(vals[0]) == "str" {
+			c.need("l0")
+			return fmt.Sprintf("aic_str_cmp(%s, %s)", args[0], args[1]), true, nil
+		}
+		return fmt.Sprintf("((%s) < (%s) ? -1 : ((%s) > (%s) ? 1 : 0))",
+			args[0], args[1], args[0], args[1]), true, nil
 	}
 	return "", false, nil
 }
@@ -2668,17 +3289,10 @@ func (c *Ctx) irChanCall(sym string, args []string, file string, ln int) (string
 	case "send":
 		return fmt.Sprintf("aic_chan_send_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
 	case "recv":
-		expr := fmt.Sprintf("aic_chan_recv_%s(%s, %s, %d)", suf, recv, file, ln)
-		// 运行时的 recv 返回**每个通道类型自己的**结果结构（`aic_chan_<S>_recv_t`），
-		// 而 AIR 的多值类型是通用的 `(T, bool)`（C 侧 = 合成返回结构）。两者布局逐位
-		// 相同（`_0`/`_1`，runtime 头文件里把这条约定写死了），故按目标类型补一次显式
-		// 转换 —— 否则 C 报 "invalid initializer"（742/743 实测）。
-		if elems, ok := splitMultiText(c.irPendingTy); ok {
-			if ct, err := c.irRetNameOf(elems); err == nil && ct != "" {
-				return fmt.Sprintf("((%s)%s)", ct, expr), nil
-			}
-		}
-		return expr, nil
+		// **直接发原生调用**：结果结构（aic_chan_<S>_recv_t）与 AIR 多值结构的
+		// 转换在 irLet 处按字段做（两条语句）。此前这里发结构体强转，tcc 收、
+		// gcc/clang 拒（742 的 H3 潜伏坑）。
+		return fmt.Sprintf("aic_chan_recv_%s(%s, %s, %d)", suf, recv, file, ln), nil
 	case "len":
 		return fmt.Sprintf("aic_chan_len_%s(%s)", suf, recv), nil
 	case "cap":
@@ -2787,6 +3401,35 @@ func (c *Ctx) irStrCall(sym string, args []string, file string, ln int) (string,
 		return fmt.Sprintf("aic_std_str_utf8_at(%s, %s, %s, %d)", recv, argAt(args, 1), file, ln), nil
 	case "str_codepoints":
 		return fmt.Sprintf("aic_std_str_codepoints(%s, %s, %d)", recv, file, ln), nil
+	}
+	return "", fmt.Errorf("emit(IR): %s is not covered by the IR backend", sym)
+}
+
+// irOSCall 发射 os 家族（`os.args/readFile/readStdin/exit`；运行时在 aic_std.h
+// 的薄包装 + aic_l0.h 的原语）。这些是 std 包函数，符号 = `<pkg>_<fn>`。
+func (c *Ctx) irOSCall(sym string, args []string, file string, ln int) (string, error) {
+	switch sym {
+	case "os_args":
+		c.need("l0")
+		return fmt.Sprintf("aic_std_os_args(%s, %d)", file, ln), nil
+	case "os_readFile":
+		c.need("l0")
+		return fmt.Sprintf("aic_std_os_read_file(%s, %s, %d)", argAt(args, 0), file, ln), nil
+	case "os_readStdin":
+		c.need("l0")
+		return fmt.Sprintf("aic_std_os_read_stdin(%s, %d)", file, ln), nil
+	case "os_exit":
+		c.need("l0")
+		return fmt.Sprintf("aic_os_exit(%s)", argAt(args, 0)), nil
+	case "os_writeFile":
+		c.need("l0")
+		return fmt.Sprintf("aic_std_os_write_file(%s, %s, %s, %d)", argAt(args, 0), argAt(args, 1), file, ln), nil
+	case "os_print":
+		c.need("l1")
+		return fmt.Sprintf("aic_print_str(%s)", argAt(args, 0)), nil
+	case "os_println":
+		c.need("l1")
+		return fmt.Sprintf("(aic_print_str(%s), aic_print_nl())", argAt(args, 0)), nil
 	}
 	return "", fmt.Errorf("emit(IR): %s is not covered by the IR backend", sym)
 }
@@ -2980,13 +3623,34 @@ func (c *Ctx) irPlace(p air.Place) (string, error) {
 			// aic_list_ref_* 给的是**元素地址**（T*）：写要解引用。
 			return fmt.Sprintf("(*aic_list_ref_%s(%s, %s, %s, 0))", suf, base, idx, cstr(c.Path)), nil
 		case strings.HasPrefix(host, "["):
+			// 定长数组：写也走 AIC_ARRAY_AT（左值形态，越界 trap —— 004/112）。
+			if n, ok := arrayLenOfText(host); ok {
+				return fmt.Sprintf("AIC_ARRAY_AT(%s, %s, %s, %s, 0)", base, strconv.Itoa(n), idx, cstr(c.Path)), nil
+			}
 			return fmt.Sprintf("%s[%s]", base, idx), nil
 		case strings.HasPrefix(host, "map["):
 			return "", fmt.Errorf("emit(IR): writing a map element needs the runtime put (lowered as a call)")
 		}
 		return "", fmt.Errorf("emit(IR): element write on the host type %q is not covered", host)
 	case *air.StrViewPlace:
-		return "", fmt.Errorf("emit(IR): str view places are not emitted yet")
+		// 视图只能当值用（str 不可变）：place 形态出现就是发它的读。
+		base, err := c.irPlace(v.Base)
+		if err != nil {
+			return "", err
+		}
+		return c.irStrView(&air.StrViewRHS{Base: base, Lo: v.Lo, Hi: v.Hi})
 	}
 	return "", fmt.Errorf("emit(IR): unsupported place %T", p)
+}
+
+// irStrView 发一次 str 视图求值：零拷贝 + 边界检查（运行期 aic_str_view）。
+// 基础是 str 值名（字面量/变量/字段读都行：C 的结构体字段访问对两者都合法）。
+func (c *Ctx) irStrView(v *air.StrViewRHS) (string, error) {
+	base := c.irVal(v.Base)
+	lo, hi := c.irVal(v.Lo), c.irVal(v.Hi)
+	if base == "" || lo == "" || hi == "" {
+		return "", fmt.Errorf("emit(IR): a str view needs its base and both bounds")
+	}
+	c.need("l1")
+	return fmt.Sprintf("aic_str_view(%s, %s, %s, %s, 0)", base, lo, hi, cstr(c.Path)), nil
 }

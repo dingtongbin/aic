@@ -12,22 +12,22 @@ type ok_Point = struct
 func ok_main() {
   entry:
     loc ../../testdata/ok/731_print_class_derive.aic:24:13 let obj1 : ok_Point* = alloc task(ok_Point)
-    loc ../../testdata/ok/731_print_class_derive.aic:24:19 store field obj1, 0, const 1
-    loc ../../testdata/ok/731_print_class_derive.aic:24:25 store field obj1, 1, const 2
+    loc ../../testdata/ok/731_print_class_derive.aic:24:13 store field obj1, 0, const 1
+    loc ../../testdata/ok/731_print_class_derive.aic:24:13 store field obj1, 1, const 2
     loc ../../testdata/ok/731_print_class_derive.aic:24:5 var p : ok_Point* = obj1
     loc ../../testdata/ok/731_print_class_derive.aic:25:18 let t2 : void = call print_println(p)
     loc ../../testdata/ok/731_print_class_derive.aic:26:13 let obj3 : ok_Point* = alloc task(ok_Point)
-    loc ../../testdata/ok/731_print_class_derive.aic:26:19 store field obj3, 0, const 3
-    loc ../../testdata/ok/731_print_class_derive.aic:26:25 store field obj3, 1, const 4
+    loc ../../testdata/ok/731_print_class_derive.aic:26:13 store field obj3, 0, const 3
+    loc ../../testdata/ok/731_print_class_derive.aic:26:13 store field obj3, 1, const 4
     loc ../../testdata/ok/731_print_class_derive.aic:26:5 var q : ok_Point* = obj3
     loc ../../testdata/ok/731_print_class_derive.aic:27:19 let obj4 : ok_Line* = alloc task(ok_Line)
-    loc ../../testdata/ok/731_print_class_derive.aic:27:24 store field obj4, 0, p
-    loc ../../testdata/ok/731_print_class_derive.aic:27:33 store field obj4, 1, q
-    loc ../../testdata/ok/731_print_class_derive.aic:27:40 store field obj4, 2, const "seg"
+    loc ../../testdata/ok/731_print_class_derive.aic:27:19 store field obj4, 0, p
+    loc ../../testdata/ok/731_print_class_derive.aic:27:19 store field obj4, 1, q
+    loc ../../testdata/ok/731_print_class_derive.aic:27:19 store field obj4, 2, const "seg"
     loc ../../testdata/ok/731_print_class_derive.aic:27:18 let t5 : void = call print_println(obj4)
     loc ../../testdata/ok/731_print_class_derive.aic:28:13 let obj6 : ok_Pair = alloc task(ok_Pair)
-    loc ../../testdata/ok/731_print_class_derive.aic:28:18 store field obj6, 0, const 7
-    loc ../../testdata/ok/731_print_class_derive.aic:28:24 store field obj6, 1, const 8
+    loc ../../testdata/ok/731_print_class_derive.aic:28:13 store field obj6, 0, const 7
+    loc ../../testdata/ok/731_print_class_derive.aic:28:13 store field obj6, 1, const 8
     loc ../../testdata/ok/731_print_class_derive.aic:28:5 var w : ok_Pair = obj6
     loc ../../testdata/ok/731_print_class_derive.aic:29:18 let t7 : void = call print_println(w)
     loc ../../testdata/ok/731_print_class_derive.aic:30:22 let lit8 : ok_Point*[] = call list.new[ok_Point*]()

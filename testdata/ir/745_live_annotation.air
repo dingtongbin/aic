@@ -7,7 +7,7 @@ func ok_main() -> Err {
     loc ../../testdata/ok/745_live_annotation.aic:10:5 var kept : ok_Buf* = nil
     loc ../../testdata/ok/745_live_annotation.aic:11:5 region.enter r1
     loc ../../testdata/ok/745_live_annotation.aic:12:23 let obj2 : ok_Buf* = alloc region(ok_Buf)
-    loc ../../testdata/ok/745_live_annotation.aic:12:27 store field obj2, 0, const 7
+    loc ../../testdata/ok/745_live_annotation.aic:12:23 store field obj2, 0, const 7
     loc ../../testdata/ok/745_live_annotation.aic:12:9 var b : ok_Buf* = obj2
     loc ../../testdata/ok/745_live_annotation.aic:13:14 store kept, b
     loc ../../testdata/ok/745_live_annotation.aic:11:5 region.exit

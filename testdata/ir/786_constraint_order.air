@@ -18,10 +18,10 @@ func ok_main() {
   entry:
     loc ../../testdata/ok/786_constraint_order.aic:23:22 var lit1 : [ok_Sq*;2]
     loc ../../testdata/ok/786_constraint_order.aic:23:23 let obj2 : ok_Sq* = alloc task(ok_Sq)
-    loc ../../testdata/ok/786_constraint_order.aic:23:26 store field obj2, 0, const 2
+    loc ../../testdata/ok/786_constraint_order.aic:23:23 store field obj2, 0, const 2
     loc ../../testdata/ok/786_constraint_order.aic:23:22 store elem lit1, const 0, obj2
     loc ../../testdata/ok/786_constraint_order.aic:23:33 let obj3 : ok_Sq* = alloc task(ok_Sq)
-    loc ../../testdata/ok/786_constraint_order.aic:23:36 store field obj3, 0, const 3
+    loc ../../testdata/ok/786_constraint_order.aic:23:33 store field obj3, 0, const 3
     loc ../../testdata/ok/786_constraint_order.aic:23:22 store elem lit1, const 1, obj3
     loc ../../testdata/ok/786_constraint_order.aic:23:5 var xs : [ok_Sq*;2] = lit1
     loc ../../testdata/ok/786_constraint_order.aic:24:26 let t4 : i32 = call ok_sum[ok_Sq*](xs)

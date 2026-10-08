@@ -31,21 +31,21 @@ func ok_main() {
     loc ../../testdata/ok/031_range_over_containers.aic:16:10 let t13 : void = call map_str_i32_put(m, const "b", const 2)
     loc ../../testdata/ok/031_range_over_containers.aic:17:5 var keys : usize = const 0
     loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t14 : usize = len m
-    loc ../../testdata/ok/031_range_over_containers.aic:18:5 var k : usize = const 0
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 var i__ : usize = const 0
     loc ../../testdata/ok/031_range_over_containers.aic:18:5 br forhead5
   forhead5:
-    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t15 : bool = cmp lt k, t14
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t15 : bool = cmp lt i__, t14
     loc ../../testdata/ok/031_range_over_containers.aic:18:5 cbr t15, forbody6, fordone8
   forbody6:
-    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t16 : i32 = elem m, k
-    loc ../../testdata/ok/031_range_over_containers.aic:18:9 var k : i32 = t16
+    loc ../../testdata/ok/031_range_over_containers.aic:18:9 let t16 : str = call map_str_i32_keyAt(m, i__)
+    loc ../../testdata/ok/031_range_over_containers.aic:18:9 var k : str = t16
     loc ../../testdata/ok/031_range_over_containers.aic:19:22 let t17 : void = call print_println(k)
     loc ../../testdata/ok/031_range_over_containers.aic:20:21 let t18 : usize = binop + keys, const 1
     loc ../../testdata/ok/031_range_over_containers.aic:20:14 store keys, t18
     loc ../../testdata/ok/031_range_over_containers.aic:18:5 br forpost7
   forpost7:
-    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t19 : usize = binop + k, const 1
-    loc ../../testdata/ok/031_range_over_containers.aic:18:5 store k, t19
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t19 : usize = binop + i__, const 1
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 store i__, t19
     loc ../../testdata/ok/031_range_over_containers.aic:18:5 br forhead5
   fordone8:
     loc ../../testdata/ok/031_range_over_containers.aic:22:18 let t20 : void = call print_println(keys)

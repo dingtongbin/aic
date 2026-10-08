@@ -70,9 +70,12 @@ type Slot struct {
 }
 
 // Param 是函数形参。
+// Ref = 按引用传参（defer 块形提升体的捕获槽：C 侧是 `T *name__p`，体内对 name
+// 的读写都是 `(*name__p)` —— 出口读到的必须是最终值，035/713 锚点）。
 type Param struct {
 	Name string
 	Ty   string
+	Ref  bool
 }
 
 // Func 是一个函数/方法体。
@@ -130,11 +133,28 @@ type Store struct {
 }
 
 // RegionEnter / RegionExit 与作用域严格配对（V3.1）。
+// Scope = 这是 `scope { }`（任务域：退出 join 全部 spawn 的任务），不是
+// `region { }`（内存区域）—— 两者在 C 侧的进出序列不同（scope 还要
+// aic_scope_enter/exit），降级期就必须分开（773/742/772 锚点）。
 type RegionEnter struct {
 	TypeID string
+	Scope  bool
 	Loc    Loc
 }
-type RegionExit struct{ Loc Loc }
+type RegionExit struct {
+	Scope bool
+	Loc   Loc
+}
+
+// Spawn 是 `spawn <callee>(<vals…>)`：在所属 scope 里起一个任务。
+// 实参在 spawn 点求值（与 defer 同纪律）；被调符号与实参表都在这里定下来，
+// 后端据此发上下文块 + 薄 thunk + aic_scope_spawn。
+type Spawn struct {
+	Callee   string
+	TypeArgs []string
+	Vals     []string
+	Loc      Loc
+}
 
 // DeferReg / DeferInit / DeferRun 是 defer 三件套（§10.1：注册点求值 + 逆序执行）。
 // OnErr = 仅因 Err 返回时执行（N8 `errdefer`）。
@@ -147,11 +167,15 @@ type DeferReg struct {
 // 被调符号与实参都在注册点定下来（之后改原变量不影响已注册的实参 —— 核心设计
 // §三"N8 实参注册点求值"，锚点 ok/757）。方法形态 = 普通函数 + 接收者当首实参
 // （与直调同一条 mangling，后端不必再认识"方法"）。
+// Limits 与 Vals 逐位对齐（空 = 该实参无守卫）：GuardDefer 的注册点界检查
+// （§五 R5：defer 实参的界 ≤ 函数入口；781 锚点 —— 此前检查器标了守卫但降级侧
+// 没有载体，守卫从未发出，defer 在退出时读已弹出的区域）。
 type DeferInit struct {
 	ID       int
 	Callee   string
 	TypeArgs []string
 	Vals     []string
+	Limits   []string
 	OnErr    bool
 	Loc      Loc
 }
@@ -200,9 +224,10 @@ type SelWait struct {
 func (*Let) airInst()         {}
 func (*Var) airInst()         {}
 func (*Store) airInst()       {}
-func (*RegionEnter) airInst() {}
-func (*RegionExit) airInst()  {}
-func (*DeferReg) airInst()    {}
+func (*RegionEnter) airInst()      {}
+func (*RegionExit) airInst()       {}
+func (*Spawn) airInst()            {}
+func (*DeferReg) airInst()         {}
 func (*DeferInit) airInst()   {}
 func (*DeferRun) airInst()    {}
 func (*TrapIfErr) airInst()   {}
@@ -270,6 +295,11 @@ type ElemRHS struct {
 	Idx   string // 下标是值（临时量或常量）
 }
 type LenRHS struct{ Place Place }
+
+// StrViewRHS 是 str 视图读 `s[lo..hi]`：**零拷贝**（字节恒在任务区域），
+// Base 是基础 str 的值名，Lo/Hi 是边界值名（§二.5：lo <= hi <= len）。
+// `for ch in s` 的单字节视图也走这条（Hi = 下标 + 1）—— 元素类型是 str 不是 u8，
+// 只有 `for i, b in s` 两形式才出 u8 字节。
 type StrViewRHS struct{ Base, Lo, Hi string }
 
 // MultiExtract / EnumTag / EnumPayload 是解构。
@@ -299,6 +329,12 @@ type TmpRef struct{ Name string }
 type VarRef struct{ Name string }
 type Nil struct{ Ty string }
 
+// AddrRHS 是**取地址**（defer 块形按引用捕获的注册点：`&x`）。
+// 为什么必须有这个形态：defer 块在函数出口跑，块内读外层局部量必须读到**最终值**
+// （035/713 的 `failed = true` 之后才生效）⇒ 注册点传的是变量槽的地址，不是值的
+// 拷贝。C 有取地址，AIR 没有这条指令就表达不了这个语义（R14：IR 先无损装下）。
+type AddrRHS struct{ Val string }
+
 func (*Call) airRHS()         {}
 func (*CallInd) airRHS()      {}
 func (*Closure) airRHS()      {}
@@ -313,6 +349,7 @@ func (*FieldRHS) airRHS()     {}
 func (*ElemRHS) airRHS()      {}
 func (*LenRHS) airRHS()       {}
 func (*StrViewRHS) airRHS()   {}
+func (*AddrRHS) airRHS()      {}
 func (*MultiExtract) airRHS() {}
 func (*EnumTag) airRHS()      {}
 func (*EnumPayload) airRHS()  {}
@@ -373,7 +410,12 @@ type ElemPlace struct {
 	Base Place
 	Idx  string
 }
-type StrViewPlace struct{ Base Place }
+// StrViewPlace 是 str 视图的 place 形态（Lo/Hi 与 StrViewRHS 同语义；
+// str 不可变，视图只能当值用，place 形态是为 IR 完整性保留）。
+type StrViewPlace struct {
+	Base   Place
+	Lo, Hi string
+}
 
 func (*VarPlace) airPlace()     {}
 func (*FieldPlace) airPlace()   {}

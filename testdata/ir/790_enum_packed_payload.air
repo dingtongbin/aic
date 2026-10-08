@@ -38,8 +38,8 @@ func ok_main() {
     loc ../../testdata/ok/790_enum_packed_payload.aic:20:23 let t2 : i32 = call ok_area(t1)
     loc ../../testdata/ok/790_enum_packed_payload.aic:20:18 let t3 : void = call print_println(t2)
     loc ../../testdata/ok/790_enum_packed_payload.aic:21:35 let obj4 : ok_Size = alloc task(ok_Size)
-    loc ../../testdata/ok/790_enum_packed_payload.aic:21:40 store field obj4, 0, const 3
-    loc ../../testdata/ok/790_enum_packed_payload.aic:21:46 store field obj4, 1, const 4
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:35 store field obj4, 0, const 3
+    loc ../../testdata/ok/790_enum_packed_payload.aic:21:35 store field obj4, 1, const 4
     loc ../../testdata/ok/790_enum_packed_payload.aic:21:34 let t5 : ok_Shape = call Shape_Rect(obj4)
     loc ../../testdata/ok/790_enum_packed_payload.aic:21:23 let t6 : i32 = call ok_area(t5)
     loc ../../testdata/ok/790_enum_packed_payload.aic:21:18 let t7 : void = call print_println(t6)

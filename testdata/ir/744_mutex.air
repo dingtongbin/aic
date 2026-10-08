@@ -18,9 +18,9 @@ func ok_Counter_bump(this__:ok_Counter*) {
 func ok_main() {
   entry:
     loc ../../testdata/ok/744_mutex.aic:17:13 let obj1 : ok_Counter* = alloc task(ok_Counter)
-    loc ../../testdata/ok/744_mutex.aic:17:21 store field obj1, 0, const 0
+    loc ../../testdata/ok/744_mutex.aic:17:13 store field obj1, 0, const 0
     loc ../../testdata/ok/744_mutex.aic:17:44 let t2 : sync_Mutex = call sync_Mutex_new()
-    loc ../../testdata/ok/744_mutex.aic:17:27 store field obj1, 1, t2
+    loc ../../testdata/ok/744_mutex.aic:17:13 store field obj1, 1, t2
     loc ../../testdata/ok/744_mutex.aic:17:5 var c : ok_Counter* = obj1
     loc ../../testdata/ok/744_mutex.aic:18:11 let t3 : void = call ok_Counter_bump(c)
     loc ../../testdata/ok/744_mutex.aic:19:11 let t4 : void = call ok_Counter_bump(c)
@@ -33,16 +33,16 @@ func ok_main() {
     loc ../../testdata/ok/744_mutex.aic:24:18 let t10 : void = call print_println(const "locked-once")
     loc ../../testdata/ok/744_mutex.aic:25:38 let t11 : chan[i32] = call chan_new_i32()
     loc ../../testdata/ok/744_mutex.aic:25:5 var out : chan[i32] = t11
-    loc ../../testdata/ok/744_mutex.aic:26:5 region.enter sc12
-    loc ../../testdata/ok/744_mutex.aic:27:21 let t13 : void = call ok_worker(out)
-    loc ../../testdata/ok/744_mutex.aic:26:5 region.exit
-    loc ../../testdata/ok/744_mutex.aic:29:25 let t14 : (i32, bool) = call chan_i32_recv(out)
-    loc ../../testdata/ok/744_mutex.aic:29:5 let t15 : i32 = multi.extract t14, 0
-    loc ../../testdata/ok/744_mutex.aic:29:9 var v : i32 = t15
-    loc ../../testdata/ok/744_mutex.aic:29:5 let t16 : bool = multi.extract t14, 1
-    loc ../../testdata/ok/744_mutex.aic:29:12 var ok : bool = t16
-    loc ../../testdata/ok/744_mutex.aic:30:18 let t17 : void = call print_println(v)
-    loc ../../testdata/ok/744_mutex.aic:31:18 let t18 : void = call print_println(ok)
+    loc ../../testdata/ok/744_mutex.aic:26:5 scope.enter sc12
+    loc ../../testdata/ok/744_mutex.aic:27:9 spawn ok_worker(out)
+    loc ../../testdata/ok/744_mutex.aic:26:5 scope.exit
+    loc ../../testdata/ok/744_mutex.aic:29:25 let t13 : (i32, bool) = call chan_i32_recv(out)
+    loc ../../testdata/ok/744_mutex.aic:29:5 let t14 : i32 = multi.extract t13, 0
+    loc ../../testdata/ok/744_mutex.aic:29:9 var v : i32 = t14
+    loc ../../testdata/ok/744_mutex.aic:29:5 let t15 : bool = multi.extract t13, 1
+    loc ../../testdata/ok/744_mutex.aic:29:12 var ok : bool = t15
+    loc ../../testdata/ok/744_mutex.aic:30:18 let t16 : void = call print_println(v)
+    loc ../../testdata/ok/744_mutex.aic:31:18 let t17 : void = call print_println(ok)
     loc ../../testdata/ok/744_mutex.aic:16:1 br exit
   exit:
     loc ../../testdata/ok/744_mutex.aic:16:1 ret 

@@ -377,6 +377,12 @@ func substInst(in Inst, sub map[string]string) (Inst, error) {
 		c.TypeArgs = substList(v.TypeArgs, sub)
 		c.Vals = append([]string{}, v.Vals...)
 		return &c, nil
+	case *Spawn:
+		c := *v
+		c.Callee = substTypeText(v.Callee, sub)
+		c.TypeArgs = substList(v.TypeArgs, sub)
+		c.Vals = append([]string{}, v.Vals...)
+		return &c, nil
 	}
 	return in, nil
 }

@@ -25,19 +25,19 @@ func ok_main() {
     loc ../../testdata/ok/740_generic_functions.aic:29:5 var names : str[] = lit13
     loc ../../testdata/ok/740_generic_functions.aic:30:24 let t16 : str = call ok_first[str](names)
     loc ../../testdata/ok/740_generic_functions.aic:30:18 let t17 : void = call print_println(t16)
-    loc ../../testdata/ok/740_generic_functions.aic:31:16 let obj18 : ok_Box*[i32] = alloc task(ok_Box*[i32])
-    loc ../../testdata/ok/740_generic_functions.aic:31:22 store field obj18, 0, const 42
-    loc ../../testdata/ok/740_generic_functions.aic:31:5 var b : ok_Box*[i32] = obj18
+    loc ../../testdata/ok/740_generic_functions.aic:31:16 let obj18 : ok_Box[i32]* = alloc task(ok_Box[i32])
+    loc ../../testdata/ok/740_generic_functions.aic:31:16 store field obj18, 0, const 42
+    loc ../../testdata/ok/740_generic_functions.aic:31:5 var b : ok_Box[i32]* = obj18
     loc ../../testdata/ok/740_generic_functions.aic:32:20 let t19 : i32 = field b, 0
     loc ../../testdata/ok/740_generic_functions.aic:32:18 let t20 : void = call print_println(t19)
-    loc ../../testdata/ok/740_generic_functions.aic:33:16 let obj21 : ok_Box*[str] = alloc task(ok_Box*[str])
-    loc ../../testdata/ok/740_generic_functions.aic:33:22 store field obj21, 0, const "boxed"
-    loc ../../testdata/ok/740_generic_functions.aic:33:5 var s : ok_Box*[str] = obj21
+    loc ../../testdata/ok/740_generic_functions.aic:33:16 let obj21 : ok_Box[str]* = alloc task(ok_Box[str])
+    loc ../../testdata/ok/740_generic_functions.aic:33:16 store field obj21, 0, const "boxed"
+    loc ../../testdata/ok/740_generic_functions.aic:33:5 var s : ok_Box[str]* = obj21
     loc ../../testdata/ok/740_generic_functions.aic:34:20 let t22 : str = field s, 0
     loc ../../testdata/ok/740_generic_functions.aic:34:18 let t23 : void = call print_println(t22)
     loc ../../testdata/ok/740_generic_functions.aic:35:17 let obj24 : ok_Pair[i32,str] = alloc task(ok_Pair[i32,str])
-    loc ../../testdata/ok/740_generic_functions.aic:35:28 store field obj24, 0, const 1
-    loc ../../testdata/ok/740_generic_functions.aic:35:34 store field obj24, 1, const "one"
+    loc ../../testdata/ok/740_generic_functions.aic:35:17 store field obj24, 0, const 1
+    loc ../../testdata/ok/740_generic_functions.aic:35:17 store field obj24, 1, const "one"
     loc ../../testdata/ok/740_generic_functions.aic:35:5 var p : ok_Pair[i32,str] = obj24
     loc ../../testdata/ok/740_generic_functions.aic:36:20 let t25 : i32 = field p, 0
     loc ../../testdata/ok/740_generic_functions.aic:36:18 let t26 : void = call print_println(t25)

@@ -168,6 +168,11 @@ type lowerer struct {
 	instArgs   []types.Type
 	// symOverride 非空 = 函数符号用实例名 `<base>[args]`（单态化实例各占一个符号）。
 	symOverride string
+	// fnKey 是当前函数的 Locals 键（defer 块形的捕获分析用它取外层局部量表）。
+	fnKey string
+	// dfblkSeq 是 defer 块形提升体的**模块级**编号（deferSeq 每函数重置，
+	// 提升体符号跨函数唯一 ⇒ 必须有一个不随 begin/end 归零的计数器）。
+	dfblkSeq int
 }
 
 // emitInstanceTypes 发泛型类的**实例**声明（mair）：每个实例一份 struct，
@@ -283,6 +288,7 @@ func (l *lowerer) funcDecl(d *parse.FuncDecl, recv string) error {
 	if l.symOverride != "" {
 		sym = l.symOverride
 	}
+	l.fnKey = types.FuncKey(recv, d.Name)
 	f := &Func{Sym: sym, Loc: LocOf(d.Pos)}
 	if sig.Export {
 		f.Flags = append(f.Flags, "export")
@@ -739,10 +745,8 @@ func (l *lowerer) regionStmt(v *parse.RegionStmt) error {
 // 上下文结构体（与直译路径同一套运行期 ABI），不必再认识调用形态的差别。
 func (l *lowerer) deferStmt(v *parse.DeferStmt, onErr bool) error {
 	if v.Block != nil {
-		// 块形 defer 要**按引用**捕获外层局部量（在出口读到的必须是最终值，
-		// 锚点 ok/035 的 "errdefer ran" 就靠这条），而 AIR 目前没有取地址/解引用
-		// 形态，闭包又只按值捕获。语义未定 ⇒ 明确拒绝，绝不发半截（红线 23）。
-		return fmt.Errorf("air: `defer { … }` block form is not lowered yet (it needs by-reference capture; line %d)", v.Pos.Line)
+		// 块形 defer：提升体 + 按引用捕获（见 lower_deferblk.go）。
+		return l.deferBlockStmt(v, onErr)
 	}
 	call, ok := v.Call.(*parse.Call)
 	if !ok {
@@ -753,6 +757,7 @@ func (l *lowerer) deferStmt(v *parse.DeferStmt, onErr bool) error {
 		return fmt.Errorf("air: cannot resolve the deferred call target (line %d)", v.Pos.Line)
 	}
 	vals := []string{}
+	limits := []string{}
 	// 方法形态：接收者是首实参（求值时机 = 注册点，与直调一致）。
 	if f, isField := call.Fn.(*parse.Field); isField && l.methodRecv(f.X) {
 		rv, err := l.value(f.X)
@@ -760,6 +765,7 @@ func (l *lowerer) deferStmt(v *parse.DeferStmt, onErr bool) error {
 			return err
 		}
 		vals = append(vals, rv)
+		limits = append(limits, l.guardLimitOf(f.X))
 	}
 	for _, a := range call.Args {
 		val, err := l.deferVal(a)
@@ -767,6 +773,7 @@ func (l *lowerer) deferStmt(v *parse.DeferStmt, onErr bool) error {
 			return err
 		}
 		vals = append(vals, val)
+		limits = append(limits, l.guardLimitOf(a))
 	}
 	l.deferSeq++
 	if onErr {
@@ -774,8 +781,19 @@ func (l *lowerer) deferStmt(v *parse.DeferStmt, onErr bool) error {
 	}
 	l.cur.Insts = append(l.cur.Insts, &DeferReg{OnErr: onErr, Loc: LocOf(v.Pos)})
 	l.cur.Insts = append(l.cur.Insts, &DeferInit{
-		ID: l.deferSeq, Callee: sym, TypeArgs: ta, Vals: vals, OnErr: onErr, Loc: LocOf(v.Pos)})
+		ID: l.deferSeq, Callee: sym, TypeArgs: ta, Vals: vals, Limits: limits,
+		OnErr: onErr, Loc: LocOf(v.Pos)})
 	return nil
+}
+
+// guardLimitOf 取一个表达式上的存储点守卫的 IR limit 文本（没有守卫 = 空串）。
+// defer/errdefer 实参的界 ≤ 函数入口（§五 R5），检查器把 GuardDefer 标在实参
+// 节点上；此前降级侧从不查它 ⇒ 守卫从未发出（781：defer 退出时读已弹出的区域）。
+func (l *lowerer) guardLimitOf(e parse.Expr) string {
+	if g, ok := l.info.HasGuard(e); ok {
+		return l.limitOf(g, e)
+	}
+	return ""
 }
 
 // deferVal 求值一个 defer 实参：**字面量先绑成临时量**。
@@ -805,6 +823,11 @@ func (l *lowerer) deferVal(e parse.Expr) (string, error) {
 
 // methodRecv 报告 `x.m(…)` 的 x 是否是"值接收者"（方法调用：接收者当首实参）。
 // 与调用降级用**同一条**判定（红线 10：两处各自判断迟早会分叉）。
+//
+// **标量接收者也算**：语言面标量没有任何内建方法，故出现在标量上的方法调用只有
+// 一种可能 = N3 约束授权的方法（`[T: Ord]` 的 a.compare(b)）。它们同样把接收者
+// 当首实参（约束签名 compare(other) 之外隐含 this）—— 漏了这条，实例降级会把
+// `a.compare(b)` 发成 `opaque_compare(b)`（少一个实参，762 实测）。
 func (l *lowerer) methodRecv(x parse.Expr) bool {
 	rt := l.typeOf(x)
 	if rt == nil {
@@ -820,6 +843,9 @@ func (l *lowerer) methodRecv(x parse.Expr) bool {
 		return true
 	}
 	if _, isMu := rt.(*types.MutexT); isMu {
+		return true
+	}
+	if _, isBasic := rt.(*types.Basic); isBasic {
 		return true
 	}
 	return types.IsSlice(rt) || types.IsMap(rt) || types.IsSet(rt) || types.IsArray(rt) ||

@@ -33,20 +33,22 @@ func ok_main() {
     loc ../../testdata/ok/788_map_iface.aic:27:33 let t1 : map[str]ok_Area = call map_new_str_iface()
     loc ../../testdata/ok/788_map_iface.aic:27:5 var m : map[str]ok_Area = t1
     loc ../../testdata/ok/788_map_iface.aic:28:17 let obj2 : ok_Sq* = alloc task(ok_Sq)
-    loc ../../testdata/ok/788_map_iface.aic:28:20 store field obj2, 0, const 3
-    loc ../../testdata/ok/788_map_iface.aic:28:10 let t3 : void = call map_str_iface_put(m, const "sq", obj2)
-    loc ../../testdata/ok/788_map_iface.aic:29:19 let obj4 : ok_Rect* = alloc task(ok_Rect)
-    loc ../../testdata/ok/788_map_iface.aic:29:24 store field obj4, 0, const 2
-    loc ../../testdata/ok/788_map_iface.aic:29:30 store field obj4, 1, const 5
-    loc ../../testdata/ok/788_map_iface.aic:29:10 let t5 : void = call map_str_iface_put(m, const "rect", obj4)
-    loc ../../testdata/ok/788_map_iface.aic:30:24 let t6 : usize = call map_str_iface_len(m)
-    loc ../../testdata/ok/788_map_iface.aic:30:18 let t7 : void = call print_println(t6)
-    loc ../../testdata/ok/788_map_iface.aic:31:24 let t8 : ok_Area = call map_str_iface_get(m, const "sq")
-    loc ../../testdata/ok/788_map_iface.aic:31:35 let t9 : i32 = call.ind t8.0()
-    loc ../../testdata/ok/788_map_iface.aic:31:18 let t10 : void = call print_println(t9)
-    loc ../../testdata/ok/788_map_iface.aic:32:24 let t11 : ok_Area = call map_str_iface_get(m, const "rect")
-    loc ../../testdata/ok/788_map_iface.aic:32:37 let t12 : i32 = call.ind t11.0()
-    loc ../../testdata/ok/788_map_iface.aic:32:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/788_map_iface.aic:28:17 store field obj2, 0, const 3
+    loc ../../testdata/ok/788_map_iface.aic:28:17 let t3 : ok_Area = box obj2, ok_Area
+    loc ../../testdata/ok/788_map_iface.aic:28:10 let t4 : void = call map_str_iface_put(m, const "sq", t3)
+    loc ../../testdata/ok/788_map_iface.aic:29:19 let obj5 : ok_Rect* = alloc task(ok_Rect)
+    loc ../../testdata/ok/788_map_iface.aic:29:19 store field obj5, 0, const 2
+    loc ../../testdata/ok/788_map_iface.aic:29:19 store field obj5, 1, const 5
+    loc ../../testdata/ok/788_map_iface.aic:29:19 let t6 : ok_Area = box obj5, ok_Area
+    loc ../../testdata/ok/788_map_iface.aic:29:10 let t7 : void = call map_str_iface_put(m, const "rect", t6)
+    loc ../../testdata/ok/788_map_iface.aic:30:24 let t8 : usize = call map_str_iface_len(m)
+    loc ../../testdata/ok/788_map_iface.aic:30:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/788_map_iface.aic:31:24 let t10 : ok_Area = call map_str_iface_get(m, const "sq")
+    loc ../../testdata/ok/788_map_iface.aic:31:35 let t11 : i32 = call.ind t10.0()
+    loc ../../testdata/ok/788_map_iface.aic:31:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/788_map_iface.aic:32:24 let t13 : ok_Area = call map_str_iface_get(m, const "rect")
+    loc ../../testdata/ok/788_map_iface.aic:32:37 let t14 : i32 = call.ind t13.0()
+    loc ../../testdata/ok/788_map_iface.aic:32:18 let t15 : void = call print_println(t14)
     loc ../../testdata/ok/788_map_iface.aic:26:1 br exit
   exit:
     loc ../../testdata/ok/788_map_iface.aic:26:1 ret 

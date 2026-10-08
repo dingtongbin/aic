@@ -37,17 +37,18 @@ func ok_main() {
     loc ../../testdata/ok/025_for_range.aic:15:5 let t15 : bool = cmp lt b, t14
     loc ../../testdata/ok/025_for_range.aic:15:5 cbr t15, forbody6, fordone8
   forbody6:
-    loc ../../testdata/ok/025_for_range.aic:15:5 let t16 : u8 = elem s, b
-    loc ../../testdata/ok/025_for_range.aic:15:9 var b : u8 = t16
-    loc ../../testdata/ok/025_for_range.aic:16:23 let t17 : i32 = binop + bytes, const 1
-    loc ../../testdata/ok/025_for_range.aic:16:15 store bytes, t17
+    loc ../../testdata/ok/025_for_range.aic:15:5 let t16 : usize = binop + b, const 1
+    loc ../../testdata/ok/025_for_range.aic:15:5 let t17 : str = str.view s, b, t16
+    loc ../../testdata/ok/025_for_range.aic:15:9 var b : str = t17
+    loc ../../testdata/ok/025_for_range.aic:16:23 let t18 : i32 = binop + bytes, const 1
+    loc ../../testdata/ok/025_for_range.aic:16:15 store bytes, t18
     loc ../../testdata/ok/025_for_range.aic:15:5 br forpost7
   forpost7:
-    loc ../../testdata/ok/025_for_range.aic:15:5 let t18 : usize = binop + b, const 1
-    loc ../../testdata/ok/025_for_range.aic:15:5 store b, t18
+    loc ../../testdata/ok/025_for_range.aic:15:5 let t19 : usize = binop + b, const 1
+    loc ../../testdata/ok/025_for_range.aic:15:5 store b, t19
     loc ../../testdata/ok/025_for_range.aic:15:5 br forhead5
   fordone8:
-    loc ../../testdata/ok/025_for_range.aic:18:18 let t19 : void = call print_println(bytes)
+    loc ../../testdata/ok/025_for_range.aic:18:18 let t20 : void = call print_println(bytes)
     loc ../../testdata/ok/025_for_range.aic:3:1 br exit
   exit:
     loc ../../testdata/ok/025_for_range.aic:3:1 ret 

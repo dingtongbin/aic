@@ -24,49 +24,73 @@ type instMethodEntry struct {
 	sig  *types.FuncSig
 }
 
-// collectInstMethods 汇总全部类实例的方法（按符号名排序，保 H2 确定性）。
+// collectInstMethods 汇总**已登记**的泛型类方法实例。
+//
+// 判据 = 检查器的 FuncInsts（真正被调用点引用过的实例，实例缓存与键的唯一来源），
+// **不是**「类实例 × 全部方法」的笛卡尔积 —— 那个积里的多数实例 AIR 侧没有体
+// （air 只降级登记过的实例），irOneFunc 会报 no IR body（741 实测）。
 func (c *Ctx) collectInstMethods(u *Unit) []instMethodEntry {
 	var out []instMethodEntry
-	for _, e := range c.insts {
-		cl, isCl := e.inst.Base.(*types.Class)
-		if !isCl {
+	seen := map[string]bool{}
+	for _, fu := range u.Files {
+		if fu.Info == nil {
 			continue
 		}
-		segs := make([]string, 0, len(e.inst.Args))
-		for _, a := range e.inst.Args {
-			segs = append(segs, typeSeg(a))
-		}
-		for _, fu := range u.Files {
-			if fu.Info == nil {
+		for _, fi := range fu.Info.FuncInsts {
+			if fi.Fn == nil || fi.Fn.Recv == "" || len(fi.Args) == 0 {
 				continue
 			}
-			if bcl, ok := fu.Info.Classes[cl.Name]; !ok || bcl != cl {
+			cl, ok := fu.Info.Classes[fi.Fn.Recv]
+			if !ok || len(cl.TypeParams) != len(fi.Args) {
+				continue // 非泛型类的方法不走实例路径
+			}
+			decl := findMethodDecl(u, fu.Info.Pkg, fi.Fn.Recv, fi.Fn.Name)
+			if decl == nil || decl.Body == nil {
 				continue
 			}
-			for _, d := range fu.File.Decls {
-				cd, isCD := d.(*parse.ClassDecl)
-				if !isCD || cd.Name != cl.Name {
-					continue
-				}
-				for _, m := range cd.Methods {
-					if m.IsInit {
-						continue // init 是构造函数，归构造路径
-					}
-					sig, has := cl.Method(m.Name)
-					if !has || sig == nil {
-						continue
-					}
-					out = append(out, instMethodEntry{
-						name: MangleGeneric(c.ownerPkg(cl.Pkg), cl.Name+"_"+m.Name, segs),
-						cl:   cl, inst: e.inst, decl: m, fu: fu,
-						sig: types.SubstSig(sig, paramMapOf(cl.TypeParams, e.inst.Args)),
-					})
-				}
+			inst := &types.Instance{Base: cl, Args: fi.Args}
+			name := MangleGeneric(c.ownerPkg(cl.Pkg), cl.Name+"_"+decl.Name, instSegs(inst))
+			if seen[name] {
+				continue
 			}
+			seen[name] = true
+			out = append(out, instMethodEntry{
+				name: name,
+				cl:   cl, inst: inst, decl: decl, fu: fu,
+				sig: types.SubstSig(fi.Fn, paramMapOf(cl.TypeParams, fi.Args)),
+			})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].name < out[j].name })
 	return out
+}
+
+// instSegs 是实例实参的短后缀表（键与名同源：符号名由实参拼出）。
+func instSegs(inst *types.Instance) []string {
+	segs := make([]string, 0, len(inst.Args))
+	for _, a := range inst.Args {
+		segs = append(segs, typeSeg(a))
+	}
+	return segs
+}
+
+// findMethodDecl 在整程序里找某个类的某个方法声明（实例体的源码来源）。
+func findMethodDecl(u *Unit, pkg, cls, name string) *parse.FuncDecl {
+	for _, fu := range u.Files {
+		if fu.Info == nil || fu.Info.Pkg != pkg || fu.File == nil {
+			continue
+		}
+		for _, d := range fu.File.Decls {
+			if cd, ok := d.(*parse.ClassDecl); ok && cd.Name == cls {
+				for _, m := range cd.Methods {
+					if m.Name == name {
+						return m
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // instParamList 是实例方法的 C 形参表：this__ 用**实例**类型（不是泛型类），

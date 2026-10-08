@@ -21,8 +21,9 @@ func ok_main() {
     loc ../../testdata/ok/706_option_match_binds_payload.aic:12:31 let t1 : option_Option[i32] = call Some(const 21)
     loc ../../testdata/ok/706_option_match_binds_payload.aic:12:26 let t2 : i32 = call ok_doubled(t1)
     loc ../../testdata/ok/706_option_match_binds_payload.aic:12:18 let t3 : void = call print_println(t2)
-    loc ../../testdata/ok/706_option_match_binds_payload.aic:13:26 let t4 : i32 = call ok_doubled(const None)
-    loc ../../testdata/ok/706_option_match_binds_payload.aic:13:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:13:27 let t4 : option_Option[i32] = const None
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:13:26 let t5 : i32 = call ok_doubled(t4)
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:13:18 let t6 : void = call print_println(t5)
     loc ../../testdata/ok/706_option_match_binds_payload.aic:11:1 br exit
   exit:
     loc ../../testdata/ok/706_option_match_binds_payload.aic:11:1 ret 

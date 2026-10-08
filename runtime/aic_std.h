@@ -43,10 +43,22 @@ static inline bool aic_str_ends_with(aic_str s, aic_str suffix) {
 }
 
 /* indexOf：首个出现的字节偏移；未命中 = (usize)-1。 */
-/* str 下标读：越界 = trap（§二.3；str 字节在任务区域，读不产生分配）。 */
+/* str 的字节下标 = trap（§二.3：str 字节不越界；视图只读故无写入路径）。 */
 static inline aic_u8 aic_str_at(aic_str s, aic_usize i, const char *file, int line) {
     if (i >= s.len) aic_trap(AIC_TRAP_INDEX_OUT_OF_BOUNDS, file, line);
     return (aic_u8)s.p[i];
+}
+
+/* str 视图 s[lo..hi]：**零拷贝**（字节恒在任务区域，视图永不悬垂，§二.5）；
+ * lo <= hi <= len 否则 trap。单字节视图（`for ch in s` 的元素）走同一条：
+ * 循环条件已保证 lo < len，这里的检查不会触发，但语义只留一处。 */
+static inline aic_str aic_str_view(aic_str s, aic_usize lo, aic_usize hi,
+                                   const char *file, int line) {
+    if (lo > hi || hi > s.len) aic_trap(AIC_TRAP_INDEX_OUT_OF_BOUNDS, file, line);
+    aic_str v;
+    v.p = s.p + lo;
+    v.len = hi - lo;
+    return v;
 }
 
 static inline aic_usize aic_str_index_of(aic_str hay, aic_str needle) {

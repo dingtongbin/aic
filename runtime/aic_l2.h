@@ -60,15 +60,19 @@ typedef struct aic_task {
     void (*fn)(void *);
     void *env;
     aic_thr thr;
-    bool started;
+    bool started; /* 真线程 = 线程已创建；无 TLS = 已入队等 scope 退出 */
+    bool ran;     /* 无 TLS：本体是否已跑过（让出/退出都按它跳过，防双跑） */
     struct aic_task *next;
 } aic_task;
 
-/* 一个 scope = 任务链；退出时 join 全部（不等结果也等结束，§七）。 */
+/* 一个 scope = 任务链；退出时 join 全部（不等结果也等结束，§七）。
+ * prev 只在无 TLS 退化后端用：等待点的协作式让步靠它找"当前 scope"
+ * （嵌套 scope 栈式保存/恢复；有 TLS 的真线程后端不用这个字段）。 */
 typedef struct {
     aic_task *head;
     aic_task *tail;
     aic_u32 live; /* 本 scope 内尚未结束的任务数（不含发起者） */
+    struct aic_scope *prev;
 } aic_scope;
 
 void  aic_scope_enter(aic_scope *s);

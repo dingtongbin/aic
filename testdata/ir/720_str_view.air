@@ -2,14 +2,14 @@ air v1 module ok
 func ok_main() {
   entry:
     loc ../../testdata/ok/720_str_view.aic:4:5 var s : str = const "hello"
-    loc ../../testdata/ok/720_str_view.aic:5:18 let t1 : str = elem strview s, const 1
+    loc ../../testdata/ok/720_str_view.aic:5:18 let t1 : str = str.view s, const 1, const 3
     loc ../../testdata/ok/720_str_view.aic:5:5 var v : str = t1
     loc ../../testdata/ok/720_str_view.aic:6:18 let t2 : void = call print_println(v)
-    loc ../../testdata/ok/720_str_view.aic:7:20 let t3 : str = elem strview s, const 0
+    loc ../../testdata/ok/720_str_view.aic:7:20 let t3 : str = str.view s, const 0, const 5
     loc ../../testdata/ok/720_str_view.aic:7:18 let t4 : void = call print_println(t3)
     loc ../../testdata/ok/720_str_view.aic:8:24 let t5 : usize = call str_len(s)
     loc ../../testdata/ok/720_str_view.aic:8:18 let t6 : void = call print_println(t5)
-    loc ../../testdata/ok/720_str_view.aic:9:20 let t7 : str = elem strview s, const 2
+    loc ../../testdata/ok/720_str_view.aic:9:20 let t7 : str = str.view s, const 2, const 2
     loc ../../testdata/ok/720_str_view.aic:9:30 let t8 : usize = call str_len(t7)
     loc ../../testdata/ok/720_str_view.aic:9:18 let t9 : void = call print_println(t8)
     loc ../../testdata/ok/720_str_view.aic:3:1 br exit

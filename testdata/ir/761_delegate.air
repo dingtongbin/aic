@@ -33,11 +33,11 @@ func ok_Car_stop(this__:ok_Car*) -> bool {
 func ok_main() {
   entry:
     loc ../../testdata/ok/761_delegate.aic:31:13 let obj1 : ok_Engine* = alloc task(ok_Engine)
-    loc ../../testdata/ok/761_delegate.aic:31:20 store field obj1, 0, const 120
+    loc ../../testdata/ok/761_delegate.aic:31:13 store field obj1, 0, const 120
     loc ../../testdata/ok/761_delegate.aic:31:5 var e : ok_Engine* = obj1
     loc ../../testdata/ok/761_delegate.aic:32:13 let obj2 : ok_Car* = alloc task(ok_Car)
-    loc ../../testdata/ok/761_delegate.aic:32:17 store field obj2, 0, e
-    loc ../../testdata/ok/761_delegate.aic:32:25 store field obj2, 1, const "sedan"
+    loc ../../testdata/ok/761_delegate.aic:32:13 store field obj2, 0, e
+    loc ../../testdata/ok/761_delegate.aic:32:13 store field obj2, 1, const "sedan"
     loc ../../testdata/ok/761_delegate.aic:32:5 var c : ok_Car* = obj2
     loc ../../testdata/ok/761_delegate.aic:33:26 let t3 : ok_Engine* = field c, 0
     loc ../../testdata/ok/761_delegate.aic:33:26 let t4 : i32 = call ok_Engine_start(t3)

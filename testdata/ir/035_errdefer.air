@@ -1,55 +1,87 @@
 air v1 module ok
+func ok_dfblk1(ref failed:bool) static {
+  entry:
+    loc ../../testdata/ok/035_errdefer.aic:8:9 cbr failed, then1, else2
+  then1:
+    loc ../../testdata/ok/035_errdefer.aic:9:26 let t1 : void = call print_println(const "errdefer ran")
+    loc ../../testdata/ok/035_errdefer.aic:8:9 br join3
+  else2:
+    loc ../../testdata/ok/035_errdefer.aic:8:9 br join3
+  join3:
+    loc ../../testdata/ok/035_errdefer.aic:11:22 let t2 : void = call print_println(const "defer ran")
+    loc ../../testdata/ok/035_errdefer.aic:7:5 br exit
+  exit:
+    loc ../../testdata/ok/035_errdefer.aic:7:5 ret 
+}
 func ok_mayFail(n:i32) -> (i32, Err) {
   entry:
     loc ../../testdata/ok/035_errdefer.aic:5:1 var ret0 : i32
     loc ../../testdata/ok/035_errdefer.aic:5:1 var ret1 : Err
     loc ../../testdata/ok/035_errdefer.aic:6:5 var failed : bool = const false
+    loc ../../testdata/ok/035_errdefer.aic:7:5 let t1 : bool* = addr failed
     loc ../../testdata/ok/035_errdefer.aic:7:5 defer.reg
-    loc ../../testdata/ok/035_errdefer.aic:7:5 defer.init 1, 
-    loc ../../testdata/ok/035_errdefer.aic:13:10 let t1 : bool = cmp < n, const 0
-    loc ../../testdata/ok/035_errdefer.aic:13:5 cbr t1, then1, else2
-  then1:
+    loc ../../testdata/ok/035_errdefer.aic:7:5 defer.init 1, ok_dfblk1(t1)
+    loc ../../testdata/ok/035_errdefer.aic:13:10 let t2 : bool = cmp < n, const 0
+    loc ../../testdata/ok/035_errdefer.aic:13:5 cbr t2, then2, else3
+  then2:
     loc ../../testdata/ok/035_errdefer.aic:14:16 store failed, const true
     loc ../../testdata/ok/035_errdefer.aic:15:9 store ret0, const 0
-    loc ../../testdata/ok/035_errdefer.aic:15:22 let t2 : Err = call Err(const 1, const "bad")
-    loc ../../testdata/ok/035_errdefer.aic:15:9 store ret1, t2
+    loc ../../testdata/ok/035_errdefer.aic:15:22 let t3 : Err = call Err(const 1, const "bad")
+    loc ../../testdata/ok/035_errdefer.aic:15:9 store ret1, t3
     loc ../../testdata/ok/035_errdefer.aic:15:9 br exit
-  else2:
-    loc ../../testdata/ok/035_errdefer.aic:13:5 br join3
-  join3:
+  else3:
+    loc ../../testdata/ok/035_errdefer.aic:13:5 br join4
+  join4:
     loc ../../testdata/ok/035_errdefer.aic:17:5 store ret0, n
     loc ../../testdata/ok/035_errdefer.aic:17:5 store ret1, nil
     loc ../../testdata/ok/035_errdefer.aic:17:5 br exit
   exit:
+    loc ../../testdata/ok/035_errdefer.aic:5:1 defer.run
     loc ../../testdata/ok/035_errdefer.aic:5:1 ret ret0, ret1
+}
+func ok_dfblk2(ref failed:bool) static {
+  entry:
+    loc ../../testdata/ok/035_errdefer.aic:23:9 cbr failed, then1, else2
+  then1:
+    loc ../../testdata/ok/035_errdefer.aic:24:26 let t1 : void = call print_println(const "errdefer in wrapper")
+    loc ../../testdata/ok/035_errdefer.aic:23:9 br join3
+  else2:
+    loc ../../testdata/ok/035_errdefer.aic:23:9 br join3
+  join3:
+    loc ../../testdata/ok/035_errdefer.aic:26:22 let t2 : void = call print_println(const "defer in wrapper")
+    loc ../../testdata/ok/035_errdefer.aic:22:5 br exit
+  exit:
+    loc ../../testdata/ok/035_errdefer.aic:22:5 ret 
 }
 func ok_viaCheck(n:i32) -> (i32, Err) {
   entry:
     loc ../../testdata/ok/035_errdefer.aic:20:1 var ret0 : i32
     loc ../../testdata/ok/035_errdefer.aic:20:1 var ret1 : Err
     loc ../../testdata/ok/035_errdefer.aic:21:5 var failed : bool = const false
+    loc ../../testdata/ok/035_errdefer.aic:22:5 let t1 : bool* = addr failed
     loc ../../testdata/ok/035_errdefer.aic:22:5 defer.reg
-    loc ../../testdata/ok/035_errdefer.aic:22:5 defer.init 1, 
-    loc ../../testdata/ok/035_errdefer.aic:28:25 let t1 : (i32, Err) = call ok_mayFail(n)
-    loc ../../testdata/ok/035_errdefer.aic:28:5 let t2 : i32 = multi.extract t1, 0
-    loc ../../testdata/ok/035_errdefer.aic:28:9 var v : i32 = t2
-    loc ../../testdata/ok/035_errdefer.aic:28:5 let t3 : Err = multi.extract t1, 1
-    loc ../../testdata/ok/035_errdefer.aic:28:12 var err : Err = t3
-    loc ../../testdata/ok/035_errdefer.aic:29:12 let t4 : bool = cmp != err, nil
-    loc ../../testdata/ok/035_errdefer.aic:29:5 cbr t4, then1, else2
-  then1:
-    loc ../../testdata/ok/035_errdefer.aic:30:22 let t5 : void = call print_println(const "wrapper caught")
+    loc ../../testdata/ok/035_errdefer.aic:22:5 defer.init 1, ok_dfblk2(t1)
+    loc ../../testdata/ok/035_errdefer.aic:28:25 let t2 : (i32, Err) = call ok_mayFail(n)
+    loc ../../testdata/ok/035_errdefer.aic:28:5 let t3 : i32 = multi.extract t2, 0
+    loc ../../testdata/ok/035_errdefer.aic:28:9 var v : i32 = t3
+    loc ../../testdata/ok/035_errdefer.aic:28:5 let t4 : Err = multi.extract t2, 1
+    loc ../../testdata/ok/035_errdefer.aic:28:12 var err : Err = t4
+    loc ../../testdata/ok/035_errdefer.aic:29:12 let t5 : bool = cmp != err, nil
+    loc ../../testdata/ok/035_errdefer.aic:29:5 cbr t5, then2, else3
+  then2:
+    loc ../../testdata/ok/035_errdefer.aic:30:22 let t6 : void = call print_println(const "wrapper caught")
     loc ../../testdata/ok/035_errdefer.aic:31:16 store failed, const true
     loc ../../testdata/ok/035_errdefer.aic:32:9 store ret0, const 0
     loc ../../testdata/ok/035_errdefer.aic:32:9 store ret1, err
     loc ../../testdata/ok/035_errdefer.aic:32:9 br exit
-  else2:
-    loc ../../testdata/ok/035_errdefer.aic:29:5 br join3
-  join3:
+  else3:
+    loc ../../testdata/ok/035_errdefer.aic:29:5 br join4
+  join4:
     loc ../../testdata/ok/035_errdefer.aic:34:5 store ret0, v
     loc ../../testdata/ok/035_errdefer.aic:34:5 store ret1, nil
     loc ../../testdata/ok/035_errdefer.aic:34:5 br exit
   exit:
+    loc ../../testdata/ok/035_errdefer.aic:20:1 defer.run
     loc ../../testdata/ok/035_errdefer.aic:20:1 ret ret0, ret1
 }
 func ok_main() {

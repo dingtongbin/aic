@@ -6,24 +6,39 @@ func ok_note(tag:str) {
   exit:
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:3:1 ret 
 }
+func ok_dfblk1(ref failed:bool) static {
+  entry:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:11:9 cbr failed, then1, else2
+  then1:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:12:17 let t1 : void = call ok_note(const "cleanup")
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:11:9 br join3
+  else2:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:11:9 br join3
+  join3:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 br exit
+  exit:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 ret 
+}
 func ok_f(fail:bool) -> Err {
   entry:
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:8:1 var ret0 : Err
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:9:5 var failed : bool = const false
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 let t1 : bool* = addr failed
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 defer.reg
-    loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 defer.init 1, 
-    loc ../../testdata/ok/713_errdefer_only_on_error.aic:15:5 cbr fail, then1, else2
-  then1:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 defer.init 1, ok_dfblk1(t1)
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:15:5 cbr fail, then2, else3
+  then2:
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:16:16 store failed, const true
-    loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:19 let t1 : Err = call Err(const 1, const "boom")
-    loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:9 store ret0, t1
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:19 let t2 : Err = call Err(const 1, const "boom")
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:9 store ret0, t2
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:9 br exit
-  else2:
-    loc ../../testdata/ok/713_errdefer_only_on_error.aic:15:5 br join3
-  join3:
+  else3:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:15:5 br join4
+  join4:
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:19:5 store ret0, nil
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:19:5 br exit
   exit:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:8:1 defer.run
     loc ../../testdata/ok/713_errdefer_only_on_error.aic:8:1 ret ret0
 }
 func ok_main() {

@@ -31,12 +31,19 @@ type funcInstEntry struct {
 }
 
 // funcInstName 是实例的 C 符号名（键与名同源，§十 10.2）。
+// **方法实例的名字带接收者**（`aic_<pkg>_<Cls>_<m>__<实参>`）：与 genericmethod.go 的
+// 实例方法同一张表 —— 早先这里只管自由函数，方法实例被拼成 `aic_ok_get__i32`
+// （少了 Box_），调用点链到不存在的符号（741 实测）。
 func funcInstName(pkg string, sig *types.FuncSig, args []types.Type) string {
+	name := sig.Name
+	if sig.Recv != "" {
+		name = sig.Recv + "_" + sig.Name
+	}
 	segs := make([]string, 0, len(args))
 	for _, a := range args {
 		segs = append(segs, typeSeg(a))
 	}
-	return MangleGeneric(pkg, sig.Name, segs)
+	return MangleGeneric(pkg, name, segs)
 }
 
 // collectFuncInsts 汇总各包登记的泛型函数实例（pass 1）。

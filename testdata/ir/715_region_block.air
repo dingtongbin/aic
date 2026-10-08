@@ -15,7 +15,7 @@ func ok_main() -> Err {
     loc ../../testdata/ok/715_region_block.aic:11:1 var ret0 : Err
     loc ../../testdata/ok/715_region_block.aic:12:5 region.enter r1
     loc ../../testdata/ok/715_region_block.aic:13:17 let obj2 : ok_Buf* = alloc region(ok_Buf)
-    loc ../../testdata/ok/715_region_block.aic:13:21 store field obj2, 0, const 3
+    loc ../../testdata/ok/715_region_block.aic:13:17 store field obj2, 0, const 3
     loc ../../testdata/ok/715_region_block.aic:13:9 var b : ok_Buf* = obj2
     loc ../../testdata/ok/715_region_block.aic:14:26 let t3 : i32 = call ok_use(b)
     loc ../../testdata/ok/715_region_block.aic:14:22 let t4 : void = call print_println(t3)

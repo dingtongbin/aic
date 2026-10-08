@@ -32,16 +32,16 @@ func ok_main() {
     loc ../../testdata/ok/776_operators.aic:27:21 let t22 : i32 = elem elem xs, const 1, const 1
     loc ../../testdata/ok/776_operators.aic:27:18 let t23 : void = call print_println(t22)
     loc ../../testdata/ok/776_operators.aic:29:18 let obj24 : ok_Pair = alloc task(ok_Pair)
-    loc ../../testdata/ok/776_operators.aic:29:23 store field obj24, 0, const 1
-    loc ../../testdata/ok/776_operators.aic:29:29 store field obj24, 1, const 2
+    loc ../../testdata/ok/776_operators.aic:29:18 store field obj24, 0, const 1
+    loc ../../testdata/ok/776_operators.aic:29:18 store field obj24, 1, const 2
     loc ../../testdata/ok/776_operators.aic:29:5 var p : ok_Pair = obj24
     loc ../../testdata/ok/776_operators.aic:30:18 let obj25 : ok_Pair = alloc task(ok_Pair)
-    loc ../../testdata/ok/776_operators.aic:30:23 store field obj25, 0, const 1
-    loc ../../testdata/ok/776_operators.aic:30:29 store field obj25, 1, const 2
+    loc ../../testdata/ok/776_operators.aic:30:18 store field obj25, 0, const 1
+    loc ../../testdata/ok/776_operators.aic:30:18 store field obj25, 1, const 2
     loc ../../testdata/ok/776_operators.aic:30:5 var q : ok_Pair = obj25
     loc ../../testdata/ok/776_operators.aic:31:18 let obj26 : ok_Pair = alloc task(ok_Pair)
-    loc ../../testdata/ok/776_operators.aic:31:23 store field obj26, 0, const 2
-    loc ../../testdata/ok/776_operators.aic:31:29 store field obj26, 1, const 0
+    loc ../../testdata/ok/776_operators.aic:31:18 store field obj26, 0, const 2
+    loc ../../testdata/ok/776_operators.aic:31:18 store field obj26, 1, const 0
     loc ../../testdata/ok/776_operators.aic:31:5 var r : ok_Pair = obj26
     loc ../../testdata/ok/776_operators.aic:32:21 let t27 : bool = cmp == p, q
     loc ../../testdata/ok/776_operators.aic:32:18 let t28 : void = call print_println(t27)

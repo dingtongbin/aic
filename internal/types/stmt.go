@@ -361,6 +361,11 @@ func (c *Checker) checkFieldStore(v *parse.Assign, lhs *parse.Field, rhs Type, r
 			return
 		}
 		owner = c.thisClass
+		// 赋值目标的 `this` 也必须在类型表里：AIR 的 fieldIndex 按接收者类型定字段
+		// 下标，这张表缺了 `this` 就静默回落 0（`this.b = 2` 会写进字段 a —— 752 实测）。
+		if c.types[lhs.X] == nil {
+			c.types[lhs.X] = owner
+		}
 	} else {
 		xt, _, _ := c.checkExprFull(lhs.X, nil)
 		if cl, ok := xt.(*Class); ok {
@@ -380,6 +385,9 @@ func (c *Checker) checkFieldStore(v *parse.Assign, lhs *parse.Field, rhs Type, r
 		return
 	}
 	ft = owner.Fields[idx].Type
+	// 整个目标节点也落表（`this.b = …` 的 LHS 从不走 checkExprFull，不记 lowers
+	// 侧拿不到字段类型：复合赋值的读回定型会兜底成 i32）。
+	c.types[lhs] = ft
 	if v.Op != "=" {
 		c.checkCompound(v, rhs, ft, rinfo, "this."+lhs.Name)
 		return

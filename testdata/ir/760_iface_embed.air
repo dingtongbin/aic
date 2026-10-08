@@ -31,7 +31,7 @@ func ok_File_write(this__:ok_File*, s:str) -> i32 {
     loc ../../testdata/ok/760_iface_embed.aic:40:5 var ret0 : i32
     loc ../../testdata/ok/760_iface_embed.aic:41:28 let t1 : i32 = field this__, 1
     loc ../../testdata/ok/760_iface_embed.aic:41:37 let t2 : i32 = binop + t1, const 1
-    loc ../../testdata/ok/760_iface_embed.aic:41:22 store field this__, 0, t2
+    loc ../../testdata/ok/760_iface_embed.aic:41:22 store field this__, 1, t2
     loc ../../testdata/ok/760_iface_embed.aic:42:20 let t3 : i32 = field this__, 1
     loc ../../testdata/ok/760_iface_embed.aic:42:9 store ret0, t3
     loc ../../testdata/ok/760_iface_embed.aic:42:9 br exit
@@ -66,8 +66,8 @@ func ok_describe(r:ok_Reader) -> str {
 func ok_main() {
   entry:
     loc ../../testdata/ok/760_iface_embed.aic:59:13 let obj1 : ok_File* = alloc task(ok_File)
-    loc ../../testdata/ok/760_iface_embed.aic:59:18 store field obj1, 0, const "data"
-    loc ../../testdata/ok/760_iface_embed.aic:59:32 store field obj1, 1, const 0
+    loc ../../testdata/ok/760_iface_embed.aic:59:13 store field obj1, 0, const "data"
+    loc ../../testdata/ok/760_iface_embed.aic:59:13 store field obj1, 1, const 0
     loc ../../testdata/ok/760_iface_embed.aic:59:5 var f : ok_File* = obj1
     loc ../../testdata/ok/760_iface_embed.aic:61:25 let t2 : ok_ReadWriter = box f, ok_ReadWriter
     loc ../../testdata/ok/760_iface_embed.aic:61:5 var rw : ok_ReadWriter = t2
