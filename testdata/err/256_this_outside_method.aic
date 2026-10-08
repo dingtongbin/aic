@@ -1,0 +1,6 @@
+func f() -> i32 {
+    return this.v
+}
+
+func main() {
+}

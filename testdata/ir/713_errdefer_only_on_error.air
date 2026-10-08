@@ -1,0 +1,42 @@
+air v1 module ok
+func ok_note(tag:str) {
+  entry:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:4:18 let t1 : void = call print_println(tag)
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:3:1 ret 
+}
+func ok_f(fail:bool) -> Err {
+  entry:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:8:1 var ret0 : Err
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:9:5 var failed : bool = const false
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 defer.reg
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:10:5 defer.init 1, 
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:15:5 cbr fail, then1, else2
+  then1:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:16:16 store failed, const true
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:19 let t1 : Err = call Err(const 1, const "boom")
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:9 store ret0, t1
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:17:9 br exit
+  else2:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:15:5 br join3
+  join3:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:19:5 store ret0, nil
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:19:5 br exit
+  exit:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:8:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:23:14 let t1 : Err = call ok_f(const false)
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:23:5 var a : Err = t1
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:24:20 let t2 : i32 = field a, 0
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:24:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:25:14 let t4 : Err = call ok_f(const true)
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:25:5 var b : Err = t4
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:26:20 let t5 : i32 = field b, 0
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:26:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:22:1 br exit
+  exit:
+    loc ../../testdata/ok/713_errdefer_only_on_error.aic:22:1 ret 
+}

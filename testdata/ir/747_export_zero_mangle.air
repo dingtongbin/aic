@@ -1,0 +1,29 @@
+air v1 module ok
+func ok_aic_add(a:i32, b:i32) -> i32 export {
+  entry:
+    loc ../../testdata/ok/747_export_zero_mangle.aic:4:8 var ret0 : i32
+    loc ../../testdata/ok/747_export_zero_mangle.aic:5:14 let t1 : i32 = binop + a, b
+    loc ../../testdata/ok/747_export_zero_mangle.aic:5:5 store ret0, t1
+    loc ../../testdata/ok/747_export_zero_mangle.aic:5:5 br exit
+  exit:
+    loc ../../testdata/ok/747_export_zero_mangle.aic:4:8 ret ret0
+}
+func ok_aic_scale(x:f64) -> f64 export {
+  entry:
+    loc ../../testdata/ok/747_export_zero_mangle.aic:8:8 var ret0 : f64
+    loc ../../testdata/ok/747_export_zero_mangle.aic:9:14 let t1 : f64 = binop * x, const 2.0
+    loc ../../testdata/ok/747_export_zero_mangle.aic:9:5 store ret0, t1
+    loc ../../testdata/ok/747_export_zero_mangle.aic:9:5 br exit
+  exit:
+    loc ../../testdata/ok/747_export_zero_mangle.aic:8:8 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/747_export_zero_mangle.aic:13:26 let t1 : i32 = call ok_aic_add(const 2, const 3)
+    loc ../../testdata/ok/747_export_zero_mangle.aic:13:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/747_export_zero_mangle.aic:14:28 let t3 : f64 = call ok_aic_scale(const 1.5)
+    loc ../../testdata/ok/747_export_zero_mangle.aic:14:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/747_export_zero_mangle.aic:12:1 br exit
+  exit:
+    loc ../../testdata/ok/747_export_zero_mangle.aic:12:1 ret 
+}

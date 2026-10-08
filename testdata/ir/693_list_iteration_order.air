@@ -1,0 +1,44 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/693_list_iteration_order.aic:4:20 let lit1 : str[] = call list.new[str]()
+    loc ../../testdata/ok/693_list_iteration_order.aic:4:20 let t2 : void = call list.append[str](lit1, const "b")
+    loc ../../testdata/ok/693_list_iteration_order.aic:4:20 let t3 : void = call list.append[str](lit1, const "a")
+    loc ../../testdata/ok/693_list_iteration_order.aic:4:20 let t4 : void = call list.append[str](lit1, const "c")
+    loc ../../testdata/ok/693_list_iteration_order.aic:4:5 var xs : str[] = lit1
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 let t5 : usize = len xs
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 var x : usize = const 0
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 let t6 : bool = cmp lt x, t5
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 cbr t6, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 let t7 : str = elem xs, x
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:9 var x : str = t7
+    loc ../../testdata/ok/693_list_iteration_order.aic:6:22 let t8 : void = call print_println(x)
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 let t9 : usize = binop + x, const 1
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 store x, t9
+    loc ../../testdata/ok/693_list_iteration_order.aic:5:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t10 : usize = len const "hey"
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 var ch : usize = const 0
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t11 : bool = cmp lt ch, t10
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 cbr t11, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t12 : u8 = elem const "hey", ch
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:9 var ch : u8 = t12
+    loc ../../testdata/ok/693_list_iteration_order.aic:9:22 let t13 : void = call print_println(ch)
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t14 : usize = binop + ch, const 1
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 store ch, t14
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/693_list_iteration_order.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/693_list_iteration_order.aic:3:1 ret 
+}

@@ -1,0 +1,13 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:5:29 let t1 : str = call str_concat(const "a", const "b")
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:5:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:6:54 let t3 : str = call str_trim(const "  pad  ")
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:6:45 let t4 : str = call str_concat(t3, const "]")
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:6:29 let t5 : str = call str_concat(const "[", t4)
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:6:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/683_str_concat_replace_trim.aic:4:1 ret 
+}

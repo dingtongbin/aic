@@ -1,0 +1,19 @@
+import print
+import time
+
+// N6 err 锚点：select 只允许**一个** time.after 分支（两个超时分支没有可定义的语义：
+// 最早到点者必然先就绪，后者永不执行）—— 编译期直接拒，不留"看起来能用"的歧义。
+func main() {
+    var ch chan[i32] = chan[i32].new()
+    select {
+        case v = ch.recv() {
+            print.println(v)
+        }
+        case time.after(10) {
+            print.println("first")
+        }
+        case time.after(20) {
+            print.println("second")
+        }
+    }
+}

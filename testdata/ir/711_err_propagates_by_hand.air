@@ -1,0 +1,54 @@
+air v1 module ok
+func ok_inner(fail:bool) -> Err {
+  entry:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:3:1 var ret0 : Err
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:4:5 cbr fail, then1, else2
+  then1:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:5:19 let t1 : Err = call Err(const 3, const "inner failed")
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:5:9 store ret0, t1
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:5:9 br exit
+  else2:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:4:5 br join3
+  join3:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:7:5 store ret0, nil
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:7:5 br exit
+  exit:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:3:1 ret ret0
+}
+func ok_outer(fail:bool) -> Err {
+  entry:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:10:1 var ret0 : Err
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:11:18 let t1 : Err = call ok_inner(fail)
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:11:5 var e : Err = t1
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:12:9 let t2 : i32 = field e, 0
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:12:15 let t3 : bool = cmp != t2, const 0
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:12:5 cbr t3, then1, else2
+  then1:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:13:9 store ret0, e
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:13:9 br exit
+  else2:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:12:5 br join3
+  join3:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:15:5 store ret0, nil
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:15:5 br exit
+  exit:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:10:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:19:24 let t1 : Err = call ok_outer(const false)
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:19:24 let t2 : Err = tmp t1
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:19:31 let t3 : i32 = field t2, 0
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:19:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:20:24 let t5 : Err = call ok_outer(const true)
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:20:24 let t6 : Err = tmp t5
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:20:30 let t7 : i32 = field t6, 0
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:20:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:21:24 let t9 : Err = call ok_outer(const true)
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:21:24 let t10 : Err = tmp t9
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:21:30 let t11 : str = field t10, 1
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:21:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:18:1 br exit
+  exit:
+    loc ../../testdata/ok/711_err_propagates_by_hand.aic:18:1 ret 
+}

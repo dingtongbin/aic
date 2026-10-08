@@ -1,0 +1,46 @@
+// aic:ir-only
+import print
+
+// N1 闭包锚点（核心设计 §16）：**按值捕获** —— 捕获时点拷贝一份；
+// 闭包提升为「静态函数 + 环境结构体」，捕获项存进环境。
+// 三条语义在这里被冻结：
+//   ① 捕获值：之后改原变量不影响闭包；
+//   ② 捕获引用（同区域）合法，闭包与对象同生共死；
+//   ③ 闭包可作返回值（函数类型是值类型）。
+class Counter {
+    var n i32
+
+    func bump() -> i32 {
+        this.n = this.n + 1
+        return this.n
+    }
+}
+
+func makeAdder(base i32) -> (i32) -> i32 {
+    return func(x i32) -> i32 { return x + base }
+}
+
+func apply(f (i32) -> i32, v i32) -> i32 {
+    return f(v)
+}
+
+func main() {
+    var add10 = makeAdder(10)
+    print.println(add10(1))
+    print.println(add10(2))
+
+    // ① 捕获后改原变量：闭包看到的是捕获时点的值
+    var base i32 = 5
+    var f = func(x i32) -> i32 { return x + base }
+    base = 100
+    print.println(f(1))
+
+    // ② 同一区域内捕获引用
+    var c = Counter{n: 0}
+    var tick = func() -> i32 { return c.bump() }
+    print.println(tick())
+    print.println(tick())
+
+    // 闭包作实参
+    print.println(apply(f, 3))
+}

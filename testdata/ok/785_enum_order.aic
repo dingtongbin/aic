@@ -1,0 +1,14 @@
+import print
+
+// L4 审计补锚点：**无负载 enum 按 tag 排序**（§三：带负载的 enum 禁 `==`/`<`，必须用 match；
+// 无负载 enum 的 tag 就是它的值）。此前 `<` 只对数值类型成立 ⇒ 枚举排序被拒。
+enum Color { Red, Green, Blue }
+
+func main() {
+    print.println(Color.Red < Color.Green)
+    print.println(Color.Blue > Color.Red)
+    print.println(Color.Green <= Color.Green)
+    print.println(Color.Green < Color.Red)
+    print.println(Color.Red == Color.Red)
+    print.println(Color.Red != Color.Blue)
+}

@@ -1,0 +1,3 @@
+func f(m map[str]i32) -> i32 {
+    return m[0]
+}

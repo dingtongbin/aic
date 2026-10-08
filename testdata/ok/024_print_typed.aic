@@ -1,0 +1,9 @@
+import print
+
+func main() {
+    print.println(42)
+    print.println(-7)
+    print.println(true)
+    print.println(false)
+    print.println(1.5)
+}

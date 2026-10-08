@@ -1,0 +1,11 @@
+import print
+import option
+
+func main() {
+    var a = option.ok(5)
+    var b option.Option[i32] = option.none()
+    print.println(option.isSome(a))
+    print.println(option.isSome(b))
+    print.println(!option.isSome(b))
+    print.println(option.unwrap(a))
+}

@@ -1,0 +1,96 @@
+air v1 module ok
+type ok_File = struct
+    0:name:str
+    1:written:i32
+type ok_Both = iface
+    slot 0:read:() -> (str)
+    slot 1:write:(str) -> (i32)
+    slot 2:close:() -> (bool)
+type ok_ReadWriter = iface
+    slot 0:read:() -> (str)
+    slot 1:write:(str) -> (i32)
+    slot 2:close:() -> (bool)
+type ok_Reader = iface
+    slot 0:read:() -> (str)
+type ok_ReaderExtra = iface
+    slot 0:read:() -> (str)
+    slot 1:extra:() -> (i32)
+type ok_Writer = iface
+    slot 0:write:(str) -> (i32)
+func ok_File_read(this__:ok_File*) -> str {
+  entry:
+    loc ../../testdata/ok/760_iface_embed.aic:36:5 var ret0 : str
+    loc ../../testdata/ok/760_iface_embed.aic:37:20 let t1 : str = field this__, 0
+    loc ../../testdata/ok/760_iface_embed.aic:37:9 store ret0, t1
+    loc ../../testdata/ok/760_iface_embed.aic:37:9 br exit
+  exit:
+    loc ../../testdata/ok/760_iface_embed.aic:36:5 ret ret0
+}
+func ok_File_write(this__:ok_File*, s:str) -> i32 {
+  entry:
+    loc ../../testdata/ok/760_iface_embed.aic:40:5 var ret0 : i32
+    loc ../../testdata/ok/760_iface_embed.aic:41:28 let t1 : i32 = field this__, 1
+    loc ../../testdata/ok/760_iface_embed.aic:41:37 let t2 : i32 = binop + t1, const 1
+    loc ../../testdata/ok/760_iface_embed.aic:41:22 store field this__, 0, t2
+    loc ../../testdata/ok/760_iface_embed.aic:42:20 let t3 : i32 = field this__, 1
+    loc ../../testdata/ok/760_iface_embed.aic:42:9 store ret0, t3
+    loc ../../testdata/ok/760_iface_embed.aic:42:9 br exit
+  exit:
+    loc ../../testdata/ok/760_iface_embed.aic:40:5 ret ret0
+}
+func ok_File_close(this__:ok_File*) -> bool {
+  entry:
+    loc ../../testdata/ok/760_iface_embed.aic:45:5 var ret0 : bool
+    loc ../../testdata/ok/760_iface_embed.aic:46:9 store ret0, const true
+    loc ../../testdata/ok/760_iface_embed.aic:46:9 br exit
+  exit:
+    loc ../../testdata/ok/760_iface_embed.aic:45:5 ret ret0
+}
+func ok_File_extra(this__:ok_File*) -> i32 {
+  entry:
+    loc ../../testdata/ok/760_iface_embed.aic:49:5 var ret0 : i32
+    loc ../../testdata/ok/760_iface_embed.aic:50:9 store ret0, const 7
+    loc ../../testdata/ok/760_iface_embed.aic:50:9 br exit
+  exit:
+    loc ../../testdata/ok/760_iface_embed.aic:49:5 ret ret0
+}
+func ok_describe(r:ok_Reader) -> str {
+  entry:
+    loc ../../testdata/ok/760_iface_embed.aic:54:1 var ret0 : str
+    loc ../../testdata/ok/760_iface_embed.aic:55:18 let t1 : str = call.ind r.0()
+    loc ../../testdata/ok/760_iface_embed.aic:55:5 store ret0, t1
+    loc ../../testdata/ok/760_iface_embed.aic:55:5 br exit
+  exit:
+    loc ../../testdata/ok/760_iface_embed.aic:54:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/760_iface_embed.aic:59:13 let obj1 : ok_File* = alloc task(ok_File)
+    loc ../../testdata/ok/760_iface_embed.aic:59:18 store field obj1, 0, const "data"
+    loc ../../testdata/ok/760_iface_embed.aic:59:32 store field obj1, 1, const 0
+    loc ../../testdata/ok/760_iface_embed.aic:59:5 var f : ok_File* = obj1
+    loc ../../testdata/ok/760_iface_embed.aic:61:25 let t2 : ok_ReadWriter = box f, ok_ReadWriter
+    loc ../../testdata/ok/760_iface_embed.aic:61:5 var rw : ok_ReadWriter = t2
+    loc ../../testdata/ok/760_iface_embed.aic:62:26 let t3 : str = call.ind rw.0()
+    loc ../../testdata/ok/760_iface_embed.aic:62:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/760_iface_embed.aic:63:27 let t5 : i32 = call.ind rw.1(const "x")
+    loc ../../testdata/ok/760_iface_embed.aic:63:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/760_iface_embed.aic:64:27 let t7 : bool = call.ind rw.2()
+    loc ../../testdata/ok/760_iface_embed.aic:64:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/760_iface_embed.aic:65:28 let t9 : ok_Reader = box f, ok_Reader
+    loc ../../testdata/ok/760_iface_embed.aic:65:27 let t10 : str = call ok_describe(t9)
+    loc ../../testdata/ok/760_iface_embed.aic:65:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/760_iface_embed.aic:66:26 let t12 : ok_ReaderExtra = box f, ok_ReaderExtra
+    loc ../../testdata/ok/760_iface_embed.aic:66:5 var re : ok_ReaderExtra = t12
+    loc ../../testdata/ok/760_iface_embed.aic:67:26 let t13 : str = call.ind re.0()
+    loc ../../testdata/ok/760_iface_embed.aic:67:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/760_iface_embed.aic:68:27 let t15 : i32 = call.ind re.1()
+    loc ../../testdata/ok/760_iface_embed.aic:68:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/760_iface_embed.aic:69:18 let t17 : ok_Both = box f, ok_Both
+    loc ../../testdata/ok/760_iface_embed.aic:69:5 var b : ok_Both = t17
+    loc ../../testdata/ok/760_iface_embed.aic:70:25 let t18 : str = call.ind b.0()
+    loc ../../testdata/ok/760_iface_embed.aic:70:18 let t19 : void = call print_println(t18)
+    loc ../../testdata/ok/760_iface_embed.aic:58:1 br exit
+  exit:
+    loc ../../testdata/ok/760_iface_embed.aic:58:1 ret 
+}

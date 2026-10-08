@@ -1,0 +1,16 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/020_explicit_conversions.aic:4:5 var a : i32 = const 5
+    loc ../../testdata/ok/020_explicit_conversions.aic:5:20 let t1 : i64 = call i64(a)
+    loc ../../testdata/ok/020_explicit_conversions.aic:5:5 var b : i64 = t1
+    loc ../../testdata/ok/020_explicit_conversions.aic:6:18 let t2 : u8 = call u8(a)
+    loc ../../testdata/ok/020_explicit_conversions.aic:6:5 var c : u8 = t2
+    loc ../../testdata/ok/020_explicit_conversions.aic:7:5 var d : f64 = const 1.5
+    loc ../../testdata/ok/020_explicit_conversions.aic:8:20 let t3 : i32 = call i32(d)
+    loc ../../testdata/ok/020_explicit_conversions.aic:8:5 var e : i32 = t3
+    loc ../../testdata/ok/020_explicit_conversions.aic:9:18 let t4 : void = call print_println(const "conv ok")
+    loc ../../testdata/ok/020_explicit_conversions.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/020_explicit_conversions.aic:3:1 ret 
+}

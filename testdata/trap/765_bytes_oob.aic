@@ -1,0 +1,9 @@
+import print
+
+// N7 trap 锚点：越界**读** = trap（越界写是增长补零，不是 trap —— 见 ok/764）。
+func main() {
+    var b = bytes.fromStr("ab")
+    print.println(b.len())
+    print.println(b.get(5)) // 越界读 ⇒ trap
+    print.println(999)
+}

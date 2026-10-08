@@ -1,0 +1,4 @@
+func main() {
+    var f = func(x i32) -> i32 { return x }
+    var n = f(1, 2)
+}

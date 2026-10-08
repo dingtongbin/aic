@@ -1,0 +1,13 @@
+interface A {
+    func m() -> i32
+}
+
+interface B {
+    func m() -> str
+}
+
+// 槽位冲突：两个嵌入接口对同一个方法名给出不同签名 ⇒ 编译错（并集不是覆盖）。
+interface C {
+    A
+    B
+}

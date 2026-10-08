@@ -1,0 +1,11 @@
+enum E {
+    A,
+    B
+}
+
+func f(e E) -> i32 {
+    match e {
+        A => { return 1 }
+        _ => { return 2 }
+    }
+}

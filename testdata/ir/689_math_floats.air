@@ -1,0 +1,14 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/689_math_floats.aic:5:27 let t1 : f64 = call math_min(const 1.5, const 2.5)
+    loc ../../testdata/ok/689_math_floats.aic:5:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/689_math_floats.aic:6:27 let t3 : f64 = call math_max(const 1.5, const 2.5)
+    loc ../../testdata/ok/689_math_floats.aic:6:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/689_math_floats.aic:7:32 let t5 : f64 = binop - const 0.0, const 2.5
+    loc ../../testdata/ok/689_math_floats.aic:7:27 let t6 : f64 = call math_abs(t5)
+    loc ../../testdata/ok/689_math_floats.aic:7:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/689_math_floats.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/689_math_floats.aic:4:1 ret 
+}

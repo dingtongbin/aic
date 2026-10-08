@@ -1,0 +1,14 @@
+import print
+
+@derive(Compare)
+class P {
+    var x i32
+
+    func compare(o P) -> i32 {
+        return 0
+    }
+}
+
+func main() {
+    print.println(1)
+}

@@ -1,0 +1,3 @@
+testdata/err/387_delegate_unknown_field.aic:9:5: error: the delegated field is not declared in this class
+    Car.eng
+    fix: declare the field first: var eng Engine; then use eng Engine (fields stay local to the class)

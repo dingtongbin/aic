@@ -1,0 +1,29 @@
+air v1 module ok
+func ok_note(tag:str) {
+  entry:
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:4:18 let t1 : void = call print_println(tag)
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:3:1 ret 
+}
+func ok_f() {
+  entry:
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:8:16 let t1 : str = const "first"
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:8:5 defer.reg
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:8:5 defer.init 1, ok_note(t1)
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:9:16 let t2 : str = const "second"
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:9:5 defer.reg
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:9:5 defer.init 2, ok_note(t2)
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:10:9 let t3 : void = call ok_note(const "body")
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:7:1 br exit
+  exit:
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:7:1 defer.run
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:7:1 ret 
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:14:6 let t1 : void = call ok_f()
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:13:1 br exit
+  exit:
+    loc ../../testdata/ok/712_defer_runs_lifo.aic:13:1 ret 
+}

@@ -1,0 +1,7 @@
+class Box[T] {
+    var v T
+}
+
+func main() {
+    var b = Box[i32, str]{v: 1}
+}

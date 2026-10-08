@@ -1,0 +1,3 @@
+testdata/err/269_result_type_unknown.aic:1:13: error: unknown type name
+    unknown
+    fix: a type must be declared in this file or come from an imported package; write generics as Box[T]

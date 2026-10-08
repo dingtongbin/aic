@@ -1,0 +1,32 @@
+air v1 module ok
+type ok_Sq = struct
+    0:s:i32
+type ok_Shape = iface
+    slot 0:area:() -> (i32)
+func ok_Sq_area(this__:ok_Sq*) -> i32 {
+  entry:
+    loc ../../testdata/ok/786_constraint_order.aic:17:5 var ret0 : i32
+    loc ../../testdata/ok/786_constraint_order.aic:18:20 let t1 : i32 = field this__, 0
+    loc ../../testdata/ok/786_constraint_order.aic:18:29 let t2 : i32 = field this__, 0
+    loc ../../testdata/ok/786_constraint_order.aic:18:23 let t3 : i32 = binop * t1, t2
+    loc ../../testdata/ok/786_constraint_order.aic:18:9 store ret0, t3
+    loc ../../testdata/ok/786_constraint_order.aic:18:9 br exit
+  exit:
+    loc ../../testdata/ok/786_constraint_order.aic:17:5 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/786_constraint_order.aic:23:22 var lit1 : [ok_Sq*;2]
+    loc ../../testdata/ok/786_constraint_order.aic:23:23 let obj2 : ok_Sq* = alloc task(ok_Sq)
+    loc ../../testdata/ok/786_constraint_order.aic:23:26 store field obj2, 0, const 2
+    loc ../../testdata/ok/786_constraint_order.aic:23:22 store elem lit1, const 0, obj2
+    loc ../../testdata/ok/786_constraint_order.aic:23:33 let obj3 : ok_Sq* = alloc task(ok_Sq)
+    loc ../../testdata/ok/786_constraint_order.aic:23:36 store field obj3, 0, const 3
+    loc ../../testdata/ok/786_constraint_order.aic:23:22 store elem lit1, const 1, obj3
+    loc ../../testdata/ok/786_constraint_order.aic:23:5 var xs : [ok_Sq*;2] = lit1
+    loc ../../testdata/ok/786_constraint_order.aic:24:26 let t4 : i32 = call ok_sum[ok_Sq*](xs)
+    loc ../../testdata/ok/786_constraint_order.aic:24:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/786_constraint_order.aic:22:1 br exit
+  exit:
+    loc ../../testdata/ok/786_constraint_order.aic:22:1 ret 
+}

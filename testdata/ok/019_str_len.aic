@@ -1,0 +1,7 @@
+import print
+
+func main() {
+    var s str = "hello"
+    var n = s.len()
+    print.println("str ok")
+}

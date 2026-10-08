@@ -1,0 +1,6 @@
+import print
+
+func main() {
+    var i usize = 4
+    print.println("ab"[i])
+}

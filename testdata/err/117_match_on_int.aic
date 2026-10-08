@@ -1,0 +1,5 @@
+func f(x i32) -> i32 {
+    match x {
+        return 1
+    }
+}

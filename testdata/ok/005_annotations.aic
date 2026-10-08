@@ -1,0 +1,15 @@
+import print
+
+@packed
+class Packed {
+    func id() -> i32 { return 1 }
+}
+
+@derive(Compare)
+class Other {
+    func id() -> i32 { return 2 }
+}
+
+func main() {
+    print.println("annotations ok")
+}

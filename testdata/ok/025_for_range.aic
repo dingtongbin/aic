@@ -1,0 +1,19 @@
+import print
+
+func main() {
+    var xs i32[] = [10, 20, 30]
+    var total i32 = 0
+    for x in xs {
+        total = total + x
+        print.println(x)
+    }
+    print.println(total)
+    print.println(xs.isEmpty())
+
+    var s str = "abc"
+    var bytes i32 = 0
+    for b in s {
+        bytes = bytes + 1
+    }
+    print.println(bytes)
+}

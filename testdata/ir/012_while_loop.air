@@ -1,0 +1,23 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/012_while_loop.aic:4:5 var i : i32 = const 0
+    loc ../../testdata/ok/012_while_loop.aic:5:5 var total : i32 = const 0
+    loc ../../testdata/ok/012_while_loop.aic:6:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/012_while_loop.aic:6:11 let t1 : bool = cmp < i, const 5
+    loc ../../testdata/ok/012_while_loop.aic:6:5 cbr t1, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/012_while_loop.aic:7:23 let t2 : i32 = binop + total, i
+    loc ../../testdata/ok/012_while_loop.aic:7:15 store total, t2
+    loc ../../testdata/ok/012_while_loop.aic:8:15 let t3 : i32 = binop + i, const 1
+    loc ../../testdata/ok/012_while_loop.aic:8:11 store i, t3
+    loc ../../testdata/ok/012_while_loop.aic:6:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/012_while_loop.aic:6:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/012_while_loop.aic:10:18 let t4 : void = call print_println(const "while ok")
+    loc ../../testdata/ok/012_while_loop.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/012_while_loop.aic:3:1 ret 
+}

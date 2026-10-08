@@ -1,0 +1,6 @@
+testdata/err/021_match_no_arrow.aic:4:11: error: missing `=>`
+    got PUNCT {
+    fix: match arm is missing `=>`
+testdata/err/021_match_no_arrow.aic:3:5: error: match needs at least one arm
+    match x is empty
+    fix: write every enum variant: match x { A => { ... } B => { ... } }

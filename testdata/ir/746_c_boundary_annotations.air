@@ -1,0 +1,15 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:13:23 let t1 : i32 = unop - const 5
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:13:22 let t2 : i32 = call ok_abs(t1)
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:13:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:14:25 let t4 : i32 = unop - const 7
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:14:24 let t5 : i64 = call ok_llabs(t4)
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:14:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:15:22 let t7 : i32 = call ok_abs(const 3)
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:15:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:12:1 br exit
+  exit:
+    loc ../../testdata/ok/746_c_boundary_annotations.aic:12:1 ret 
+}

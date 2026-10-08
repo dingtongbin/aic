@@ -1,0 +1,3 @@
+testdata/err/098_conv_signed_unsigned.aic:3:12: error: type mismatch with no implicit conversion
+    result 1: i32 written into u32
+    fix: convert explicitly first: u32(x) (red line 1)

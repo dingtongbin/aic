@@ -1,0 +1,14 @@
+import print
+import str
+
+func main() {
+    print.println(str.startsWith("hello", "he"))
+    print.println(str.endsWith("hello", "lo"))
+    print.println(str.indexOf("hello", "ll"))
+    print.println(str.trim("  pad	").len())
+    var parts = str.split("a,b,c", ",")
+    print.println(parts.len())
+    print.println(parts[0])
+    print.println(parts[2])
+    print.println(str.startsWith("abc", "abcdef"))
+}

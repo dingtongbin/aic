@@ -1,0 +1,11 @@
+import print
+
+func main() {
+    var xs str[] = ["b", "a", "c"]
+    for x in xs {
+        print.println(x)
+    }
+    for ch in "hey" {
+        print.println(ch)
+    }
+}

@@ -1,0 +1,3 @@
+testdata/err/361_derive_compare_data_enum_field.aic:10:1: error: a field of @derive(Compare) is not comparable
+    P.e: enum with payload err.E is not comparable (a payload-free enum compares by tag)
+    fix: Compare supports numeric / bool / str / payload-free enum / @packed / Compare-enabled class fields only (core design §4)

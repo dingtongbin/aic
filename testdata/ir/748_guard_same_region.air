@@ -1,0 +1,29 @@
+air v1 module ok
+type ok_Buf = struct
+    0:n:i32
+func ok_pick(p:ok_Buf*) -> ok_Buf* {
+  entry:
+    loc ../../testdata/ok/748_guard_same_region.aic:11:1 var ret0 : ok_Buf*
+    loc ../../testdata/ok/748_guard_same_region.aic:12:5 store ret0, p
+    loc ../../testdata/ok/748_guard_same_region.aic:12:5 br exit
+  exit:
+    loc ../../testdata/ok/748_guard_same_region.aic:11:1 ret ret0
+}
+func ok_main() -> Err {
+  entry:
+    loc ../../testdata/ok/748_guard_same_region.aic:15:1 var ret0 : Err
+    loc ../../testdata/ok/748_guard_same_region.aic:16:5 var outer : ok_Buf* = nil
+    loc ../../testdata/ok/748_guard_same_region.aic:17:16 let obj1 : ok_Buf* = alloc task(ok_Buf)
+    loc ../../testdata/ok/748_guard_same_region.aic:17:20 store field obj1, 0, const 7
+    loc ../../testdata/ok/748_guard_same_region.aic:17:5 var base : ok_Buf* = obj1
+    loc ../../testdata/ok/748_guard_same_region.aic:18:5 region.enter r2
+    loc ../../testdata/ok/748_guard_same_region.aic:19:21 let t3 : ok_Buf* = call ok_pick(base)
+    loc ../../testdata/ok/748_guard_same_region.aic:19:15 store.guard(depth-1) outer, t3
+    loc ../../testdata/ok/748_guard_same_region.aic:18:5 region.exit
+    loc ../../testdata/ok/748_guard_same_region.aic:21:24 let t4 : i32 = field outer, 0
+    loc ../../testdata/ok/748_guard_same_region.aic:21:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/748_guard_same_region.aic:22:5 store ret0, nil
+    loc ../../testdata/ok/748_guard_same_region.aic:22:5 br exit
+  exit:
+    loc ../../testdata/ok/748_guard_same_region.aic:15:1 ret ret0
+}

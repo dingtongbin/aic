@@ -1,0 +1,3 @@
+func f() -> (Err, i32) {
+    return nil, 1
+}

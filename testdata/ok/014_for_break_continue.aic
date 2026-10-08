@@ -1,0 +1,15 @@
+import print
+
+func main() {
+    var total i32 = 0
+    for var i = 0; i < 10; i = i + 1 {
+        if i == 3 {
+            continue
+        }
+        if i == 7 {
+            break
+        }
+        total = total + i
+    }
+    print.println("branch ok")
+}

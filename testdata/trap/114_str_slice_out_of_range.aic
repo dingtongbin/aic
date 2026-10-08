@@ -1,0 +1,6 @@
+import print
+import str
+
+func main() {
+    print.println(str.sub("abc", 1, 9))
+}

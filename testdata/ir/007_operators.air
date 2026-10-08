@@ -1,0 +1,24 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/007_operators.aic:4:19 let t1 : i32 = binop * const 2, const 3
+    loc ../../testdata/ok/007_operators.aic:4:15 let t2 : i32 = binop + const 1, t1
+    loc ../../testdata/ok/007_operators.aic:4:27 let t3 : i32 = binop / const 4, const 2
+    loc ../../testdata/ok/007_operators.aic:4:31 let t4 : i32 = binop % t3, const 5
+    loc ../../testdata/ok/007_operators.aic:4:23 let t5 : i32 = binop - t2, t4
+    loc ../../testdata/ok/007_operators.aic:4:5 var a : i32 = t5
+    loc ../../testdata/ok/007_operators.aic:5:15 let t6 : bool = cmp == a, const 1
+    loc ../../testdata/ok/007_operators.aic:5:25 let t7 : bool = cmp != a, const 2
+    loc ../../testdata/ok/007_operators.aic:5:35 let t8 : bool = cmp <= a, const 3
+    loc ../../testdata/ok/007_operators.aic:5:30 let t9 : bool = cmp && t7, t8
+    loc ../../testdata/ok/007_operators.aic:5:20 let t10 : bool = cmp || t6, t9
+    loc ../../testdata/ok/007_operators.aic:5:45 let t11 : bool = cmp >= a, const 4
+    loc ../../testdata/ok/007_operators.aic:5:40 let t12 : bool = cmp || t10, t11
+    loc ../../testdata/ok/007_operators.aic:5:5 var b : bool = t12
+    loc ../../testdata/ok/007_operators.aic:6:15 let t13 : i32 = binop << a, const 1
+    loc ../../testdata/ok/007_operators.aic:6:5 var c : i32 = t13
+    loc ../../testdata/ok/007_operators.aic:7:18 let t14 : void = call print_println(const "operators ok")
+    loc ../../testdata/ok/007_operators.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/007_operators.aic:3:1 ret 
+}

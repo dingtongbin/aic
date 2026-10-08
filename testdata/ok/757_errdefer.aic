@@ -1,0 +1,33 @@
+// aic:ir-only
+import print
+
+// N8 errdefer 锚点（核心设计 §16）：
+//   ① 仅在**因 Err 返回**时执行；
+//   ② 正常返回不执行；
+//   ③ 与 defer 共用同一栈（LIFO，逆注册序），实参在注册点求值。
+func work(fail bool) -> (i32, Err) {
+    defer print.println("defer always")
+    errdefer print.println("rollback")
+    if fail {
+        return 0, Err(7, "boom")
+    }
+    return 42, nil
+}
+
+// 实参在注册点求值：改成 100 不影响已注册的实参。
+func argAt() -> (i32, Err) {
+    var x i32 = 1
+    errdefer print.println(x)
+    x = 100
+    return 0, Err(9, "late")
+}
+
+func main() {
+    var v, e1 = work(false)
+    print.println(v)
+    print.println(e1 == nil)
+    var _, e2 = work(true)
+    print.println(e2.code)
+    var _, e3 = argAt()
+    print.println(e3.code)
+}

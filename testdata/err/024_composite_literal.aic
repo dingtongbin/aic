@@ -1,0 +1,15 @@
+class P {
+    var x i32
+}
+func g(p P) -> i32 {
+    return p.x
+}
+func f() -> i32 {
+    return g(P{x: 1})
+}
+func h(ready bool, p P) -> i32 {
+    if P{x: 1}.x > 0 {
+        return 1
+    }
+    return g(p)
+}

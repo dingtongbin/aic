@@ -1,0 +1,17 @@
+import testing
+
+func add(a i32, b i32) -> i32 {
+    return a + b
+}
+
+func testAdd() {
+    testing.eq(add(2, 3), 5, "2+3")
+    testing.gt(add(2, 3), 4, "2+3 > 4")
+    testing.lt(add(2, 3), 6, "2+3 < 6")
+}
+
+func testStr() {
+    var s str = "aic"
+    testing.eq(s, "aic", "str 相等")
+    testing.lt(s, "b", "字典序")
+}

@@ -1,0 +1,13 @@
+class Derived {
+    var v i32 = 0
+
+    func init() {
+        this.v = 1
+    }
+}
+
+func main() {
+    // `Derived.init()` 是**合法构造**（本锚点原样冻的是"未声明的名字 Derived"这条误诊，
+    // 与 err/280 同源，已修）；把别的名字挂在类名上必须报"类名不是值"。
+    var d Derived = Derived.nope()
+}

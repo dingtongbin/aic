@@ -1,0 +1,8 @@
+func g() -> (i32, Err) {
+    return 1, nil
+}
+
+func f() -> i32 {
+    var x i32 = check g()
+    return x
+}

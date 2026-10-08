@@ -1,0 +1,6 @@
+testdata/err/103_err_arity_short.aic:6:5: error: the number of binding targets does not match the number of results
+    2 targets but the callee returns 3
+    fix: add the missing targets, or discard with _
+testdata/err/103_err_arity_short.aic:7:12: error: undeclared name
+    a
+    fix: declare it first (var name Type = value) or check the spelling; type and function names are not values

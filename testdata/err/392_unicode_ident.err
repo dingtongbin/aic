@@ -1,0 +1,6 @@
+testdata/err/392_unicode_ident.aic:5:9: error: identifiers must use ASCII letters, digits and underscore
+    non-ASCII identifier
+    fix: rename with ASCII: A-Z a-z 0-9 _ (core design §1; visibility = first character A-Z)
+testdata/err/392_unicode_ident.aic:6:19: error: identifiers must use ASCII letters, digits and underscore
+    non-ASCII identifier
+    fix: rename with ASCII: A-Z a-z 0-9 _ (core design §1; visibility = first character A-Z)

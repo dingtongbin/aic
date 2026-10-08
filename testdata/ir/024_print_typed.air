@@ -1,0 +1,13 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/024_print_typed.aic:4:18 let t1 : void = call print_println(const 42)
+    loc ../../testdata/ok/024_print_typed.aic:5:19 let t2 : i32 = unop - const 7
+    loc ../../testdata/ok/024_print_typed.aic:5:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/024_print_typed.aic:6:18 let t4 : void = call print_println(const true)
+    loc ../../testdata/ok/024_print_typed.aic:7:18 let t5 : void = call print_println(const false)
+    loc ../../testdata/ok/024_print_typed.aic:8:18 let t6 : void = call print_println(const 1.5)
+    loc ../../testdata/ok/024_print_typed.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/024_print_typed.aic:3:1 ret 
+}

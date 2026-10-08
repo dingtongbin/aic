@@ -1,0 +1,20 @@
+import print
+
+const Limit = 3
+
+class Point {
+    var x i32
+    var y i32
+
+    func sum() -> i32 {
+        return this.x + this.y
+    }
+}
+
+func Scale(p Point, k i32) -> Point {
+    return Point{x: p.x * k, y: p.y * k}
+}
+
+func Tag() -> str {
+    return "base"
+}

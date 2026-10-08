@@ -1,0 +1,8 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/001_hello.aic:4:18 let t1 : void = call print_println(const "hello, aic")
+    loc ../../testdata/ok/001_hello.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/001_hello.aic:3:1 ret 
+}

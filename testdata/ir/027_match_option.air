@@ -1,0 +1,37 @@
+air v1 module ok
+func ok_describe(v:i32) -> str {
+  entry:
+    loc ../../testdata/ok/027_match_option.aic:4:1 var ret0 : str
+    loc ../../testdata/ok/027_match_option.aic:5:15 let t1 : option_Option[i32] = call Some(v)
+    loc ../../testdata/ok/027_match_option.aic:5:5 let t2 : i32 = enum.tag t1
+    loc ../../testdata/ok/027_match_option.aic:5:5 switch t2 (arm12 arm23)
+  arm12:
+    loc ../../testdata/ok/027_match_option.aic:6:9 let t3 : i32 = enum.payload t1, 0
+    loc ../../testdata/ok/027_match_option.aic:6:9 var x : i32 = t3
+    loc ../../testdata/ok/027_match_option.aic:7:18 let t4 : bool = cmp > x, const 0
+    loc ../../testdata/ok/027_match_option.aic:7:13 cbr t4, then4, else5
+  arm23:
+    loc ../../testdata/ok/027_match_option.aic:12:19 store ret0, const "none"
+    loc ../../testdata/ok/027_match_option.aic:12:19 br exit
+  then4:
+    loc ../../testdata/ok/027_match_option.aic:8:17 store ret0, const "positive"
+    loc ../../testdata/ok/027_match_option.aic:8:17 br exit
+  else5:
+    loc ../../testdata/ok/027_match_option.aic:7:13 br join6
+  join6:
+    loc ../../testdata/ok/027_match_option.aic:10:13 store ret0, const "other"
+    loc ../../testdata/ok/027_match_option.aic:10:13 br exit
+  exit:
+    loc ../../testdata/ok/027_match_option.aic:4:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/027_match_option.aic:17:27 let t1 : str = call ok_describe(const 5)
+    loc ../../testdata/ok/027_match_option.aic:17:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/027_match_option.aic:18:28 let t3 : i32 = unop - const 2
+    loc ../../testdata/ok/027_match_option.aic:18:27 let t4 : str = call ok_describe(t3)
+    loc ../../testdata/ok/027_match_option.aic:18:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/027_match_option.aic:16:1 br exit
+  exit:
+    loc ../../testdata/ok/027_match_option.aic:16:1 ret 
+}

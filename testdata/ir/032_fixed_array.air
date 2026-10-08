@@ -1,0 +1,46 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/032_fixed_array.aic:4:5 var a : [i32;4]
+    loc ../../testdata/ok/032_fixed_array.aic:5:24 let t1 : usize = call array_i32_len(a)
+    loc ../../testdata/ok/032_fixed_array.aic:5:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/032_fixed_array.aic:6:28 let t3 : bool = call array_i32_isEmpty(a)
+    loc ../../testdata/ok/032_fixed_array.aic:6:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/032_fixed_array.aic:7:5 var i : usize = const 0
+    loc ../../testdata/ok/032_fixed_array.aic:8:5 var total : i32 = const 0
+    loc ../../testdata/ok/032_fixed_array.aic:9:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/032_fixed_array.aic:9:18 let t5 : usize = call array_i32_len(a)
+    loc ../../testdata/ok/032_fixed_array.aic:9:11 let t6 : bool = cmp < i, t5
+    loc ../../testdata/ok/032_fixed_array.aic:9:5 cbr t6, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/032_fixed_array.aic:10:19 let t7 : i32 = call i32(i)
+    loc ../../testdata/ok/032_fixed_array.aic:10:23 let t8 : i32 = binop * t7, const 2
+    loc ../../testdata/ok/032_fixed_array.aic:10:14 store elem a, i, t8
+    loc ../../testdata/ok/032_fixed_array.aic:11:15 let t9 : usize = binop + i, const 1
+    loc ../../testdata/ok/032_fixed_array.aic:11:11 store i, t9
+    loc ../../testdata/ok/032_fixed_array.aic:9:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/032_fixed_array.aic:9:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/032_fixed_array.aic:13:7 store i, const 0
+    loc ../../testdata/ok/032_fixed_array.aic:14:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/032_fixed_array.aic:14:18 let t10 : usize = call array_i32_len(a)
+    loc ../../testdata/ok/032_fixed_array.aic:14:11 let t11 : bool = cmp < i, t10
+    loc ../../testdata/ok/032_fixed_array.aic:14:5 cbr t11, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/032_fixed_array.aic:15:26 let t12 : i32 = elem elem a, i, i
+    loc ../../testdata/ok/032_fixed_array.aic:15:23 let t13 : i32 = binop + total, t12
+    loc ../../testdata/ok/032_fixed_array.aic:15:15 store total, t13
+    loc ../../testdata/ok/032_fixed_array.aic:16:15 let t14 : usize = binop + i, const 1
+    loc ../../testdata/ok/032_fixed_array.aic:16:11 store i, t14
+    loc ../../testdata/ok/032_fixed_array.aic:14:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/032_fixed_array.aic:14:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/032_fixed_array.aic:18:18 let t15 : void = call print_println(total)
+    loc ../../testdata/ok/032_fixed_array.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/032_fixed_array.aic:3:1 ret 
+}

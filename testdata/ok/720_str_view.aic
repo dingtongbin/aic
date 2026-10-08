@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var s str = "hello"
+    var v str = s[1..3]
+    print.println(v)
+    print.println(s[0..5])
+    print.println(s.len())
+    print.println(s[2..2].len())
+}

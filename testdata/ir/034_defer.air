@@ -1,0 +1,66 @@
+air v1 module ok
+func ok_traced(n:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/034_defer.aic:3:1 var ret0 : i32
+    loc ../../testdata/ok/034_defer.aic:4:25 let t1 : str = const "close 1"
+    loc ../../testdata/ok/034_defer.aic:4:5 defer.reg
+    loc ../../testdata/ok/034_defer.aic:4:5 defer.init 1, print_println(t1)
+    loc ../../testdata/ok/034_defer.aic:5:25 let t2 : str = const "close 2"
+    loc ../../testdata/ok/034_defer.aic:5:5 defer.reg
+    loc ../../testdata/ok/034_defer.aic:5:5 defer.init 2, print_println(t2)
+    loc ../../testdata/ok/034_defer.aic:6:10 let t3 : bool = cmp < n, const 0
+    loc ../../testdata/ok/034_defer.aic:6:5 cbr t3, then1, else2
+  then1:
+    loc ../../testdata/ok/034_defer.aic:7:9 store ret0, const 0
+    loc ../../testdata/ok/034_defer.aic:7:9 br exit
+  else2:
+    loc ../../testdata/ok/034_defer.aic:6:5 br join3
+  join3:
+    loc ../../testdata/ok/034_defer.aic:9:14 let t4 : i32 = binop * n, const 2
+    loc ../../testdata/ok/034_defer.aic:9:5 store ret0, t4
+    loc ../../testdata/ok/034_defer.aic:9:5 br exit
+  exit:
+    loc ../../testdata/ok/034_defer.aic:3:1 defer.run
+    loc ../../testdata/ok/034_defer.aic:3:1 ret ret0
+}
+func ok_counter(n:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/034_defer.aic:12:1 var ret0 : i32
+    loc ../../testdata/ok/034_defer.aic:13:5 var total : i32 = const 0
+    loc ../../testdata/ok/034_defer.aic:14:5 var i : usize = const 0
+    loc ../../testdata/ok/034_defer.aic:15:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/034_defer.aic:15:11 let t1 : bool = cmp < i, const 3
+    loc ../../testdata/ok/034_defer.aic:15:5 cbr t1, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/034_defer.aic:16:29 let t2 : str = const "loop end"
+    loc ../../testdata/ok/034_defer.aic:16:9 defer.reg
+    loc ../../testdata/ok/034_defer.aic:16:9 defer.init 1, print_println(t2)
+    loc ../../testdata/ok/034_defer.aic:17:28 let t3 : i32 = call i32(i)
+    loc ../../testdata/ok/034_defer.aic:17:23 let t4 : i32 = binop + total, t3
+    loc ../../testdata/ok/034_defer.aic:17:15 store total, t4
+    loc ../../testdata/ok/034_defer.aic:18:15 let t5 : usize = binop + i, const 1
+    loc ../../testdata/ok/034_defer.aic:18:11 store i, t5
+    loc ../../testdata/ok/034_defer.aic:15:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/034_defer.aic:15:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/034_defer.aic:20:5 store ret0, total
+    loc ../../testdata/ok/034_defer.aic:20:5 br exit
+  exit:
+    loc ../../testdata/ok/034_defer.aic:12:1 defer.run
+    loc ../../testdata/ok/034_defer.aic:12:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/034_defer.aic:24:25 let t1 : i32 = call ok_traced(const 3)
+    loc ../../testdata/ok/034_defer.aic:24:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/034_defer.aic:25:26 let t3 : i32 = unop - const 1
+    loc ../../testdata/ok/034_defer.aic:25:25 let t4 : i32 = call ok_traced(t3)
+    loc ../../testdata/ok/034_defer.aic:25:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/034_defer.aic:26:26 let t6 : i32 = call ok_counter(const 2)
+    loc ../../testdata/ok/034_defer.aic:26:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/034_defer.aic:23:1 br exit
+  exit:
+    loc ../../testdata/ok/034_defer.aic:23:1 ret 
+}

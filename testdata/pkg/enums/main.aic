@@ -1,0 +1,12 @@
+import print
+import lib
+
+// L4 审计补锚点：**跨包无负载枚举变体的取值**（`lib.Color.green`）。
+// 跨包变体在模式位与构造位都可用，只有取值位曾漏（报"包成员不是值"）。
+func main() {
+    var c = lib.Color.green
+    var r = lib.Color.Red
+    print.println(c == lib.Color.green)
+    print.println(c == r)
+    print.println(r == lib.Color.Red)
+}

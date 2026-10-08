@@ -1,0 +1,3 @@
+testdata/err/393_select_bad_arm.aic:12:9: error: a select arm must be a channel receive, a channel send, or time.after
+    case ch.len()
+    fix: the three arm forms are case v, ok = ch.recv() / case ch.send(v) / case time.after(ms) (core design §16 N6)

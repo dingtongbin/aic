@@ -1,0 +1,52 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/764_bytes.aic:8:22 let t1 : bytes = call bytes_new()
+    loc ../../testdata/ok/764_bytes.aic:8:5 var b : bytes = t1
+    loc ../../testdata/ok/764_bytes.aic:9:24 let t2 : usize = call bytes_len(b)
+    loc ../../testdata/ok/764_bytes.aic:9:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/764_bytes.aic:10:13 let t4 : void = call bytes_append(b, const 65)
+    loc ../../testdata/ok/764_bytes.aic:11:13 let t5 : void = call bytes_append(b, const 66)
+    loc ../../testdata/ok/764_bytes.aic:12:24 let t6 : usize = call bytes_len(b)
+    loc ../../testdata/ok/764_bytes.aic:12:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/764_bytes.aic:13:24 let t8 : u8 = call bytes_get(b, const 0)
+    loc ../../testdata/ok/764_bytes.aic:13:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/764_bytes.aic:14:24 let t10 : u8 = call bytes_get(b, const 1)
+    loc ../../testdata/ok/764_bytes.aic:14:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/764_bytes.aic:17:10 let t12 : void = call bytes_set(b, const 4, const 90)
+    loc ../../testdata/ok/764_bytes.aic:18:24 let t13 : usize = call bytes_len(b)
+    loc ../../testdata/ok/764_bytes.aic:18:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/764_bytes.aic:19:24 let t15 : u8 = call bytes_get(b, const 3)
+    loc ../../testdata/ok/764_bytes.aic:19:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/764_bytes.aic:20:24 let t17 : u8 = call bytes_get(b, const 4)
+    loc ../../testdata/ok/764_bytes.aic:20:18 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/764_bytes.aic:22:26 let t19 : str = call bytes_toStr(b)
+    loc ../../testdata/ok/764_bytes.aic:22:18 let t20 : void = call print_println(t19)
+    loc ../../testdata/ok/764_bytes.aic:24:26 let t21 : bytes = call bytes_fromStr(const "hello")
+    loc ../../testdata/ok/764_bytes.aic:24:5 var c : bytes = t21
+    loc ../../testdata/ok/764_bytes.aic:25:24 let t22 : usize = call bytes_len(c)
+    loc ../../testdata/ok/764_bytes.aic:25:18 let t23 : void = call print_println(t22)
+    loc ../../testdata/ok/764_bytes.aic:26:26 let t24 : str = call bytes_toStr(c)
+    loc ../../testdata/ok/764_bytes.aic:26:18 let t25 : void = call print_println(t24)
+    loc ../../testdata/ok/764_bytes.aic:28:26 let t26 : bytes = call bytes_withCap(const 8)
+    loc ../../testdata/ok/764_bytes.aic:28:5 var d : bytes = t26
+    loc ../../testdata/ok/764_bytes.aic:29:24 let t27 : usize = call bytes_len(d)
+    loc ../../testdata/ok/764_bytes.aic:29:18 let t28 : void = call print_println(t27)
+    loc ../../testdata/ok/764_bytes.aic:30:18 let t29 : void = call bytes_appendBytes(d, c)
+    loc ../../testdata/ok/764_bytes.aic:31:24 let t30 : usize = call bytes_len(d)
+    loc ../../testdata/ok/764_bytes.aic:31:18 let t31 : void = call print_println(t30)
+    loc ../../testdata/ok/764_bytes.aic:32:26 let t32 : str = call bytes_toStr(d)
+    loc ../../testdata/ok/764_bytes.aic:32:18 let t33 : void = call print_println(t32)
+    loc ../../testdata/ok/764_bytes.aic:34:20 let t34 : bytes = call bytes_slice(d, const 1, const 3)
+    loc ../../testdata/ok/764_bytes.aic:34:5 var s : bytes = t34
+    loc ../../testdata/ok/764_bytes.aic:35:24 let t35 : usize = call bytes_len(s)
+    loc ../../testdata/ok/764_bytes.aic:35:18 let t36 : void = call print_println(t35)
+    loc ../../testdata/ok/764_bytes.aic:36:26 let t37 : str = call bytes_toStr(s)
+    loc ../../testdata/ok/764_bytes.aic:36:18 let t38 : void = call print_println(t37)
+    loc ../../testdata/ok/764_bytes.aic:38:12 let t39 : void = call bytes_clear(d)
+    loc ../../testdata/ok/764_bytes.aic:39:24 let t40 : usize = call bytes_len(d)
+    loc ../../testdata/ok/764_bytes.aic:39:18 let t41 : void = call print_println(t40)
+    loc ../../testdata/ok/764_bytes.aic:7:1 br exit
+  exit:
+    loc ../../testdata/ok/764_bytes.aic:7:1 ret 
+}

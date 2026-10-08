@@ -1,0 +1,5 @@
+import os
+
+func main() {
+    var s, err = os.readFile(1)
+}

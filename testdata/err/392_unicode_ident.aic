@@ -1,0 +1,7 @@
+import print
+
+// 标识符字符集收紧（核心设计 §一）：首字符只能是 ASCII 字母或 `_`。
+func main() {
+    var 变量 = 1
+    print.println(变量)
+}

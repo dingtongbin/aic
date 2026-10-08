@@ -1,0 +1,41 @@
+air v1 module ok
+func ok_grade(n:i32) -> str {
+  entry:
+    loc ../../testdata/ok/011_if_chain.aic:3:1 var ret0 : str
+    loc ../../testdata/ok/011_if_chain.aic:4:10 let t1 : bool = cmp >= n, const 90
+    loc ../../testdata/ok/011_if_chain.aic:4:5 cbr t1, then1, else2
+  then1:
+    loc ../../testdata/ok/011_if_chain.aic:5:9 store ret0, const "A"
+    loc ../../testdata/ok/011_if_chain.aic:5:9 br exit
+  else2:
+    loc ../../testdata/ok/011_if_chain.aic:6:17 let t2 : bool = cmp >= n, const 80
+    loc ../../testdata/ok/011_if_chain.aic:6:12 cbr t2, then4, else5
+  then4:
+    loc ../../testdata/ok/011_if_chain.aic:7:9 store ret0, const "B"
+    loc ../../testdata/ok/011_if_chain.aic:7:9 br exit
+  else5:
+    loc ../../testdata/ok/011_if_chain.aic:8:17 let t3 : bool = cmp >= n, const 60
+    loc ../../testdata/ok/011_if_chain.aic:8:12 cbr t3, then7, else8
+  then7:
+    loc ../../testdata/ok/011_if_chain.aic:9:9 store ret0, const "C"
+    loc ../../testdata/ok/011_if_chain.aic:9:9 br exit
+  else8:
+    loc ../../testdata/ok/011_if_chain.aic:11:9 store ret0, const "F"
+    loc ../../testdata/ok/011_if_chain.aic:11:9 br exit
+  exit:
+    loc ../../testdata/ok/011_if_chain.aic:3:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/011_if_chain.aic:16:24 let t1 : str = call ok_grade(const 95)
+    loc ../../testdata/ok/011_if_chain.aic:16:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/011_if_chain.aic:17:24 let t3 : str = call ok_grade(const 85)
+    loc ../../testdata/ok/011_if_chain.aic:17:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/011_if_chain.aic:18:24 let t5 : str = call ok_grade(const 70)
+    loc ../../testdata/ok/011_if_chain.aic:18:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/011_if_chain.aic:19:24 let t7 : str = call ok_grade(const 10)
+    loc ../../testdata/ok/011_if_chain.aic:19:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/011_if_chain.aic:15:1 br exit
+  exit:
+    loc ../../testdata/ok/011_if_chain.aic:15:1 ret 
+}

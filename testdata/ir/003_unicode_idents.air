@@ -1,0 +1,17 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/003_unicode_idents.aic:7:5 var Name1 : i32 = const 1
+    loc ../../testdata/ok/003_unicode_idents.aic:8:5 var x_ : i32 = const 2
+    loc ../../testdata/ok/003_unicode_idents.aic:9:5 var _private : i32 = const 3
+    loc ../../testdata/ok/003_unicode_idents.aic:10:5 var aZ9 : i32 = const 4
+    loc ../../testdata/ok/003_unicode_idents.aic:11:23 let t1 : i32 = binop + Name1, x_
+    loc ../../testdata/ok/003_unicode_idents.aic:11:28 let t2 : i32 = binop + t1, _private
+    loc ../../testdata/ok/003_unicode_idents.aic:11:39 let t3 : i32 = binop + t2, aZ9
+    loc ../../testdata/ok/003_unicode_idents.aic:11:5 var total : i32 = t3
+    loc ../../testdata/ok/003_unicode_idents.aic:12:18 let t4 : void = call print_println(total)
+    loc ../../testdata/ok/003_unicode_idents.aic:13:18 let t5 : void = call print_println(const "idents ok")
+    loc ../../testdata/ok/003_unicode_idents.aic:6:1 br exit
+  exit:
+    loc ../../testdata/ok/003_unicode_idents.aic:6:1 ret 
+}

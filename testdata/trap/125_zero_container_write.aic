@@ -1,0 +1,7 @@
+import print
+
+func main() {
+    var xs i32[]
+    print.println("unreachable")
+    xs[0] = 7
+}

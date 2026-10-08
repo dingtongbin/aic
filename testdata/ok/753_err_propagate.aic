@@ -1,0 +1,37 @@
+import print
+import str
+
+// E1 传播锚点（核心设计 §15.7）：`expr?` 与 `check expr` 等价，但**位置无关**，
+// 且主干流程保持连续可读 —— 不再需要 `if err != nil { return 0, err }` 样板。
+func parsePort(s str) -> (i32, Err) {
+    var n, err = str.toI64(s)
+    if err != nil {
+        return 0, Err(1, "not a number")
+    }
+    if n < 0 {
+        return 0, Err(2, "negative port")
+    }
+    return i32(n), nil
+}
+
+// describe 的主干只有一行：传播点集中在签名与 `?` 处。
+func describe(s str) -> (str, Err) {
+    var p = parsePort(s)?
+    if p == 0 {
+        return "", Err(3, "zero port")
+    }
+    return "port", nil
+}
+
+func main() {
+    var a, e1 = describe("8080")
+    print.println(a)
+    print.println(e1 == nil)
+    var _, e2 = describe("-1")
+    print.println(e2.code)
+    print.println(e2.msg)
+    var _, e3 = describe("abc")
+    print.println(e3.code)
+    var _, e4 = describe("0")
+    print.println(e4.code)
+}

@@ -1,0 +1,4 @@
+func f() {
+    var m map[str]i32 = map.new()
+    m.put("k", "v")
+}

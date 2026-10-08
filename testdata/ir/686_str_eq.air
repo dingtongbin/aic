@@ -1,0 +1,18 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/686_str_eq.aic:4:5 var a : str = const "same"
+    loc ../../testdata/ok/686_str_eq.aic:5:5 var b : str = const "different"
+    loc ../../testdata/ok/686_str_eq.aic:6:5 var empty : str = const ""
+    loc ../../testdata/ok/686_str_eq.aic:7:21 let t1 : bool = cmp == a, const "same"
+    loc ../../testdata/ok/686_str_eq.aic:7:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/686_str_eq.aic:8:21 let t3 : bool = cmp == a, b
+    loc ../../testdata/ok/686_str_eq.aic:8:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/686_str_eq.aic:9:25 let t5 : bool = cmp == empty, const ""
+    loc ../../testdata/ok/686_str_eq.aic:9:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/686_str_eq.aic:10:21 let t7 : bool = cmp != a, b
+    loc ../../testdata/ok/686_str_eq.aic:10:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/686_str_eq.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/686_str_eq.aic:3:1 ret 
+}

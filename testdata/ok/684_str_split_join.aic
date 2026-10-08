@@ -1,0 +1,9 @@
+import print
+import str
+
+func main() {
+    var parts = str.split("a,b,c", ",")
+    print.println(parts.len())
+    print.println(parts[0])
+    print.println(str.split("", ",").len())
+}

@@ -1,0 +1,17 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/076_float_output.aic:4:5 var a : f64 = const 1.5
+    loc ../../testdata/ok/076_float_output.aic:5:5 var b : f64 = const 0.25
+    loc ../../testdata/ok/076_float_output.aic:6:21 let t1 : f64 = binop + a, b
+    loc ../../testdata/ok/076_float_output.aic:6:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/076_float_output.aic:7:21 let t3 : f64 = binop - a, b
+    loc ../../testdata/ok/076_float_output.aic:7:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/076_float_output.aic:8:21 let t5 : f64 = binop * a, b
+    loc ../../testdata/ok/076_float_output.aic:8:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/076_float_output.aic:9:21 let t7 : f64 = binop / b, a
+    loc ../../testdata/ok/076_float_output.aic:9:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/076_float_output.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/076_float_output.aic:3:1 ret 
+}

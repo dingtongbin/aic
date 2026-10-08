@@ -1,0 +1,10 @@
+import print
+
+@derive(Debug)
+class P {
+    var x i32
+}
+
+func main() {
+    print.println(1)
+}

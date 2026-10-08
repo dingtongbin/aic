@@ -1,0 +1,21 @@
+# 行尾纪律：语料本金与 IR 快照的比对是**逐位**的（.out/.err/.trap/.air），
+# 因此这些文件在任何平台上都必须是 LF —— 不受 core.autocrlf 影响。
+# 否则 Windows 上 clone 出来的 .out 是 CRLF，与程序打印的 LF 差一个字节。
+*.aic    text eol=lf
+*.out    text eol=lf
+*.err    text eol=lf
+*.trap   text eol=lf
+*.air    text eol=lf
+*.go     text eol=lf
+*.c      text eol=lf
+*.h      text eol=lf
+*.py     text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+
+# 构建产物按二进制处理（本就不入库，这里只是防御）
+*.exe    binary
+*.o      binary
+*.a      binary
+*.so     binary
+*.dylib  binary

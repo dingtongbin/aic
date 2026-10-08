@@ -1,0 +1,13 @@
+import print
+
+func fact(n i32) -> i32 {
+    if n <= 1 {
+        return 1
+    }
+    return n * fact(n - 1)
+}
+
+func main() {
+    print.println(fact(5))
+    print.println(fact(1))
+}

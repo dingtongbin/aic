@@ -1,0 +1,34 @@
+import print
+import sync
+
+// L3（真并发）：**真临界区**。四个任务各把共享计数器加 100 次；没有真互斥，
+// 读-改-写会丢更新（并行模式下几乎必然小于 400）。join 后打印 ⇒ 与调度顺序无关。
+class Counter {
+    var n i32
+    var m sync.Mutex
+
+    func bump() {
+        this.m.lock()
+        this.n += 1
+        this.m.unlock()
+    }
+}
+
+func work(c Counter, times i32) {
+    var i = 0
+    for i < times {
+        c.bump()
+        i += 1
+    }
+}
+
+func main() {
+    var c = Counter{n: 0, m: sync.Mutex.new()}
+    scope {
+        spawn work(c, 100)
+        spawn work(c, 100)
+        spawn work(c, 100)
+        spawn work(c, 100)
+    }
+    print.println(c.n)
+}

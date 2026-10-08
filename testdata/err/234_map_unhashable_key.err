@@ -1,0 +1,6 @@
+testdata/err/234_map_unhashable_key.aic:2:11: error: the map key type is not hashable
+    i32[]
+    fix: a key allows numeric / bool / str / payload-free enum / @packed only; class references and containers cannot be keys
+testdata/err/234_map_unhashable_key.aic:2:34: error: map.new() has no target type
+    the right-hand type cannot be inferred
+    fix: write the element type in the declaration: var m map[str]i32 = map.new() (core design §2.2)

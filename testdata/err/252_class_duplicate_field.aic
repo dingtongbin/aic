@@ -1,0 +1,7 @@
+class Box {
+    var v i32 = 0
+    var v i32 = 1
+}
+
+func main() {
+}

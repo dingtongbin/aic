@@ -1,0 +1,29 @@
+air v1 module ok
+func ok_doubled(o:option_Option[i32]) -> i32 {
+  entry:
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:4:1 var ret0 : i32
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:5:5 let t1 : i32 = enum.tag o
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:5:5 switch t1 (arm12 arm23)
+  arm12:
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:6:9 let t2 : i32 = enum.payload o, 0
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:6:9 var v : i32 = t2
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:6:31 let t3 : i32 = binop * v, const 2
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:6:22 store ret0, t3
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:6:22 br exit
+  arm23:
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:7:19 store ret0, const 0
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:7:19 br exit
+  exit:
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:4:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:12:31 let t1 : option_Option[i32] = call Some(const 21)
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:12:26 let t2 : i32 = call ok_doubled(t1)
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:12:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:13:26 let t4 : i32 = call ok_doubled(const None)
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:13:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:11:1 br exit
+  exit:
+    loc ../../testdata/ok/706_option_match_binds_payload.aic:11:1 ret 
+}

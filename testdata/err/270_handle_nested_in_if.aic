@@ -1,0 +1,11 @@
+func f(flag bool) -> (i32, Err) {
+    if flag {
+        handle err {
+            return 0, err
+        }
+    }
+    return 1, nil
+}
+
+func main() {
+}

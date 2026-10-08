@@ -1,0 +1,7 @@
+import print
+
+func main() {
+    var s str = "abc"
+    var i usize = 9
+    print.println(s[i])
+}

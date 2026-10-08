@@ -1,0 +1,12 @@
+import print
+
+// N4 err 锚点：内省原语**只在编译期可用**，没有运行期形态（运行期零元数据）。
+// 在函数体里用 fieldsOf(T) 必须报"编译期专用"，而不是"未声明的名字"（核心设计 §16 N4）。
+class Point {
+    var x i32
+}
+
+func main() {
+    var n = fieldsOf(Point).len
+    print.println(n)
+}

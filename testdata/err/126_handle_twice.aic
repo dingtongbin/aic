@@ -1,0 +1,9 @@
+func f() -> Err {
+    handle err {
+        return err
+    }
+    handle err {
+        return err
+    }
+    return nil
+}

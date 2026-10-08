@@ -1,0 +1,39 @@
+import print
+
+// L3：有界通道（N11 的背压点）在**真并发**与**串行退化后端**下语义一致：
+// 任务只往通道里放值，主任务 join 后按固定序取 ⇒ 与调度顺序无关（§七【TLS 决议】）。
+// （"满则阻塞"的阻塞语义需要真并发，锚点见运行时冒烟 smoke_l3_pipeline；本锚点保证
+//   五配置——含无 TLS 的 tcc 退化后端——输出逐位一致。）
+func produce(ch chan[i32], n i32) {
+    var i = 0
+    for i < n {
+        ch.send(i)
+        i += 1
+    }
+}
+
+func main() {
+    // 有界：容量 = 元素个数，两种后端都不必等待对方。
+    var ch chan[i32] = chan[i32].new(4)
+    scope {
+        spawn produce(ch, 4)
+    }
+    var sum = 0
+    var k = 0
+    for k < 4 {
+        var v, ok = ch.recv()
+        if ok {
+            sum += v
+        }
+        k += 1
+    }
+    print.println(sum)
+    print.println(ch.len())
+
+    // 无界（new() = 无界；【O2 决议】/ 规划 §十二 R9）：send 入队即返回。
+    var unbound chan[i32] = chan[i32].new()
+    unbound.send(7)
+    var v2, ok2 = unbound.recv()
+    print.println(v2)
+    print.println(ok2)
+}

@@ -1,0 +1,56 @@
+air v1 module ok
+type ok_Counter = struct
+    0:n:i32
+    1:m:sync_Mutex
+func ok_Counter_bump(this__:ok_Counter*) {
+  entry:
+    loc ../../testdata/ok/744_mutex.aic:10:13 let t1 : sync_Mutex = field this__, 1
+    loc ../../testdata/ok/744_mutex.aic:10:20 let t2 : void = call sync_Mutex_lock(t1)
+    loc ../../testdata/ok/744_mutex.aic:11:16 let t3 : i32 = field this__, 0
+    loc ../../testdata/ok/744_mutex.aic:11:16 let t4 : i32 = binop + t3, const 1
+    loc ../../testdata/ok/744_mutex.aic:11:16 store field this__, 0, t4
+    loc ../../testdata/ok/744_mutex.aic:12:13 let t5 : sync_Mutex = field this__, 1
+    loc ../../testdata/ok/744_mutex.aic:12:22 let t6 : void = call sync_Mutex_unlock(t5)
+    loc ../../testdata/ok/744_mutex.aic:9:5 br exit
+  exit:
+    loc ../../testdata/ok/744_mutex.aic:9:5 ret 
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/744_mutex.aic:17:13 let obj1 : ok_Counter* = alloc task(ok_Counter)
+    loc ../../testdata/ok/744_mutex.aic:17:21 store field obj1, 0, const 0
+    loc ../../testdata/ok/744_mutex.aic:17:44 let t2 : sync_Mutex = call sync_Mutex_new()
+    loc ../../testdata/ok/744_mutex.aic:17:27 store field obj1, 1, t2
+    loc ../../testdata/ok/744_mutex.aic:17:5 var c : ok_Counter* = obj1
+    loc ../../testdata/ok/744_mutex.aic:18:11 let t3 : void = call ok_Counter_bump(c)
+    loc ../../testdata/ok/744_mutex.aic:19:11 let t4 : void = call ok_Counter_bump(c)
+    loc ../../testdata/ok/744_mutex.aic:20:20 let t5 : i32 = field c, 0
+    loc ../../testdata/ok/744_mutex.aic:20:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/744_mutex.aic:21:27 let t7 : sync_Mutex = call sync_Mutex_new()
+    loc ../../testdata/ok/744_mutex.aic:21:5 var m : sync_Mutex = t7
+    loc ../../testdata/ok/744_mutex.aic:22:11 let t8 : void = call sync_Mutex_lock(m)
+    loc ../../testdata/ok/744_mutex.aic:23:13 let t9 : void = call sync_Mutex_unlock(m)
+    loc ../../testdata/ok/744_mutex.aic:24:18 let t10 : void = call print_println(const "locked-once")
+    loc ../../testdata/ok/744_mutex.aic:25:38 let t11 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/744_mutex.aic:25:5 var out : chan[i32] = t11
+    loc ../../testdata/ok/744_mutex.aic:26:5 region.enter sc12
+    loc ../../testdata/ok/744_mutex.aic:27:21 let t13 : void = call ok_worker(out)
+    loc ../../testdata/ok/744_mutex.aic:26:5 region.exit
+    loc ../../testdata/ok/744_mutex.aic:29:25 let t14 : (i32, bool) = call chan_i32_recv(out)
+    loc ../../testdata/ok/744_mutex.aic:29:5 let t15 : i32 = multi.extract t14, 0
+    loc ../../testdata/ok/744_mutex.aic:29:9 var v : i32 = t15
+    loc ../../testdata/ok/744_mutex.aic:29:5 let t16 : bool = multi.extract t14, 1
+    loc ../../testdata/ok/744_mutex.aic:29:12 var ok : bool = t16
+    loc ../../testdata/ok/744_mutex.aic:30:18 let t17 : void = call print_println(v)
+    loc ../../testdata/ok/744_mutex.aic:31:18 let t18 : void = call print_println(ok)
+    loc ../../testdata/ok/744_mutex.aic:16:1 br exit
+  exit:
+    loc ../../testdata/ok/744_mutex.aic:16:1 ret 
+}
+func ok_worker(ch:chan[i32]) {
+  entry:
+    loc ../../testdata/ok/744_mutex.aic:35:12 let t1 : void = call chan_i32_send(ch, const 7)
+    loc ../../testdata/ok/744_mutex.aic:34:1 br exit
+  exit:
+    loc ../../testdata/ok/744_mutex.aic:34:1 ret 
+}

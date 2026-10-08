@@ -1,0 +1,40 @@
+air v1 module ok
+func ok_classify(n:i32) -> str {
+  entry:
+    loc ../../testdata/ok/701_if_else_chain.aic:3:1 var ret0 : str
+    loc ../../testdata/ok/701_if_else_chain.aic:4:10 let t1 : bool = cmp < n, const 0
+    loc ../../testdata/ok/701_if_else_chain.aic:4:5 cbr t1, then1, else2
+  then1:
+    loc ../../testdata/ok/701_if_else_chain.aic:5:9 store ret0, const "neg"
+    loc ../../testdata/ok/701_if_else_chain.aic:5:9 br exit
+  else2:
+    loc ../../testdata/ok/701_if_else_chain.aic:4:5 br join3
+  join3:
+    loc ../../testdata/ok/701_if_else_chain.aic:7:10 let t2 : bool = cmp == n, const 0
+    loc ../../testdata/ok/701_if_else_chain.aic:7:5 cbr t2, then4, else5
+  then4:
+    loc ../../testdata/ok/701_if_else_chain.aic:8:9 store ret0, const "zero"
+    loc ../../testdata/ok/701_if_else_chain.aic:8:9 br exit
+  else5:
+    loc ../../testdata/ok/701_if_else_chain.aic:7:5 br join6
+  join6:
+    loc ../../testdata/ok/701_if_else_chain.aic:10:5 store ret0, const "pos"
+    loc ../../testdata/ok/701_if_else_chain.aic:10:5 br exit
+  exit:
+    loc ../../testdata/ok/701_if_else_chain.aic:3:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/701_if_else_chain.aic:14:31 let t1 : i32 = call i32(const 0)
+    loc ../../testdata/ok/701_if_else_chain.aic:14:40 let t2 : i32 = call i32(const 5)
+    loc ../../testdata/ok/701_if_else_chain.aic:14:35 let t3 : i32 = binop - t1, t2
+    loc ../../testdata/ok/701_if_else_chain.aic:14:27 let t4 : str = call ok_classify(t3)
+    loc ../../testdata/ok/701_if_else_chain.aic:14:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/701_if_else_chain.aic:15:27 let t6 : str = call ok_classify(const 0)
+    loc ../../testdata/ok/701_if_else_chain.aic:15:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/701_if_else_chain.aic:16:27 let t8 : str = call ok_classify(const 5)
+    loc ../../testdata/ok/701_if_else_chain.aic:16:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/701_if_else_chain.aic:13:1 br exit
+  exit:
+    loc ../../testdata/ok/701_if_else_chain.aic:13:1 ret 
+}

@@ -1,0 +1,17 @@
+// aic:ir-only
+import print
+
+// N6 trap 锚点：select 的**所有**分支都不可能就绪，且没有任何分支能在本 scope 内被唤醒。
+// 这里只有一条 send 分支，而通道是有界且已满的 —— 没有任何任务能腾出位置（§16 N6）。
+// 真并发下同样成立：全程序只剩等待者 ⇒ 死锁（Go 在此 panic "all goroutines are asleep"）。
+// 有界通道的 send 在真并发下是阻塞（§16 N11）；本阶段串行 L2 无法阻塞，故 trap。
+func main() {
+    var ch chan[i32] = chan[i32].new(1)
+    ch.send(1) // 容量 1 已满
+    select {
+        case ch.send(2) {
+            print.println("sent")
+        }
+    }
+    print.println(999)
+}

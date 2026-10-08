@@ -1,0 +1,26 @@
+import print
+
+// L4 trap 锚点：**形参派生值的字段存必须留守卫**（类型语义审计实测的静默内存损坏）。
+// 参数定理只保证"参数派生值写本函数**局部变量**恒安全"；两个形参之间没有深度顺序，
+// 故 `sink(h, t)` 里 `h.b = t` 的守卫不能消去，且 limit 必须**运行期**读宿主对象
+// 所在区域的深度（被调方不知道 h 到底在哪个深度）。
+class Buf {
+    var n i32
+}
+
+class Holder {
+    var b Buf
+}
+
+func sink(h Holder, t Buf) {
+    h.b = t // 存储点 ①：宿主是形参 ⇒ 守卫（Dynamic limit）
+}
+
+func main() {
+    var h = Holder{b: nil}
+    region {
+        var t = Buf{n: 7}
+        sink(h, t) // t 比 h 深 ⇒ 必须 trap（曾经静默：h.b 悬垂，区域复用后读到别的对象）
+    }
+    print.println(999) // 不可达
+}

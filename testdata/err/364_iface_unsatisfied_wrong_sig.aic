@@ -1,0 +1,17 @@
+import print
+
+interface Counter {
+    func count() -> i32
+}
+
+class Tally {
+    func count() -> i64 {
+        return 1
+    }
+}
+
+func main() {
+    var t = Tally{}
+    var c Counter = t
+    print.println(c.count())
+}

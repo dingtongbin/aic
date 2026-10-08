@@ -1,0 +1,25 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/720_bool_logic.aic:4:24 let t1 : bool = cmp && const true, const false
+    loc ../../testdata/ok/720_bool_logic.aic:4:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/720_bool_logic.aic:5:24 let t3 : bool = cmp || const true, const false
+    loc ../../testdata/ok/720_bool_logic.aic:5:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/720_bool_logic.aic:6:19 let t5 : bool = unop ! const true
+    loc ../../testdata/ok/720_bool_logic.aic:6:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/720_bool_logic.aic:7:21 let t7 : bool = cmp < const 1, const 2
+    loc ../../testdata/ok/720_bool_logic.aic:7:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/720_bool_logic.aic:8:21 let t9 : bool = cmp <= const 2, const 2
+    loc ../../testdata/ok/720_bool_logic.aic:8:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/720_bool_logic.aic:9:21 let t11 : bool = cmp > const 3, const 4
+    loc ../../testdata/ok/720_bool_logic.aic:9:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/720_bool_logic.aic:10:21 let t13 : bool = cmp >= const 4, const 4
+    loc ../../testdata/ok/720_bool_logic.aic:10:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/720_bool_logic.aic:11:21 let t15 : bool = cmp == const 1, const 1
+    loc ../../testdata/ok/720_bool_logic.aic:11:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/720_bool_logic.aic:12:21 let t17 : bool = cmp != const 1, const 1
+    loc ../../testdata/ok/720_bool_logic.aic:12:18 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/720_bool_logic.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/720_bool_logic.aic:3:1 ret 
+}

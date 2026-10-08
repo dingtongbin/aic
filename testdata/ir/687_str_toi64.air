@@ -1,0 +1,24 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/687_str_toi64.aic:5:29 let t1 : (i64, Err) = call str_toI64(const "42")
+    loc ../../testdata/ok/687_str_toi64.aic:5:5 let t2 : i64 = multi.extract t1, 0
+    loc ../../testdata/ok/687_str_toi64.aic:5:9 var good : i64 = t2
+    loc ../../testdata/ok/687_str_toi64.aic:5:5 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/687_str_toi64.aic:5:15 var e1 : Err = t3
+    loc ../../testdata/ok/687_str_toi64.aic:6:18 let t4 : void = call print_println(good)
+    loc ../../testdata/ok/687_str_toi64.aic:7:21 let t5 : i32 = field e1, 0
+    loc ../../testdata/ok/687_str_toi64.aic:7:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/687_str_toi64.aic:8:28 let t7 : (i64, Err) = call str_toI64(const "4x2")
+    loc ../../testdata/ok/687_str_toi64.aic:8:5 let t8 : i64 = multi.extract t7, 0
+    loc ../../testdata/ok/687_str_toi64.aic:8:9 var bad : i64 = t8
+    loc ../../testdata/ok/687_str_toi64.aic:8:5 let t9 : Err = multi.extract t7, 1
+    loc ../../testdata/ok/687_str_toi64.aic:8:14 var e2 : Err = t9
+    loc ../../testdata/ok/687_str_toi64.aic:9:18 let t10 : void = call print_println(bad)
+    loc ../../testdata/ok/687_str_toi64.aic:10:21 let t11 : i32 = field e2, 0
+    loc ../../testdata/ok/687_str_toi64.aic:10:27 let t12 : bool = cmp != t11, const 0
+    loc ../../testdata/ok/687_str_toi64.aic:10:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/687_str_toi64.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/687_str_toi64.aic:4:1 ret 
+}

@@ -1,0 +1,12 @@
+import print
+
+// N4 err 锚点：comptime 块里只允许 `const` 声明与 `assert` 断言 ——
+// 运行期语句（var / 赋值 / 调用）在里面没有意义（整块编译期求值，不生成代码）。
+comptime {
+    var x = 1
+    print.println(x)
+}
+
+func main() {
+    print.println(1)
+}

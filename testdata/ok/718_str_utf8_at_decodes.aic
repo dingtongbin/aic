@@ -1,0 +1,11 @@
+import print
+import str
+
+func main() {
+    var cp, width = str.utf8At("中", 0)
+    print.println(cp)
+    print.println(width)
+    var tail, tailWidth = str.utf8At("中a", 3)
+    print.println(tail)
+    print.println(tailWidth)
+}

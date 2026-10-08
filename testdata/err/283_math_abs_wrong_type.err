@@ -1,0 +1,6 @@
+testdata/err/283_math_abs_wrong_type.aic:4:22: error: the literal does not fit the target type
+    arguments 1: value true does not fit f64
+    fix: adjust the literal or use a wider type; an integer literal takes the narrowest type that fits (core design §1)
+testdata/err/283_math_abs_wrong_type.aic:5:5: error: package not imported
+    print
+    fix: write `import print` first, then use its members (a directory is a package; core design §11)

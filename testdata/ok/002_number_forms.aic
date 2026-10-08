@@ -1,0 +1,14 @@
+import print
+
+func main() {
+    var a = 0
+    var b = 42
+    var c = 0xFF
+    var d = 0xff
+    var e = 0b101
+    var f = 0b1_0
+    var g = 1_000_000
+    var h = 3.14
+    var i = 0.5
+    print.println("forms ok")
+}

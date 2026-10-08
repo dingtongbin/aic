@@ -1,0 +1,154 @@
+import print
+import os
+import str
+
+// B2 解析：JSON 子集（对象/数组/字符串/数字/true/false/null）递归下降解析器。
+// 与 benches/c/b2_json.c **逐行同构**：同一文法、同一游标推进次序、同一校验和
+// （校验和 = 所有数字之和 + 键的个数，强制走完整棵树）。
+// 输入由程序自身确定性地生成（约 1MB），避免依赖外部文件。
+class P {
+    var src str
+    var pos usize
+}
+
+func skipWS(p P) {
+    for p.pos < p.src.len() {
+        var c u8 = p.src[p.pos]
+        if c == 32 || c == 10 || c == 9 || c == 13 {
+            p.pos = p.pos + 1
+        } else {
+            break
+        }
+    }
+}
+
+func parseValue(p P) -> i64 {
+    skipWS(p)
+    if p.pos >= p.src.len() {
+        return 0
+    }
+    var c u8 = p.src[p.pos]
+    if c == 123 {
+        return parseObject(p)
+    }
+    if c == 91 {
+        return parseArray(p)
+    }
+    if c == 34 {
+        return parseString(p)
+    }
+    if c == 116 {
+        p.pos = p.pos + 4
+        return 0
+    }
+    if c == 102 {
+        p.pos = p.pos + 5
+        return 0
+    }
+    if c == 110 {
+        p.pos = p.pos + 4
+        return 0
+    }
+    return parseNumber(p)
+}
+
+func parseString(p P) -> i64 {
+    p.pos = p.pos + 1
+    for p.pos < p.src.len() {
+        var c u8 = p.src[p.pos]
+        p.pos = p.pos + 1
+        if c == 34 {
+            break
+        }
+    }
+    return 0
+}
+
+func parseNumber(p P) -> i64 {
+    var v i64 = 0
+    for p.pos < p.src.len() {
+        var c u8 = p.src[p.pos]
+        if c >= 48 && c <= 57 {
+            v = v * 10 + i64(c - 48)
+            p.pos = p.pos + 1
+        } else {
+            break
+        }
+    }
+    return v
+}
+
+func parseArray(p P) -> i64 {
+    p.pos = p.pos + 1
+    var sum i64 = 0
+    skipWS(p)
+    if p.pos < p.src.len() && p.src[p.pos] == 93 {
+        p.pos = p.pos + 1
+        return 0
+    }
+    for true {
+        sum = sum + parseValue(p)
+        skipWS(p)
+        if p.pos < p.src.len() && p.src[p.pos] == 44 {
+            p.pos = p.pos + 1
+            continue
+        }
+        break
+    }
+    skipWS(p)
+    if p.pos < p.src.len() && p.src[p.pos] == 93 {
+        p.pos = p.pos + 1
+    }
+    return sum
+}
+
+func parseObject(p P) -> i64 {
+    p.pos = p.pos + 1
+    var sum i64 = 0
+    var keys i64 = 0
+    skipWS(p)
+    if p.pos < p.src.len() && p.src[p.pos] == 125 {
+        p.pos = p.pos + 1
+        return 0
+    }
+    for true {
+        skipWS(p)
+        parseString(p)
+        keys = keys + 1
+        skipWS(p)
+        if p.pos < p.src.len() && p.src[p.pos] == 58 {
+            p.pos = p.pos + 1
+        }
+        sum = sum + parseValue(p)
+        skipWS(p)
+        if p.pos < p.src.len() && p.src[p.pos] == 44 {
+            p.pos = p.pos + 1
+            continue
+        }
+        break
+    }
+    skipWS(p)
+    if p.pos < p.src.len() && p.src[p.pos] == 125 {
+        p.pos = p.pos + 1
+    }
+    return sum + keys
+}
+
+func main() -> Err {
+    // 输入 = harness 生成的文件（约 1MB，确定性）；读入用 os.readFile（线性）。
+    var args = os.args()
+    if args.len() < 2 {
+        print.println("usage: b2_json <file.json>")
+        return nil
+    }
+    var doc, err = os.readFile(args[1])
+    if err.code != 0 {
+        print.println(err.msg)
+        return nil
+    }
+    var p = P{src: doc, pos: 0}
+    var sum = parseValue(p)
+    print.println(sum)
+    print.println(doc.len())
+    return nil
+}

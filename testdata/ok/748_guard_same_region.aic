@@ -1,0 +1,23 @@
+import print
+
+class Buf {
+    var n i32
+}
+
+// pick 的返回摘要 = 0，但**调用点偏移 = 1**（在 region 块内调用）→ 调用表达式界
+// 非精确 = 1 → 存入外层槽（深度 0）时插**存储点守卫**；运行时对象其实在任务区域
+// （深度 0 ≤ 0）→ 守卫通过。这是 H9/H10 需要的「真实守卫点」锚点：
+// 检查器证不出（非精确），但语义上安全。
+func pick(p Buf) -> Buf {
+    return p
+}
+
+func main() -> Err {
+    var outer Buf = nil
+    var base = Buf{n: 7}
+    region {
+        outer = pick(base)
+    }
+    print.println(outer.n)
+    return nil
+}

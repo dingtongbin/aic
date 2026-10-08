@@ -1,0 +1,6 @@
+testdata/err/398_comptime_bad_stmt.aic:6:5: error: a comptime block holds `const` declarations and `assert` statements only
+    got KW var
+    fix: write const NAME = <foldable expression> or assert <foldable bool> (core design §16 N4)
+testdata/err/398_comptime_bad_stmt.aic:7:5: error: a comptime block holds `const` declarations and `assert` statements only
+    got IDENT print
+    fix: write const NAME = <foldable expression> or assert <foldable bool> (core design §16 N4)

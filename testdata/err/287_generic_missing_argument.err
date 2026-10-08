@@ -1,0 +1,6 @@
+testdata/err/287_generic_missing_argument.aic:2:9: error: the variable type cannot be inferred
+    var x = ... (no type information on the right)
+    fix: write an explicit type: var x T = ...; a container literal needs a declared type (core design §2.2)
+testdata/err/287_generic_missing_argument.aic:2:11: error: unknown type name
+    Box
+    fix: a type must be declared in this file or come from an imported package; write generics as Box[T]

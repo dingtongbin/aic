@@ -1,0 +1,5 @@
+import str
+
+func main() {
+    var b = str.contains("abc")
+}

@@ -1,0 +1,57 @@
+air v1 module ok
+type ok_Pair = struct packed
+    0:a:i32
+    1:b:i32
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/776_operators.aic:14:21 let t1 : i32 = binop & const 6, const 3
+    loc ../../testdata/ok/776_operators.aic:14:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/776_operators.aic:15:21 let t3 : i32 = binop | const 6, const 3
+    loc ../../testdata/ok/776_operators.aic:15:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/776_operators.aic:16:21 let t5 : i32 = binop ^ const 6, const 3
+    loc ../../testdata/ok/776_operators.aic:16:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/776_operators.aic:17:19 let t7 : i32 = unop ~ const 0
+    loc ../../testdata/ok/776_operators.aic:17:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/776_operators.aic:19:5 var n : i32 = const 3
+    loc ../../testdata/ok/776_operators.aic:20:21 let t9 : i32 = binop << const 1, n
+    loc ../../testdata/ok/776_operators.aic:20:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/776_operators.aic:21:23 let t11 : i32 = binop >> const 256, const 2
+    loc ../../testdata/ok/776_operators.aic:21:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/776_operators.aic:23:20 let lit13 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/776_operators.aic:23:20 let t14 : void = call list.append[i32](lit13, const 10)
+    loc ../../testdata/ok/776_operators.aic:23:20 let t15 : void = call list.append[i32](lit13, const 20)
+    loc ../../testdata/ok/776_operators.aic:23:5 var xs : i32[] = lit13
+    loc ../../testdata/ok/776_operators.aic:24:11 let t16 : i32 = elem xs, const 0
+    loc ../../testdata/ok/776_operators.aic:24:11 let t17 : i32 = binop + t16, const 5
+    loc ../../testdata/ok/776_operators.aic:24:11 store elem xs, const 0, t17
+    loc ../../testdata/ok/776_operators.aic:25:11 let t18 : i32 = elem xs, const 1
+    loc ../../testdata/ok/776_operators.aic:25:11 let t19 : i32 = binop * t18, const 3
+    loc ../../testdata/ok/776_operators.aic:25:11 store elem xs, const 1, t19
+    loc ../../testdata/ok/776_operators.aic:26:21 let t20 : i32 = elem elem xs, const 0, const 0
+    loc ../../testdata/ok/776_operators.aic:26:18 let t21 : void = call print_println(t20)
+    loc ../../testdata/ok/776_operators.aic:27:21 let t22 : i32 = elem elem xs, const 1, const 1
+    loc ../../testdata/ok/776_operators.aic:27:18 let t23 : void = call print_println(t22)
+    loc ../../testdata/ok/776_operators.aic:29:18 let obj24 : ok_Pair = alloc task(ok_Pair)
+    loc ../../testdata/ok/776_operators.aic:29:23 store field obj24, 0, const 1
+    loc ../../testdata/ok/776_operators.aic:29:29 store field obj24, 1, const 2
+    loc ../../testdata/ok/776_operators.aic:29:5 var p : ok_Pair = obj24
+    loc ../../testdata/ok/776_operators.aic:30:18 let obj25 : ok_Pair = alloc task(ok_Pair)
+    loc ../../testdata/ok/776_operators.aic:30:23 store field obj25, 0, const 1
+    loc ../../testdata/ok/776_operators.aic:30:29 store field obj25, 1, const 2
+    loc ../../testdata/ok/776_operators.aic:30:5 var q : ok_Pair = obj25
+    loc ../../testdata/ok/776_operators.aic:31:18 let obj26 : ok_Pair = alloc task(ok_Pair)
+    loc ../../testdata/ok/776_operators.aic:31:23 store field obj26, 0, const 2
+    loc ../../testdata/ok/776_operators.aic:31:29 store field obj26, 1, const 0
+    loc ../../testdata/ok/776_operators.aic:31:5 var r : ok_Pair = obj26
+    loc ../../testdata/ok/776_operators.aic:32:21 let t27 : bool = cmp == p, q
+    loc ../../testdata/ok/776_operators.aic:32:18 let t28 : void = call print_println(t27)
+    loc ../../testdata/ok/776_operators.aic:33:21 let t29 : bool = cmp == p, r
+    loc ../../testdata/ok/776_operators.aic:33:18 let t30 : void = call print_println(t29)
+    loc ../../testdata/ok/776_operators.aic:34:21 let t31 : bool = cmp < p, r
+    loc ../../testdata/ok/776_operators.aic:34:18 let t32 : void = call print_println(t31)
+    loc ../../testdata/ok/776_operators.aic:35:21 let t33 : bool = cmp > r, p
+    loc ../../testdata/ok/776_operators.aic:35:18 let t34 : void = call print_println(t33)
+    loc ../../testdata/ok/776_operators.aic:12:1 br exit
+  exit:
+    loc ../../testdata/ok/776_operators.aic:12:1 ret 
+}

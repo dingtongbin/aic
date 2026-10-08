@@ -1,0 +1,34 @@
+import str
+
+// 计数：行数与词数（与 examples/wc.aic 同一套口径，供多包示例复用）。
+func CountLines(text str) -> i64 {
+    if text.len() == 0 {
+        return 0
+    }
+    var parts = str.split(text, "\n")
+    var n i64 = i64(parts.len())
+    if str.endsWith(text, "\n") {
+        n -= 1
+    }
+    return n
+}
+
+func CountWords(text str) -> i64 {
+    if text.len() == 0 {
+        return 0
+    }
+    var parts = str.split(text, "\n")
+    var words i64 = 0
+    for i in 0..parts.len() {
+        if str.trim(parts[i]).len() == 0 {
+            continue
+        }
+        var toks = str.split(parts[i], " ")
+        for j in 0..toks.len() {
+            if str.trim(toks[j]).len() != 0 {
+                words += 1
+            }
+        }
+    }
+    return words
+}

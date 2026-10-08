@@ -1,0 +1,12 @@
+import testing
+
+// 同目录普通源文件：与 math_test.aic 同属包 test（目录即包），
+// 测试文件可直接调用它（包内命名空间共享）。
+func triple(n i32) -> i32 {
+    return n * 3
+}
+
+func testTriple() {
+    testing.eq(triple(4), 12, "4*3")
+    testing.gt(triple(0), -1, "非负")
+}

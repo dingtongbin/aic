@@ -1,0 +1,46 @@
+import print
+import os
+import str
+
+// B1 数值核 · f64 矩阵乘（方阵 n³，默认 n = 512）。
+// 算法与 benches/c/b1_matmul.c **逐行同构**（扁平一维数组 + 同样循环次序），
+// 否则比的是算法不是后端（§九 性能验收方法）。
+func matmul(n usize, a f64[], b f64[], c f64[]) {
+    for i in 0..n {
+        for j in 0..n {
+            var sum f64 = 0.0
+            for k in 0..n {
+                sum = sum + a[i * n + k] * b[k * n + j]
+            }
+            c[i * n + j] = sum
+        }
+    }
+}
+
+func main() -> Err {
+    var n usize = 512
+    var args = os.args()
+    if args.len() >= 2 {
+        var v, e = str.toI64(args[1])
+        if e.code == 0 {
+            n = usize(v)
+        }
+    }
+    var size usize = n * n
+    var a f64[] = []
+    var b f64[] = []
+    var c f64[] = []
+    for i in 0..size {
+        a.append(1.5)
+        b.append(2.5)
+        c.append(0.0)
+    }
+    matmul(n, a, b, c)
+    // 打印一个依赖全部结果的校验值（防优化掉整个计算）
+    var checksum f64 = 0.0
+    for i in 0..size {
+        checksum = checksum + c[i]
+    }
+    print.println(checksum)
+    return nil
+}

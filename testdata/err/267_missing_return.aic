@@ -1,0 +1,6 @@
+func f() -> i32 {
+    var x = 1
+}
+
+func main() {
+}

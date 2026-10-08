@@ -1,0 +1,4 @@
+func f() -> i32 {
+    var x i64 = 1
+    return x
+}

@@ -1,0 +1,20 @@
+// N10 负例：两条 use 提升了同名方法 ⇒ 歧义，必须在本类显式实现。
+class A {
+    func ping() -> i32 {
+        return 1
+    }
+}
+
+class B {
+    func ping() -> i32 {
+        return 2
+    }
+}
+
+class C {
+    use a A
+    use b B
+
+    var a A
+    var b B
+}

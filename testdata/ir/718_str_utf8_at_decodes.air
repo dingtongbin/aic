@@ -1,0 +1,21 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:5:31 let t1 : (u32, usize) = call str_utf8At(const "中", const 0)
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:5:5 let t2 : u32 = multi.extract t1, 0
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:5:9 var cp : u32 = t2
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:5:5 let t3 : usize = multi.extract t1, 1
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:5:13 var width : usize = t3
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:6:18 let t4 : void = call print_println(cp)
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:7:18 let t5 : void = call print_println(width)
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:8:37 let t6 : (u32, usize) = call str_utf8At(const "中a", const 3)
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:8:5 let t7 : u32 = multi.extract t6, 0
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:8:9 var tail : u32 = t7
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:8:5 let t8 : usize = multi.extract t6, 1
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:8:15 var tailWidth : usize = t8
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:9:18 let t9 : void = call print_println(tail)
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:10:18 let t10 : void = call print_println(tailWidth)
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/718_str_utf8_at_decodes.aic:4:1 ret 
+}

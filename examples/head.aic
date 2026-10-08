@@ -1,0 +1,57 @@
+// head — 输出前若干行（v2 面：str.toI64 返 (i64, Err) / check 前的手工判错）。
+//
+// 用法：head [行数] <文件>；不给行数取 10 行；不给文件时读标准输入。
+import print
+import str
+import os
+
+// wantLines 读可选行数。os.args 含 argv[0]，故行数在 args[1]、文件顺延到 args[2]。
+// 行数不是数字 = 报错退出，绝不静默兜底（核心设计 §六）。
+func wantLines(args str[]) -> (i64, usize) {
+    if args.len() >= 2 {
+        var v, err = str.toI64(args[1])
+        if err.code != 0 {
+            print.println(str.concat("head: not a number: ", args[1]))
+            os.exit(1)
+            return 0, 1
+        }
+        return v, 2
+    }
+    return 10, 1
+}
+
+func readInput(from usize) -> (str, Err) {
+    var args = os.args()
+    if args.len() > from {
+        var content, err = os.readFile(args[from])
+        return content, err
+    }
+    var piped, err = os.readStdin()
+    return piped, err
+}
+
+func main() -> Err {
+    var args = os.args()
+    var count, from = wantLines(args)
+    var text, err = readInput(from)
+    if err.code != 0 {
+        print.println(str.concat("head: ", err.msg))
+        return err
+    }
+    if text.len() == 0 {
+        return nil
+    }
+    var lines = str.split(text, "\n")
+    // 末尾换行是「终止最后一行」而不是「开始新的一行」（与 wc -l 同口径）。
+    var last usize = lines.len()
+    if str.endsWith(text, "\n") {
+        last -= 1
+    }
+    for i in 0..last {
+        if i64(i) >= count {
+            break
+        }
+        print.println(lines[i])
+    }
+    return nil
+}

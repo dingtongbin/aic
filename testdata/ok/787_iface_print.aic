@@ -1,0 +1,23 @@
+import print
+
+// L4-e 锚点 1：**打印接口值**（§四 R6 决策三：见证表带打印槽，接口可打印）。
+// 此前报 "the printer for interface … only surfaced on the second pass"：
+// 两遍发射的 `printSeen` 复制用的是 typeSeg 键，而接口打印器登记用的是
+// ifacePrintKey（`pkg.Name`）—— 键方案不一致 ⇒ 第二遍又想登记一次。
+interface Area {
+    func area() -> i32
+}
+
+class Sq {
+    var s i32
+
+    func area() -> i32 {
+        return this.s * this.s
+    }
+}
+
+func main() {
+    var a Area = Sq{s: 3}
+    print.println(a.area())
+    print.println(a) // 动态类型未知 ⇒ 走见证表打印槽；无 ToString 时打 <类名>
+}

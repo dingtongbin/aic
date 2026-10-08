@@ -1,0 +1,11 @@
+import print
+import str
+
+func main() {
+    var good, e1 = str.toI64("42")
+    print.println(good)
+    print.println(e1.code)
+    var bad, e2 = str.toI64("4x2")
+    print.println(bad)
+    print.println(e2.code != 0)
+}

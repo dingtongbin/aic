@@ -1,0 +1,5 @@
+import print
+
+func main() {
+    print.println("tab:\tquote:\"done\"")
+}

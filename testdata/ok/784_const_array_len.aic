@@ -1,0 +1,15 @@
+import print
+
+// L4 审计补锚点：`[T;N]` 的 N 走**同一套常量折叠**（字面量 / const 名 / sizeOf 等内省原语）。
+// 此前检查器只认字面量与 const 名（`[i32; sizeOf(i32)]` 被拒），
+// 而发射侧自己再折一遍 ⇒ 即便放行也会发成 `[0]`（C 层 excess elements）。
+const N = 3
+
+func main() {
+    var a [i32; N] = [1, 2, 3]
+    print.println(a.len())
+    var b [i32; sizeOf(i32)] = [4, 5, 6, 7]
+    print.println(b.len())
+    var c [i32; 1 + 1] = [8, 9]
+    print.println(c.len())
+}

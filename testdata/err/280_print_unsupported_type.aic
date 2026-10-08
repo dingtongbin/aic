@@ -1,0 +1,10 @@
+import print
+
+class Box {
+    var v i32 = 0
+}
+
+func main() {
+    var b Box = Box.init()
+    print.println(b)
+}

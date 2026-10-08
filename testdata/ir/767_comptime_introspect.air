@@ -1,0 +1,23 @@
+air v1 module ok
+type ok_Node = struct
+    0:v:i32
+type ok_Pair = struct packed
+    0:a:i32
+    1:b:i32
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/767_comptime_introspect.aic:24:18 let t1 : void = call print_println(const "Pair")
+    loc ../../testdata/ok/767_comptime_introspect.aic:25:18 let t2 : void = call print_println(const false)
+    loc ../../testdata/ok/767_comptime_introspect.aic:26:18 let t3 : void = call print_println(const 8)
+    loc ../../testdata/ok/767_comptime_introspect.aic:27:18 let t4 : void = call print_println(const "i32")
+    loc ../../testdata/ok/767_comptime_introspect.aic:28:18 let t5 : void = call print_println(const "Node")
+    loc ../../testdata/ok/767_comptime_introspect.aic:29:18 let t6 : void = call print_println(const true)
+    loc ../../testdata/ok/767_comptime_introspect.aic:30:18 let t7 : void = call print_println(const true)
+    loc ../../testdata/ok/767_comptime_introspect.aic:31:18 let t8 : void = call print_println(const 4)
+    loc ../../testdata/ok/767_comptime_introspect.aic:32:25 let t9 : i32 = sizeof ok_Pair
+    loc ../../testdata/ok/767_comptime_introspect.aic:32:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/767_comptime_introspect.aic:33:18 let t11 : void = call print_println(const 8)
+    loc ../../testdata/ok/767_comptime_introspect.aic:23:1 br exit
+  exit:
+    loc ../../testdata/ok/767_comptime_introspect.aic:23:1 ret 
+}

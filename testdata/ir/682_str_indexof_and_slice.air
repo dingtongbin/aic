@@ -1,0 +1,17 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:5:30 let t1 : i64 = call str_indexOf(const "compiler", const "pil")
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:5:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:6:30 let t3 : i64 = call str_indexOf(const "compiler", const "zzz")
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:6:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:7:30 let t5 : i64 = call str_indexOf(const "abc", const "abc")
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:7:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:8:26 let t7 : str = call str_sub(const "compiler", const 0, const 5)
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:8:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:9:26 let t9 : str = call str_sub(const "compiler", const 4, const 8)
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:9:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/682_str_indexof_and_slice.aic:4:1 ret 
+}

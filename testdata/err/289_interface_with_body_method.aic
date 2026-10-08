@@ -1,0 +1,8 @@
+interface Shape {
+    func area() -> i32 {
+        return 0
+    }
+}
+
+func main() {
+}

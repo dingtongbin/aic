@@ -1,0 +1,15 @@
+import print
+
+// L4 err 锚点：§15.7 规则③「有 Err 位的调用结果必须被消费」的**弃位形态** ——
+// `var a, _ = f()` 把 Err 丢掉必须被拒（此前只有裸调用语句被拦）。
+func f(v i32) -> (i32, Err) {
+    if v < 0 {
+        return 0, Err(2, "neg")
+    }
+    return v * 2, nil
+}
+
+func main() {
+    var a, _ = f(3)
+    print.println(a)
+}

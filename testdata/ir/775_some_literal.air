@@ -1,0 +1,15 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/775_some_literal.aic:7:36 let t1 : option_Option[i32] = call Some(const 9)
+    loc ../../testdata/ok/775_some_literal.aic:7:5 var o : option_Option[i32] = t1
+    loc ../../testdata/ok/775_some_literal.aic:8:32 let t2 : bool = call option_isSome(o)
+    loc ../../testdata/ok/775_some_literal.aic:8:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/775_some_literal.aic:9:43 let t4 : option_Option[i32] = call option_none()
+    loc ../../testdata/ok/775_some_literal.aic:9:5 var p : option_Option[i32] = t4
+    loc ../../testdata/ok/775_some_literal.aic:10:32 let t5 : bool = call option_isSome(p)
+    loc ../../testdata/ok/775_some_literal.aic:10:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/775_some_literal.aic:6:1 br exit
+  exit:
+    loc ../../testdata/ok/775_some_literal.aic:6:1 ret 
+}

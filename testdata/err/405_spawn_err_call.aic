@@ -1,0 +1,16 @@
+import print
+
+// L4 err 锚点：§15.7 规则③ —— **spawn 的调用结果不进任何绑定**，故有 Err 位的调用不能被 spawn。
+func f(v i32) -> (i32, Err) {
+    if v < 0 {
+        return 0, Err(2, "neg")
+    }
+    return v * 2, nil
+}
+
+func main() {
+    scope {
+        spawn f(3)
+    }
+    print.println("done")
+}

@@ -1,0 +1,26 @@
+air v1 module ok
+func ok_add(a:i32, b:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/015_functions.aic:3:1 var ret0 : i32
+    loc ../../testdata/ok/015_functions.aic:4:14 let t1 : i32 = binop + a, b
+    loc ../../testdata/ok/015_functions.aic:4:5 store ret0, t1
+    loc ../../testdata/ok/015_functions.aic:4:5 br exit
+  exit:
+    loc ../../testdata/ok/015_functions.aic:3:1 ret ret0
+}
+func ok_twice(x:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/015_functions.aic:7:1 var ret0 : i32
+    loc ../../testdata/ok/015_functions.aic:8:15 let t1 : i32 = call ok_add(x, x)
+    loc ../../testdata/ok/015_functions.aic:8:5 store ret0, t1
+    loc ../../testdata/ok/015_functions.aic:8:5 br exit
+  exit:
+    loc ../../testdata/ok/015_functions.aic:7:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/015_functions.aic:12:18 let t1 : void = call print_println(const "fn ok")
+    loc ../../testdata/ok/015_functions.aic:11:1 br exit
+  exit:
+    loc ../../testdata/ok/015_functions.aic:11:1 ret 
+}

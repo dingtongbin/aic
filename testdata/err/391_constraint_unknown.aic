@@ -1,0 +1,8 @@
+// N3 负例：约束名不在封闭集合里（能力名 / 已声明接口 / value / ref）⇒ 声明处报错。
+func f[T: Bogus](x T) -> T {
+    return x
+}
+
+func main() {
+    var n = f(1)
+}

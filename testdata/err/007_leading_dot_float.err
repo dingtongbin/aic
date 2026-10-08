@@ -1,0 +1,3 @@
+testdata/err/007_leading_dot_float.aic:2:13: error: a float literal may not start with .
+    digits after a leading dot
+    fix: write the integer part first: 0.5, not .5

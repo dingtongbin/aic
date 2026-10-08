@@ -1,0 +1,9 @@
+import print
+
+func main() {
+    var xs i64[] = []
+    print.println(xs.isEmpty())
+    xs.append(7)
+    print.println(xs.len())
+    print.println(xs[0])
+}

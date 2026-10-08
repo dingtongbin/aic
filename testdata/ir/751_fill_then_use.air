@@ -1,0 +1,55 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/751_fill_then_use.aic:9:5 var n : i64 = const 8
+    loc ../../testdata/ok/751_fill_then_use.aic:10:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/751_fill_then_use.aic:10:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 var i : usize = const 0
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 let t2 : bool = cmp lt i, n
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 cbr t2, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/751_fill_then_use.aic:12:18 let t3 : void = call list_i32_append(xs, const 0)
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 let t4 : usize = binop + i, const 1
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 store i, t4
+    loc ../../testdata/ok/751_fill_then_use.aic:11:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/751_fill_then_use.aic:14:5 var m : i64 = const 0
+    loc ../../testdata/ok/751_fill_then_use.aic:15:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/751_fill_then_use.aic:15:16 let t5 : i64 = binop - n, const 1
+    loc ../../testdata/ok/751_fill_then_use.aic:15:11 let t6 : bool = cmp <= m, t5
+    loc ../../testdata/ok/751_fill_then_use.aic:15:5 cbr t6, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/751_fill_then_use.aic:16:19 let t7 : i32 = elem elem xs, m, m
+    loc ../../testdata/ok/751_fill_then_use.aic:16:23 let t8 : i32 = binop + t7, const 1
+    loc ../../testdata/ok/751_fill_then_use.aic:16:15 store elem xs, m, t8
+    loc ../../testdata/ok/751_fill_then_use.aic:17:15 let t9 : i64 = binop + m, const 1
+    loc ../../testdata/ok/751_fill_then_use.aic:17:11 store m, t9
+    loc ../../testdata/ok/751_fill_then_use.aic:15:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/751_fill_then_use.aic:15:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 var i : usize = const 0
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 br forhead9
+  forhead9:
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 let t10 : bool = cmp lt i, n
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 cbr t10, forbody10, fordone12
+  forbody10:
+    loc ../../testdata/ok/751_fill_then_use.aic:20:25 let t11 : i32 = elem elem xs, i, i
+    loc ../../testdata/ok/751_fill_then_use.aic:20:22 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 br forpost11
+  forpost11:
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 let t13 : usize = binop + i, const 1
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 store i, t13
+    loc ../../testdata/ok/751_fill_then_use.aic:19:5 br forhead9
+  fordone12:
+    loc ../../testdata/ok/751_fill_then_use.aic:22:25 let t14 : usize = call list_i32_len(xs)
+    loc ../../testdata/ok/751_fill_then_use.aic:22:18 let t15 : void = call print_println(t14)
+    loc ../../testdata/ok/751_fill_then_use.aic:8:1 br exit
+  exit:
+    loc ../../testdata/ok/751_fill_then_use.aic:8:1 ret 
+}

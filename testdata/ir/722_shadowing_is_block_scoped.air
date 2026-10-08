@@ -1,0 +1,15 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:4:5 var x : i32 = const 1
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:5:5 br scope1
+  scope1:
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:6:9 var x : i32 = const 2
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:7:22 let t1 : void = call print_println(x)
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:5:5 br scopeend2
+  scopeend2:
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:9:18 let t2 : void = call print_println(x)
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/722_shadowing_is_block_scoped.aic:3:1 ret 
+}

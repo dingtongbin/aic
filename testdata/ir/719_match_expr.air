@@ -1,0 +1,72 @@
+air v1 module ok
+type ok_Color = enum
+    Red
+    Green
+    Blue
+func ok_name(c:ok_Color) -> str {
+  entry:
+    loc ../../testdata/ok/719_match_expr.aic:5:1 var ret0 : str
+    loc ../../testdata/ok/719_match_expr.aic:6:12 var mres1 : str
+    loc ../../testdata/ok/719_match_expr.aic:6:12 let t2 : i32 = enum.tag c
+    loc ../../testdata/ok/719_match_expr.aic:6:12 switch t2 (arm12 arm23 arm34)
+  mjoin1:
+    loc ../../testdata/ok/719_match_expr.aic:6:5 store ret0, mres1
+    loc ../../testdata/ok/719_match_expr.aic:6:5 br exit
+  arm12:
+    loc ../../testdata/ok/719_match_expr.aic:7:9 store mres1, const "red"
+    loc ../../testdata/ok/719_match_expr.aic:7:9 br mjoin1
+  arm23:
+    loc ../../testdata/ok/719_match_expr.aic:8:9 store mres1, const "green"
+    loc ../../testdata/ok/719_match_expr.aic:8:9 br mjoin1
+  arm34:
+    loc ../../testdata/ok/719_match_expr.aic:9:9 store mres1, const "blue"
+    loc ../../testdata/ok/719_match_expr.aic:9:9 br mjoin1
+  exit:
+    loc ../../testdata/ok/719_match_expr.aic:5:1 ret ret0
+}
+func ok_code(c:ok_Color) -> i32 {
+  entry:
+    loc ../../testdata/ok/719_match_expr.aic:13:1 var ret0 : i32
+    loc ../../testdata/ok/719_match_expr.aic:14:12 var mres1 : i32
+    loc ../../testdata/ok/719_match_expr.aic:14:12 let t2 : i32 = enum.tag c
+    loc ../../testdata/ok/719_match_expr.aic:14:12 switch t2 (arm12 arm23 arm34)
+  mjoin1:
+    loc ../../testdata/ok/719_match_expr.aic:14:5 store ret0, mres1
+    loc ../../testdata/ok/719_match_expr.aic:14:5 br exit
+  arm12:
+    loc ../../testdata/ok/719_match_expr.aic:15:9 store mres1, const 1
+    loc ../../testdata/ok/719_match_expr.aic:15:9 br mjoin1
+  arm23:
+    loc ../../testdata/ok/719_match_expr.aic:16:9 store mres1, const 2
+    loc ../../testdata/ok/719_match_expr.aic:16:9 br mjoin1
+  arm34:
+    loc ../../testdata/ok/719_match_expr.aic:17:9 store mres1, const 3
+    loc ../../testdata/ok/719_match_expr.aic:17:9 br mjoin1
+  exit:
+    loc ../../testdata/ok/719_match_expr.aic:13:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/719_match_expr.aic:22:29 let t1 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/719_match_expr.aic:22:23 let t2 : str = call ok_name(t1)
+    loc ../../testdata/ok/719_match_expr.aic:22:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/719_match_expr.aic:23:29 let t4 : ok_Color = field ok_Color, 1
+    loc ../../testdata/ok/719_match_expr.aic:23:23 let t5 : i32 = call ok_code(t4)
+    loc ../../testdata/ok/719_match_expr.aic:23:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/719_match_expr.aic:24:16 let t7 : ok_Color = field ok_Color, 2
+    loc ../../testdata/ok/719_match_expr.aic:24:5 let t8 : i32 = enum.tag t7
+    loc ../../testdata/ok/719_match_expr.aic:24:5 switch t8 (arm12 arm23 arm34)
+  mjoin1:
+    loc ../../testdata/ok/719_match_expr.aic:21:1 br exit
+  arm12:
+    loc ../../testdata/ok/719_match_expr.aic:25:35 let t9 : void = call print_println(const "r")
+    loc ../../testdata/ok/719_match_expr.aic:25:9 br mjoin1
+  arm23:
+    loc ../../testdata/ok/719_match_expr.aic:26:37 let t10 : void = call print_println(const "g")
+    loc ../../testdata/ok/719_match_expr.aic:26:9 br mjoin1
+  arm34:
+    loc ../../testdata/ok/719_match_expr.aic:27:36 let t11 : void = call print_println(const "b")
+    loc ../../testdata/ok/719_match_expr.aic:27:9 br mjoin1
+  exit:
+    loc ../../testdata/ok/719_match_expr.aic:21:1 ret 
+}

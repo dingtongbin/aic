@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var m map[str]i32 = map.new()
+    m.put("a", 1)
+    m.put("b", 2)
+    for k in m {
+        print.println(k)
+    }
+}

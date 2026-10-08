@@ -1,0 +1,59 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/749_unchecked_access.aic:7:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/749_unchecked_access.aic:7:20 let t2 : void = call list.append[i32](lit1, const 1)
+    loc ../../testdata/ok/749_unchecked_access.aic:7:20 let t3 : void = call list.append[i32](lit1, const 2)
+    loc ../../testdata/ok/749_unchecked_access.aic:7:20 let t4 : void = call list.append[i32](lit1, const 3)
+    loc ../../testdata/ok/749_unchecked_access.aic:7:20 let t5 : void = call list.append[i32](lit1, const 4)
+    loc ../../testdata/ok/749_unchecked_access.aic:7:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/749_unchecked_access.aic:8:5 var total : i32 = const 0
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 var i : usize = const 0
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 let t6 : bool = cmp lt i, const 4
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 cbr t6, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/749_unchecked_access.aic:10:27 let t7 : i32 = elem elem xs, i, i
+    loc ../../testdata/ok/749_unchecked_access.aic:10:23 let t8 : i32 = binop + total, t7
+    loc ../../testdata/ok/749_unchecked_access.aic:10:15 store total, t8
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 let t9 : usize = binop + i, const 1
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 store i, t9
+    loc ../../testdata/ok/749_unchecked_access.aic:9:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/749_unchecked_access.aic:12:18 let t10 : void = call print_println(total)
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 var i : usize = const 0
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 let t11 : bool = cmp lt i, const 4
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 cbr t11, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/749_unchecked_access.aic:14:19 let t12 : i32 = elem elem xs, i, i
+    loc ../../testdata/ok/749_unchecked_access.aic:14:23 let t13 : i32 = binop * t12, const 2
+    loc ../../testdata/ok/749_unchecked_access.aic:14:15 store elem xs, i, t13
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 let t14 : usize = binop + i, const 1
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 store i, t14
+    loc ../../testdata/ok/749_unchecked_access.aic:13:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 var i : usize = const 0
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 br forhead9
+  forhead9:
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 let t15 : bool = cmp lt i, const 4
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 cbr t15, forbody10, fordone12
+  forbody10:
+    loc ../../testdata/ok/749_unchecked_access.aic:17:25 let t16 : i32 = elem elem xs, i, i
+    loc ../../testdata/ok/749_unchecked_access.aic:17:22 let t17 : void = call print_println(t16)
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 br forpost11
+  forpost11:
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 let t18 : usize = binop + i, const 1
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 store i, t18
+    loc ../../testdata/ok/749_unchecked_access.aic:16:5 br forhead9
+  fordone12:
+    loc ../../testdata/ok/749_unchecked_access.aic:6:1 br exit
+  exit:
+    loc ../../testdata/ok/749_unchecked_access.aic:6:1 ret 
+}

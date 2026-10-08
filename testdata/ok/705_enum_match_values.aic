@@ -1,0 +1,21 @@
+import print
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+func rank(c Color) -> i32 {
+    match c {
+        Red => { return 3 }
+        Green => { return 2 }
+        Blue => { return 1 }
+    }
+}
+
+func main() {
+    print.println(rank(Color.Red))
+    print.println(rank(Color.Green))
+    print.println(rank(Color.Blue))
+}

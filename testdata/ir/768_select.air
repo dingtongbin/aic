@@ -1,0 +1,78 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/768_select.aic:12:37 let t1 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/768_select.aic:12:5 var ch : chan[i32] = t1
+    loc ../../testdata/ok/768_select.aic:13:12 let t2 : void = call chan_i32_send(ch, const 7)
+    loc ../../testdata/ok/768_select.aic:18:9 let t3 : i64 = call time_after(const 10000)
+    loc ../../testdata/ok/768_select.aic:14:5 let t4 : i32 = select.wait [recv ch] deadline t3
+    loc ../../testdata/ok/768_select.aic:15:9 let t5 : bool = cmp == t4, const 0
+    loc ../../testdata/ok/768_select.aic:15:9 cbr t5, selarm2, selnext5
+  seljoin1:
+    loc ../../testdata/ok/768_select.aic:23:40 let t11 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/768_select.aic:23:5 var empty : chan[i32] = t11
+    loc ../../testdata/ok/768_select.aic:28:9 let t12 : i64 = call time_after(const 0)
+    loc ../../testdata/ok/768_select.aic:24:5 let t13 : i32 = select.wait [recv empty] deadline t12
+    loc ../../testdata/ok/768_select.aic:25:9 let t14 : bool = cmp == t13, const 0
+    loc ../../testdata/ok/768_select.aic:25:9 cbr t14, selarm7, selnext10
+  selarm2:
+    loc ../../testdata/ok/768_select.aic:15:9 let t7 : (i32, bool) = call chan_recv_i32(ch)
+    loc ../../testdata/ok/768_select.aic:15:14 let t8 : i32 = multi.extract t7, 0
+    loc ../../testdata/ok/768_select.aic:15:14 var v : i32 = t8
+    loc ../../testdata/ok/768_select.aic:16:26 let t9 : void = call print_println(v)
+    loc ../../testdata/ok/768_select.aic:15:9 br seljoin1
+  selarm3:
+    loc ../../testdata/ok/768_select.aic:19:26 let t10 : void = call print_println(const "timeout")
+    loc ../../testdata/ok/768_select.aic:18:9 br seljoin1
+  selnone4:
+    loc ../../testdata/ok/768_select.aic:14:5 br seljoin1
+  selnext5:
+    loc ../../testdata/ok/768_select.aic:18:9 let t6 : bool = cmp == t4, const -1
+    loc ../../testdata/ok/768_select.aic:18:9 cbr t6, selarm3, selnone4
+  seljoin6:
+    loc ../../testdata/ok/768_select.aic:34:39 let t21 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/768_select.aic:34:5 var solo : chan[i32] = t21
+    loc ../../testdata/ok/768_select.aic:35:5 let t22 : i32 = select.wait [recv solo]
+    loc ../../testdata/ok/768_select.aic:36:9 let t23 : bool = cmp == t22, const 0
+    loc ../../testdata/ok/768_select.aic:36:9 cbr t23, selarm12, selnone13
+  selarm7:
+    loc ../../testdata/ok/768_select.aic:25:9 let t16 : (i32, bool) = call chan_recv_i32(empty)
+    loc ../../testdata/ok/768_select.aic:25:14 let t17 : i32 = multi.extract t16, 0
+    loc ../../testdata/ok/768_select.aic:25:14 var v : i32 = t17
+    loc ../../testdata/ok/768_select.aic:25:17 let t18 : bool = multi.extract t16, 1
+    loc ../../testdata/ok/768_select.aic:25:17 var ok : bool = t18
+    loc ../../testdata/ok/768_select.aic:26:26 let t19 : void = call print_println(ok)
+    loc ../../testdata/ok/768_select.aic:25:9 br seljoin6
+  selarm8:
+    loc ../../testdata/ok/768_select.aic:29:26 let t20 : void = call print_println(const "timeout2")
+    loc ../../testdata/ok/768_select.aic:28:9 br seljoin6
+  selnone9:
+    loc ../../testdata/ok/768_select.aic:24:5 br seljoin6
+  selnext10:
+    loc ../../testdata/ok/768_select.aic:28:9 let t15 : bool = cmp == t13, const -1
+    loc ../../testdata/ok/768_select.aic:28:9 cbr t15, selarm8, selnone9
+  seljoin11:
+    loc ../../testdata/ok/768_select.aic:43:5 let t29 : void = call scope_timeout(const 50)
+    loc ../../testdata/ok/768_select.aic:43:5 region.enter sc30
+    loc ../../testdata/ok/768_select.aic:44:44 let t31 : chan[i32] = call chan_new_i32()
+    loc ../../testdata/ok/768_select.aic:44:9 var inner : chan[i32] = t31
+    loc ../../testdata/ok/768_select.aic:45:19 let t32 : void = call chan_i32_send(inner, const 9)
+    loc ../../testdata/ok/768_select.aic:46:28 let t33 : usize = call chan_i32_len(inner)
+    loc ../../testdata/ok/768_select.aic:46:9 var got : usize = t33
+    loc ../../testdata/ok/768_select.aic:47:22 let t34 : void = call print_println(got)
+    loc ../../testdata/ok/768_select.aic:43:5 region.exit
+    loc ../../testdata/ok/768_select.aic:11:1 br exit
+  selarm12:
+    loc ../../testdata/ok/768_select.aic:36:9 let t24 : (i32, bool) = call chan_recv_i32(solo)
+    loc ../../testdata/ok/768_select.aic:36:14 let t25 : i32 = multi.extract t24, 0
+    loc ../../testdata/ok/768_select.aic:36:14 var v : i32 = t25
+    loc ../../testdata/ok/768_select.aic:36:17 let t26 : bool = multi.extract t24, 1
+    loc ../../testdata/ok/768_select.aic:36:17 var ok : bool = t26
+    loc ../../testdata/ok/768_select.aic:37:26 let t27 : void = call print_println(v)
+    loc ../../testdata/ok/768_select.aic:38:26 let t28 : void = call print_println(ok)
+    loc ../../testdata/ok/768_select.aic:36:9 br seljoin11
+  selnone13:
+    loc ../../testdata/ok/768_select.aic:35:5 br seljoin11
+  exit:
+    loc ../../testdata/ok/768_select.aic:11:1 ret 
+}

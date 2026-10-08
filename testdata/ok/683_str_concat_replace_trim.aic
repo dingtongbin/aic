@@ -1,0 +1,7 @@
+import print
+import str
+
+func main() {
+    print.println(str.concat("a", "b"))
+    print.println(str.concat("[", str.concat(str.trim("  pad  "), "]")))
+}

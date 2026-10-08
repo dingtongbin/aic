@@ -1,0 +1,6 @@
+testdata/err/025_top_level_decl_in_body.aic:2:5: error: a top-level declaration cannot appear inside a function body
+    got KW export
+    fix: move it to the top level of the file; a function body holds statements only
+testdata/err/025_top_level_decl_in_body.aic:2:17: error: a function declaration cannot appear inside a function body
+    func g
+    fix: move it to the top level of the file; a func literal in an expression position has no name: func(x i32) -> i32 { ... }

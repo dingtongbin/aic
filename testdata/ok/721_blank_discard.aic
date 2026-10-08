@@ -1,0 +1,16 @@
+import print
+
+func pair() -> (i32, Err) {
+    return 7, Err(0, "")
+}
+
+func main() {
+    // 弃位规则（§15.7 规则③）：**值**可以弃（`_`），**Err 必须被消费**。
+    // 原锚点这里写的是 `var v, _ = pair()`（把 Err 丢掉）—— 规则③落地后它成为编译错，
+    // 该形态已移到 err/403；本锚点只保留合法形态。
+    var _, err = pair()
+    print.println(err.code)
+    var v, err2 = pair()
+    print.println(v)
+    print.println(err2.code)
+}

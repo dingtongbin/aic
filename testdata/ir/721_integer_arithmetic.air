@@ -1,0 +1,23 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/721_integer_arithmetic.aic:4:21 let t1 : i32 = binop / const 7, const 2
+    loc ../../testdata/ok/721_integer_arithmetic.aic:4:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:5:21 let t3 : i32 = binop % const 7, const 2
+    loc ../../testdata/ok/721_integer_arithmetic.aic:5:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:6:22 let t5 : i32 = call i32(const 7)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:6:31 let t6 : i32 = call i32(const 9)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:6:26 let t7 : i32 = binop - t5, t6
+    loc ../../testdata/ok/721_integer_arithmetic.aic:6:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:7:22 let t9 : i32 = call i32(const 6)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:7:31 let t10 : i32 = call i32(const 7)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:7:26 let t11 : i32 = binop * t9, t10
+    loc ../../testdata/ok/721_integer_arithmetic.aic:7:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:8:22 let t13 : i64 = call i64(const 100000)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:8:36 let t14 : i64 = call i64(const 100000)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:8:31 let t15 : i64 = binop * t13, t14
+    loc ../../testdata/ok/721_integer_arithmetic.aic:8:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/721_integer_arithmetic.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/721_integer_arithmetic.aic:3:1 ret 
+}

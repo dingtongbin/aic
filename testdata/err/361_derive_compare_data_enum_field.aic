@@ -1,0 +1,15 @@
+import print
+
+enum E {
+    A(i32),
+    B
+}
+
+@derive(Compare)
+class P {
+    var e E
+}
+
+func main() {
+    print.println(1)
+}

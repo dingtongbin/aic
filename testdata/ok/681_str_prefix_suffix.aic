@@ -1,0 +1,9 @@
+import print
+import str
+
+func main() {
+    print.println(str.startsWith("compiler", "comp"))
+    print.println(str.startsWith("compiler", "pile"))
+    print.println(str.endsWith("compiler", "iler"))
+    print.println(str.endsWith("compiler", "comp"))
+}

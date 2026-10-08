@@ -1,0 +1,30 @@
+air v1 module ok
+func ok_fact(n:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/723_recursion.aic:3:1 var ret0 : i32
+    loc ../../testdata/ok/723_recursion.aic:4:10 let t1 : bool = cmp <= n, const 1
+    loc ../../testdata/ok/723_recursion.aic:4:5 cbr t1, then1, else2
+  then1:
+    loc ../../testdata/ok/723_recursion.aic:5:9 store ret0, const 1
+    loc ../../testdata/ok/723_recursion.aic:5:9 br exit
+  else2:
+    loc ../../testdata/ok/723_recursion.aic:4:5 br join3
+  join3:
+    loc ../../testdata/ok/723_recursion.aic:7:23 let t2 : i32 = binop - n, const 1
+    loc ../../testdata/ok/723_recursion.aic:7:20 let t3 : i32 = call ok_fact(t2)
+    loc ../../testdata/ok/723_recursion.aic:7:14 let t4 : i32 = binop * n, t3
+    loc ../../testdata/ok/723_recursion.aic:7:5 store ret0, t4
+    loc ../../testdata/ok/723_recursion.aic:7:5 br exit
+  exit:
+    loc ../../testdata/ok/723_recursion.aic:3:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/723_recursion.aic:11:23 let t1 : i32 = call ok_fact(const 5)
+    loc ../../testdata/ok/723_recursion.aic:11:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/723_recursion.aic:12:23 let t3 : i32 = call ok_fact(const 1)
+    loc ../../testdata/ok/723_recursion.aic:12:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/723_recursion.aic:10:1 br exit
+  exit:
+    loc ../../testdata/ok/723_recursion.aic:10:1 ret 
+}

@@ -1,0 +1,8 @@
+class Box {
+    func get() -> i32 {
+        return v
+    }
+}
+
+func main() {
+}

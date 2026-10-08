@@ -1,0 +1,55 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/031_range_over_containers.aic:4:29 let t1 : set[i32] = call set_new_i32()
+    loc ../../testdata/ok/031_range_over_containers.aic:4:5 var s : set[i32] = t1
+    loc ../../testdata/ok/031_range_over_containers.aic:5:10 let t2 : void = call set_i32_add(s, const 5)
+    loc ../../testdata/ok/031_range_over_containers.aic:6:10 let t3 : void = call set_i32_add(s, const 6)
+    loc ../../testdata/ok/031_range_over_containers.aic:7:5 var total : i32 = const 0
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 let t4 : usize = len s
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 var x : usize = const 0
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 let t5 : bool = cmp lt x, t4
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 cbr t5, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 let t6 : i32 = elem s, x
+    loc ../../testdata/ok/031_range_over_containers.aic:8:9 var x : i32 = t6
+    loc ../../testdata/ok/031_range_over_containers.aic:9:23 let t7 : i32 = binop + total, x
+    loc ../../testdata/ok/031_range_over_containers.aic:9:15 store total, t7
+    loc ../../testdata/ok/031_range_over_containers.aic:10:22 let t8 : void = call print_println(x)
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 let t9 : usize = binop + x, const 1
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 store x, t9
+    loc ../../testdata/ok/031_range_over_containers.aic:8:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/031_range_over_containers.aic:12:18 let t10 : void = call print_println(total)
+    loc ../../testdata/ok/031_range_over_containers.aic:14:32 let t11 : map[str]i32 = call map_new_str_i32()
+    loc ../../testdata/ok/031_range_over_containers.aic:14:5 var m : map[str]i32 = t11
+    loc ../../testdata/ok/031_range_over_containers.aic:15:10 let t12 : void = call map_str_i32_put(m, const "a", const 1)
+    loc ../../testdata/ok/031_range_over_containers.aic:16:10 let t13 : void = call map_str_i32_put(m, const "b", const 2)
+    loc ../../testdata/ok/031_range_over_containers.aic:17:5 var keys : usize = const 0
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t14 : usize = len m
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 var k : usize = const 0
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t15 : bool = cmp lt k, t14
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 cbr t15, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t16 : i32 = elem m, k
+    loc ../../testdata/ok/031_range_over_containers.aic:18:9 var k : i32 = t16
+    loc ../../testdata/ok/031_range_over_containers.aic:19:22 let t17 : void = call print_println(k)
+    loc ../../testdata/ok/031_range_over_containers.aic:20:21 let t18 : usize = binop + keys, const 1
+    loc ../../testdata/ok/031_range_over_containers.aic:20:14 store keys, t18
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 let t19 : usize = binop + k, const 1
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 store k, t19
+    loc ../../testdata/ok/031_range_over_containers.aic:18:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/031_range_over_containers.aic:22:18 let t20 : void = call print_println(keys)
+    loc ../../testdata/ok/031_range_over_containers.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/031_range_over_containers.aic:3:1 ret 
+}

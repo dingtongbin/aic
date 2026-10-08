@@ -1,0 +1,5 @@
+import print
+
+func f() {
+    defer 1
+}

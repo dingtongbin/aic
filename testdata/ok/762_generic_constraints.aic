@@ -1,0 +1,58 @@
+import print
+
+// N3 锚点：泛型约束（核心设计 §16）。
+//   ① 能力约束：Eq / Ord / Hash / Print / Zero —— 与 @derive 同一封闭集合；
+//   ② 接口约束：结构化满足（[T: Shape]）；
+//   ③ 值性约束：value / ref 统一散落的"安全集"判断。
+// 约束不满足 = 编译错，位置在**调用点/实例化点**（不报模板体内部）。
+@derive(Compare, Hash, ToString)
+class Money {
+    var cents i64
+
+    func cmp(other Money) -> i32 {
+        return this.compare(other)
+    }
+}
+
+interface Shape {
+    func area() -> i32
+}
+
+class Square {
+    var side i32
+
+    func area() -> i32 {
+        return this.side * this.side
+    }
+}
+
+func maxOf[T: Ord](a T, b T) -> T {
+    if a.compare(b) < 0 {
+        return b
+    }
+    return a
+}
+
+func total[T: Shape](xs T[]) -> i32 {
+    var sum i32 = 0
+    for i in 0..xs.len() {
+        sum = sum + xs[i].area()
+    }
+    return sum
+}
+
+func firstOf[T: value](xs T[]) -> T {
+    return xs[0]
+}
+
+func main() {
+    print.println(maxOf(3, 9))
+    var m1 = Money{cents: 500}
+    var m2 = Money{cents: 900}
+    print.println(maxOf(m1, m2).cents)
+    var sq = Square{side: 3}
+    var ss Square[] = [sq, Square{side: 4}]
+    print.println(total(ss))
+    var ns i32[] = [7, 8, 9]
+    print.println(firstOf(ns))
+}

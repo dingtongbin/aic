@@ -1,0 +1,9 @@
+import print
+
+// N6 err 锚点：scope.timeout(ms) 的毫秒数不能为负（核心设计 §16 N6）。
+// 超时是"多久之后取消"，负数没有语义 —— 编译期直接拒。
+func main() {
+    scope.timeout(-1) {
+        print.println(1)
+    }
+}

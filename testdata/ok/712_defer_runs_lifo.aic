@@ -1,0 +1,15 @@
+import print
+
+func note(tag str) {
+    print.println(tag)
+}
+
+func f() {
+    defer note("first")
+    defer note("second")
+    note("body")
+}
+
+func main() {
+    f()
+}

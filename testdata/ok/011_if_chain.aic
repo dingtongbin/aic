@@ -1,0 +1,20 @@
+import print
+
+func grade(n i32) -> str {
+    if n >= 90 {
+        return "A"
+    } else if n >= 80 {
+        return "B"
+    } else if n >= 60 {
+        return "C"
+    } else {
+        return "F"
+    }
+}
+
+func main() {
+    print.println(grade(95))
+    print.println(grade(85))
+    print.println(grade(70))
+    print.println(grade(10))
+}

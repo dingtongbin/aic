@@ -1,0 +1,92 @@
+air v1 module ok
+type ok_Counter = struct
+    0:n:i32
+func ok_Counter_bump(this__:ok_Counter*) -> i32 {
+  entry:
+    loc ../../testdata/ok/756_closure.aic:13:5 var ret0 : i32
+    loc ../../testdata/ok/756_closure.aic:14:22 let t1 : i32 = field this__, 0
+    loc ../../testdata/ok/756_closure.aic:14:25 let t2 : i32 = binop + t1, const 1
+    loc ../../testdata/ok/756_closure.aic:14:16 store field this__, 0, t2
+    loc ../../testdata/ok/756_closure.aic:15:20 let t3 : i32 = field this__, 0
+    loc ../../testdata/ok/756_closure.aic:15:9 store ret0, t3
+    loc ../../testdata/ok/756_closure.aic:15:9 br exit
+  exit:
+    loc ../../testdata/ok/756_closure.aic:13:5 ret ret0
+}
+func ok_lambda1(env__:env(ok_lambda1), x:i32) -> i32 static {
+  entry:
+    loc ../../testdata/ok/756_closure.aic:20:12 var ret0 : i32
+    loc ../../testdata/ok/756_closure.aic:20:44 let t1 : i32 = field env__, 0
+    loc ../../testdata/ok/756_closure.aic:20:42 let t2 : i32 = binop + x, t1
+    loc ../../testdata/ok/756_closure.aic:20:33 store ret0, t2
+    loc ../../testdata/ok/756_closure.aic:20:33 br exit
+  exit:
+    loc ../../testdata/ok/756_closure.aic:20:12 ret ret0
+}
+func ok_makeAdder(base:i32) -> fn(i32)->i32 {
+  entry:
+    loc ../../testdata/ok/756_closure.aic:19:1 var ret0 : fn(i32)->i32
+    loc ../../testdata/ok/756_closure.aic:20:12 let clo1 : fn(i32)->i32 = closure ok_lambda1 [base]
+    loc ../../testdata/ok/756_closure.aic:20:5 store ret0, clo1
+    loc ../../testdata/ok/756_closure.aic:20:5 br exit
+  exit:
+    loc ../../testdata/ok/756_closure.aic:19:1 ret ret0
+}
+func ok_apply(f:fn(i32)->i32, v:i32) -> i32 {
+  entry:
+    loc ../../testdata/ok/756_closure.aic:23:1 var ret0 : i32
+    loc ../../testdata/ok/756_closure.aic:24:13 let t1 : i32 = call.closure f(v)
+    loc ../../testdata/ok/756_closure.aic:24:5 store ret0, t1
+    loc ../../testdata/ok/756_closure.aic:24:5 br exit
+  exit:
+    loc ../../testdata/ok/756_closure.aic:23:1 ret ret0
+}
+func ok_lambda2(env__:env(ok_lambda2), x:i32) -> i32 static {
+  entry:
+    loc ../../testdata/ok/756_closure.aic:34:13 var ret0 : i32
+    loc ../../testdata/ok/756_closure.aic:34:45 let t1 : i32 = field env__, 0
+    loc ../../testdata/ok/756_closure.aic:34:43 let t2 : i32 = binop + x, t1
+    loc ../../testdata/ok/756_closure.aic:34:34 store ret0, t2
+    loc ../../testdata/ok/756_closure.aic:34:34 br exit
+  exit:
+    loc ../../testdata/ok/756_closure.aic:34:13 ret ret0
+}
+func ok_lambda3(env__:env(ok_lambda3)) -> i32 static {
+  entry:
+    loc ../../testdata/ok/756_closure.aic:40:16 var ret0 : i32
+    loc ../../testdata/ok/756_closure.aic:40:39 let t1 : ok_Counter* = field env__, 0
+    loc ../../testdata/ok/756_closure.aic:40:45 let t2 : i32 = call ok_Counter_bump(t1)
+    loc ../../testdata/ok/756_closure.aic:40:32 store ret0, t2
+    loc ../../testdata/ok/756_closure.aic:40:32 br exit
+  exit:
+    loc ../../testdata/ok/756_closure.aic:40:16 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/756_closure.aic:28:26 let t1 : fn(i32)->i32 = call ok_makeAdder(const 10)
+    loc ../../testdata/ok/756_closure.aic:28:5 var add10 : fn(i32)->i32 = t1
+    loc ../../testdata/ok/756_closure.aic:29:24 let t2 : i32 = call.closure add10(const 1)
+    loc ../../testdata/ok/756_closure.aic:29:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/756_closure.aic:30:24 let t4 : i32 = call.closure add10(const 2)
+    loc ../../testdata/ok/756_closure.aic:30:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/756_closure.aic:33:5 var base : i32 = const 5
+    loc ../../testdata/ok/756_closure.aic:34:13 let clo6 : fn(i32)->i32 = closure ok_lambda2 [base]
+    loc ../../testdata/ok/756_closure.aic:34:5 var f : fn(i32)->i32 = clo6
+    loc ../../testdata/ok/756_closure.aic:35:10 store base, const 100
+    loc ../../testdata/ok/756_closure.aic:36:20 let t7 : i32 = call.closure f(const 1)
+    loc ../../testdata/ok/756_closure.aic:36:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/756_closure.aic:39:13 let obj9 : ok_Counter* = alloc task(ok_Counter)
+    loc ../../testdata/ok/756_closure.aic:39:21 store field obj9, 0, const 0
+    loc ../../testdata/ok/756_closure.aic:39:5 var c : ok_Counter* = obj9
+    loc ../../testdata/ok/756_closure.aic:40:16 let clo10 : fn()->i32 = closure ok_lambda3 [c]
+    loc ../../testdata/ok/756_closure.aic:40:5 var tick : fn()->i32 = clo10
+    loc ../../testdata/ok/756_closure.aic:41:23 let t11 : i32 = call.closure tick()
+    loc ../../testdata/ok/756_closure.aic:41:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/756_closure.aic:42:23 let t13 : i32 = call.closure tick()
+    loc ../../testdata/ok/756_closure.aic:42:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/756_closure.aic:45:24 let t15 : i32 = call ok_apply(f, const 3)
+    loc ../../testdata/ok/756_closure.aic:45:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/756_closure.aic:27:1 br exit
+  exit:
+    loc ../../testdata/ok/756_closure.aic:27:1 ret 
+}

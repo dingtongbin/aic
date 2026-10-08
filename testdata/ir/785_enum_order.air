@@ -1,0 +1,35 @@
+air v1 module ok
+type ok_Color = enum
+    Red
+    Green
+    Blue
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/785_enum_order.aic:8:24 let t1 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/785_enum_order.aic:8:36 let t2 : ok_Color = field ok_Color, 1
+    loc ../../testdata/ok/785_enum_order.aic:8:29 let t3 : bool = cmp < t1, t2
+    loc ../../testdata/ok/785_enum_order.aic:8:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/785_enum_order.aic:9:24 let t5 : ok_Color = field ok_Color, 2
+    loc ../../testdata/ok/785_enum_order.aic:9:37 let t6 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/785_enum_order.aic:9:30 let t7 : bool = cmp > t5, t6
+    loc ../../testdata/ok/785_enum_order.aic:9:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/785_enum_order.aic:10:24 let t9 : ok_Color = field ok_Color, 1
+    loc ../../testdata/ok/785_enum_order.aic:10:39 let t10 : ok_Color = field ok_Color, 1
+    loc ../../testdata/ok/785_enum_order.aic:10:31 let t11 : bool = cmp <= t9, t10
+    loc ../../testdata/ok/785_enum_order.aic:10:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/785_enum_order.aic:11:24 let t13 : ok_Color = field ok_Color, 1
+    loc ../../testdata/ok/785_enum_order.aic:11:38 let t14 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/785_enum_order.aic:11:31 let t15 : bool = cmp < t13, t14
+    loc ../../testdata/ok/785_enum_order.aic:11:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/785_enum_order.aic:12:24 let t17 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/785_enum_order.aic:12:37 let t18 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/785_enum_order.aic:12:29 let t19 : bool = cmp == t17, t18
+    loc ../../testdata/ok/785_enum_order.aic:12:18 let t20 : void = call print_println(t19)
+    loc ../../testdata/ok/785_enum_order.aic:13:24 let t21 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/785_enum_order.aic:13:37 let t22 : ok_Color = field ok_Color, 2
+    loc ../../testdata/ok/785_enum_order.aic:13:29 let t23 : bool = cmp != t21, t22
+    loc ../../testdata/ok/785_enum_order.aic:13:18 let t24 : void = call print_println(t23)
+    loc ../../testdata/ok/785_enum_order.aic:7:1 br exit
+  exit:
+    loc ../../testdata/ok/785_enum_order.aic:7:1 ret 
+}

@@ -1,0 +1,3 @@
+testdata/err/281_os_readfile_argument.aic:4:30: error: the literal does not fit the target type
+    arguments 1: value 1 does not fit str
+    fix: adjust the literal or use a wider type; an integer literal takes the narrowest type that fits (core design §1)

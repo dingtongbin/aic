@@ -1,0 +1,145 @@
+air v1 module ok
+func ok_lookup(k:i32) -> (str, Err) {
+  entry:
+    loc ../../testdata/ok/754_err_paths_ir.aic:8:1 var ret0 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:8:1 var ret1 : Err
+    loc ../../testdata/ok/754_err_paths_ir.aic:9:10 let t1 : bool = cmp < k, const 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:9:5 cbr t1, then1, else2
+  then1:
+    loc ../../testdata/ok/754_err_paths_ir.aic:10:9 store ret0, const ""
+    loc ../../testdata/ok/754_err_paths_ir.aic:10:23 let t2 : Err = call Err(const 10, const "bad key")
+    loc ../../testdata/ok/754_err_paths_ir.aic:10:9 store ret1, t2
+    loc ../../testdata/ok/754_err_paths_ir.aic:10:9 br exit
+  else2:
+    loc ../../testdata/ok/754_err_paths_ir.aic:9:5 br join3
+  join3:
+    loc ../../testdata/ok/754_err_paths_ir.aic:12:10 let t3 : bool = cmp == k, const 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:12:5 cbr t3, then4, else5
+  then4:
+    loc ../../testdata/ok/754_err_paths_ir.aic:13:9 store ret0, const ""
+    loc ../../testdata/ok/754_err_paths_ir.aic:13:23 let t4 : Err = call Err(const 11, const "missing")
+    loc ../../testdata/ok/754_err_paths_ir.aic:13:9 store ret1, t4
+    loc ../../testdata/ok/754_err_paths_ir.aic:13:9 br exit
+  else5:
+    loc ../../testdata/ok/754_err_paths_ir.aic:12:5 br join6
+  join6:
+    loc ../../testdata/ok/754_err_paths_ir.aic:15:5 store ret0, const "value"
+    loc ../../testdata/ok/754_err_paths_ir.aic:15:5 store ret1, nil
+    loc ../../testdata/ok/754_err_paths_ir.aic:15:5 br exit
+  exit:
+    loc ../../testdata/ok/754_err_paths_ir.aic:8:1 ret ret0, ret1
+}
+func ok_fallback(k:i32) -> str {
+  entry:
+    loc ../../testdata/ok/754_err_paths_ir.aic:19:1 var ret0 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:18 let t1 : (str, Err) = call ok_lookup(k)
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 let t2 : str = multi.extract t1, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 var or4 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 let t5 : i32 = field t3, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 let t6 : bool = cmp ne t5, const 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 cbr t6, orfallback1, orok2
+  orfallback1:
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 store or4, const "default"
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 br orjoin3
+  orok2:
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 store or4, t2
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:22 br orjoin3
+  orjoin3:
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:5 store ret0, or4
+    loc ../../testdata/ok/754_err_paths_ir.aic:20:5 br exit
+  exit:
+    loc ../../testdata/ok/754_err_paths_ir.aic:19:1 ret ret0
+}
+func ok_inPlace(k:i32) -> str {
+  entry:
+    loc ../../testdata/ok/754_err_paths_ir.aic:24:1 var ret0 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:18 let t1 : (str, Err) = call ok_lookup(k)
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 let t2 : str = multi.extract t1, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 var catch4 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 let t5 : i32 = field t3, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 let t6 : bool = cmp ne t5, const 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 cbr t6, catch1, catchok2
+  catch1:
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 var e : Err = t3
+    loc ../../testdata/ok/754_err_paths_ir.aic:26:24 let t7 : i32 = field e, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:26:22 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/754_err_paths_ir.aic:27:9 store catch4, const "handled"
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 br catchjoin3
+  catchok2:
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 store catch4, t2
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:22 br catchjoin3
+  catchjoin3:
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:5 store ret0, catch4
+    loc ../../testdata/ok/754_err_paths_ir.aic:25:5 br exit
+  exit:
+    loc ../../testdata/ok/754_err_paths_ir.aic:24:1 ret ret0
+}
+func ok_bail(k:i32) -> (str, Err) {
+  entry:
+    loc ../../testdata/ok/754_err_paths_ir.aic:32:1 var ret0 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:32:1 var ret1 : Err
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:19 let t1 : (str, Err) = call ok_lookup(k)
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 let t2 : str = multi.extract t1, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 var catch4 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 let t5 : i32 = field t3, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 let t6 : bool = cmp ne t5, const 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 cbr t6, catch1, catchok2
+  catch1:
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 var e : Err = t3
+    loc ../../testdata/ok/754_err_paths_ir.aic:34:9 store ret0, const ""
+    loc ../../testdata/ok/754_err_paths_ir.aic:34:30 let t7 : str = field e, 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:34:23 let t8 : Err = call Err(const 100, t7)
+    loc ../../testdata/ok/754_err_paths_ir.aic:34:9 store ret1, t8
+    loc ../../testdata/ok/754_err_paths_ir.aic:34:9 br exit
+  catchok2:
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 store catch4, t2
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:23 br catchjoin3
+  catchjoin3:
+    loc ../../testdata/ok/754_err_paths_ir.aic:33:5 var v : str = catch4
+    loc ../../testdata/ok/754_err_paths_ir.aic:36:5 store ret0, v
+    loc ../../testdata/ok/754_err_paths_ir.aic:36:5 store ret1, nil
+    loc ../../testdata/ok/754_err_paths_ir.aic:36:5 br exit
+  exit:
+    loc ../../testdata/ok/754_err_paths_ir.aic:32:1 ret ret0, ret1
+}
+func ok_asserted(k:i32) -> str {
+  entry:
+    loc ../../testdata/ok/754_err_paths_ir.aic:40:1 var ret0 : str
+    loc ../../testdata/ok/754_err_paths_ir.aic:41:18 let t1 : (str, Err) = call ok_lookup(k)
+    loc ../../testdata/ok/754_err_paths_ir.aic:41:21 let t2 : str = multi.extract t1, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:41:21 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:41:21 trap.if.err t3, line 41
+    loc ../../testdata/ok/754_err_paths_ir.aic:41:5 store ret0, t2
+    loc ../../testdata/ok/754_err_paths_ir.aic:41:5 br exit
+  exit:
+    loc ../../testdata/ok/754_err_paths_ir.aic:40:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/754_err_paths_ir.aic:45:28 let t1 : i32 = unop - const 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:45:27 let t2 : str = call ok_fallback(t1)
+    loc ../../testdata/ok/754_err_paths_ir.aic:45:18 let t3 : void = call print_println(t2)
+    loc ../../testdata/ok/754_err_paths_ir.aic:46:27 let t4 : str = call ok_fallback(const 1)
+    loc ../../testdata/ok/754_err_paths_ir.aic:46:18 let t5 : void = call print_println(t4)
+    loc ../../testdata/ok/754_err_paths_ir.aic:47:26 let t6 : str = call ok_inPlace(const 0)
+    loc ../../testdata/ok/754_err_paths_ir.aic:47:18 let t7 : void = call print_println(t6)
+    loc ../../testdata/ok/754_err_paths_ir.aic:48:26 let t8 : str = call ok_inPlace(const 1)
+    loc ../../testdata/ok/754_err_paths_ir.aic:48:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/754_err_paths_ir.aic:49:23 let t10 : i32 = unop - const 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:49:22 let t11 : (str, Err) = call ok_bail(t10)
+    loc ../../testdata/ok/754_err_paths_ir.aic:49:5 let t12 : str = multi.extract t11, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:49:9 var v : str = t12
+    loc ../../testdata/ok/754_err_paths_ir.aic:49:5 let t13 : Err = multi.extract t11, 1
+    loc ../../testdata/ok/754_err_paths_ir.aic:49:12 var err : Err = t13
+    loc ../../testdata/ok/754_err_paths_ir.aic:50:22 let t14 : i32 = field err, 0
+    loc ../../testdata/ok/754_err_paths_ir.aic:50:18 let t15 : void = call print_println(t14)
+    loc ../../testdata/ok/754_err_paths_ir.aic:51:18 let t16 : void = call print_println(v)
+    loc ../../testdata/ok/754_err_paths_ir.aic:52:27 let t17 : str = call ok_asserted(const 2)
+    loc ../../testdata/ok/754_err_paths_ir.aic:52:18 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/754_err_paths_ir.aic:44:1 br exit
+  exit:
+    loc ../../testdata/ok/754_err_paths_ir.aic:44:1 ret 
+}

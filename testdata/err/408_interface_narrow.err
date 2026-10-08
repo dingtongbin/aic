@@ -1,0 +1,3 @@
+testdata/err/408_interface_narrow.aic:28:18: error: narrowing one interface to another is not supported yet
+    declaration a: err.Named → err.Area
+    fix: declare the variable with the narrower interface from the start, or keep the wider type and call only the methods it has (core design §12 R11)

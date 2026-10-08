@@ -1,0 +1,4 @@
+func f() -> i8 {
+    var x i32 = 300
+    return x
+}

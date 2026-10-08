@@ -1,0 +1,9 @@
+import print
+
+// L4-g err 锚点：`Err.wrap` 的实参表 = (code i32, msg str, cause Err)。
+// 少传 cause 必须在**检查期**报错（三段式），而不是到发射层才炸。
+func main() {
+    var e = Err(1, "inner")
+    var bad = Err.wrap(2, "outer")
+    print.println(e.code)
+}

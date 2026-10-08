@@ -1,0 +1,16 @@
+import print
+
+func emit(tag str, n i32) {
+    print.println(tag)
+    print.println(n)
+}
+
+func f(n i32) {
+    var tag str = "done"
+    defer emit(tag, n)
+    print.println("start")
+}
+
+func main() {
+    f(9)
+}

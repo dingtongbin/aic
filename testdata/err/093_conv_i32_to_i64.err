@@ -1,0 +1,3 @@
+testdata/err/093_conv_i32_to_i64.aic:3:12: error: type mismatch with no implicit conversion
+    result 1: i32 written into i64
+    fix: convert explicitly first: i64(x) (red line 1)

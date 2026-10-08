@@ -1,0 +1,9 @@
+import print
+import str
+
+func main() {
+    var cps = str.codepoints("a中")
+    print.println(cps.len())
+    print.println(cps[0])
+    print.println(cps[1])
+}

@@ -1,0 +1,14 @@
+import print
+
+class Inner {
+    var x i32
+}
+
+@derive(Compare)
+class Outer {
+    var i Inner
+}
+
+func main() {
+    print.println(1)
+}

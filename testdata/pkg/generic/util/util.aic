@@ -1,0 +1,15 @@
+import base
+import option
+
+// 跨包泛型实例：形参类型 option.Option[i32] 在三个包里出现，
+// 实例缓存保证只发一份 typedef（红线 11）。
+func Twice(o option.Option[i32]) -> i32 {
+    if option.isSome(o) {
+        return option.unwrap(o) * 2
+    }
+    return 0
+}
+
+func Through(p base.Point) -> i32 {
+    return p.sum()
+}

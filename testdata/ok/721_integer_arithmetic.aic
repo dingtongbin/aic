@@ -1,0 +1,9 @@
+import print
+
+func main() {
+    print.println(7 / 2)
+    print.println(7 % 2)
+    print.println(i32(7) - i32(9))
+    print.println(i32(6) * i32(7))
+    print.println(i64(100000) * i64(100000))
+}

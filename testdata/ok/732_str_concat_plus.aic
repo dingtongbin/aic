@@ -1,0 +1,13 @@
+import print
+import str
+
+func main() {
+    var a str = "aic"
+    var b str = "-v2"
+    // 运算符全表第 3 级：str + str = 连接（与 str.concat 同义）
+    print.println(a + b)
+    print.println(str.concat(a, b))
+    print.println(a + "" + b)
+    var xs str[] = ["x", "y"]
+    print.println(xs[0] + xs[1])
+}

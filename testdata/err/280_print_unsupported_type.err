@@ -1,0 +1,6 @@
+testdata/err/280_print_unsupported_type.aic:8:25: error: this class has no init constructor
+    Box(...)
+    fix: a class without init uses a composite literal: Box{field: value} (core design §4)
+testdata/err/280_print_unsupported_type.aic:9:18: error: printing a class needs @derive(ToString)
+    type err.Box has no ToString
+    fix: annotate the class with @derive(ToString), or print its fields individually (core design §14)

@@ -1,0 +1,4 @@
+func f() {
+    var a = 0x_
+    var b = 1__2
+}

@@ -1,0 +1,8 @@
+import print
+
+func main() {
+    var xs i32[] = []
+    var i usize = 0
+    xs[i] = 7
+    print.println("list ok")
+}

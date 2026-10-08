@@ -1,0 +1,9 @@
+func lookup(k i32) -> (i32, Err) {
+    return k, nil
+}
+
+func main() {
+    var v = lookup(1) catch e {
+        var msg = e.msg
+    }
+}

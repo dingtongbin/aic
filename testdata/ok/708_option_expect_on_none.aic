@@ -1,0 +1,10 @@
+import print
+import option
+
+func main() {
+    var o option.Option[i32] = option.none()
+    match o {
+        Some(v) => { print.println(v) }
+        None => { print.println("none") }
+    }
+}

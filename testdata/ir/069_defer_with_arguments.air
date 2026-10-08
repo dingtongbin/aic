@@ -1,0 +1,27 @@
+air v1 module ok
+func ok_emit(tag:str, n:i32) {
+  entry:
+    loc ../../testdata/ok/069_defer_with_arguments.aic:4:18 let t1 : void = call print_println(tag)
+    loc ../../testdata/ok/069_defer_with_arguments.aic:5:18 let t2 : void = call print_println(n)
+    loc ../../testdata/ok/069_defer_with_arguments.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/069_defer_with_arguments.aic:3:1 ret 
+}
+func ok_f(n:i32) {
+  entry:
+    loc ../../testdata/ok/069_defer_with_arguments.aic:9:16 let t1 : str = const "done"
+    loc ../../testdata/ok/069_defer_with_arguments.aic:9:5 defer.reg
+    loc ../../testdata/ok/069_defer_with_arguments.aic:9:5 defer.init 1, ok_emit(t1, n)
+    loc ../../testdata/ok/069_defer_with_arguments.aic:10:18 let t2 : void = call print_println(const "start")
+    loc ../../testdata/ok/069_defer_with_arguments.aic:8:1 br exit
+  exit:
+    loc ../../testdata/ok/069_defer_with_arguments.aic:8:1 defer.run
+    loc ../../testdata/ok/069_defer_with_arguments.aic:8:1 ret 
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/069_defer_with_arguments.aic:14:6 let t1 : void = call ok_f(const 9)
+    loc ../../testdata/ok/069_defer_with_arguments.aic:13:1 br exit
+  exit:
+    loc ../../testdata/ok/069_defer_with_arguments.aic:13:1 ret 
+}

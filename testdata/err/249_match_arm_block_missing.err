@@ -1,0 +1,6 @@
+testdata/err/249_match_arm_block_missing.aic:8:5: error: expression is missing or incomplete
+    got PUNCT }
+    fix: add an expression: a name, a literal, or a call; keep `()` and `[]` balanced
+testdata/err/249_match_arm_block_missing.aic:10:1: error: match expression arms need `,` between them
+    got end of file (EOF)
+    fix: separate expression arms with commas: match e { A => 1, B => 2 }

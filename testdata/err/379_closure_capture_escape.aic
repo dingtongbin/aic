@@ -1,0 +1,14 @@
+class Box {
+    var v i32
+}
+
+// N1 负例：闭包在 region 内创建、捕获 region 内的引用，却被存进 region 外的变量
+// ⇒ 编译错「closure captures a reference that does not outlive the closure」。
+func main() {
+    var g (i32) -> i32
+    region {
+        var p = Box{v: 1}
+        g = func(x i32) -> i32 { return p.v + x }
+    }
+    var n = g(1)
+}

@@ -1,0 +1,10 @@
+import print
+import lib
+
+// L4 err 锚点（多包）：**公开函数的签名里不得出现包私有类型**（§四 可见性）。
+// 此前 `func Make() -> secret` 编译通过，跨包调用点却无法书写该类型。
+// 诊断报在**库侧**（签名是跨包契约，错在定义处）。
+func main() {
+    var s = lib.Make()
+    print.println(1)
+}

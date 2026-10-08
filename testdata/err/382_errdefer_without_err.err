@@ -1,0 +1,3 @@
+testdata/err/382_errdefer_without_err.aic:5:5: error: errdefer needs a function with an Err result slot
+    this function has no Err result
+    fix: add -> Err to the signature, or use defer if the cleanup must run on every exit (core design §16 N8)

@@ -1,0 +1,17 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:4:28 let t1 : usize = call str_len(const "abc")
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:4:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:5:25 let t3 : usize = call str_len(const "")
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:5:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:6:32 let t5 : bool = call str_isEmpty(const "abc")
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:6:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:7:29 let t7 : bool = call str_isEmpty(const "")
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:7:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:8:30 let t9 : usize = call str_len(const "héllo")
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:8:18 let t10 : void = call print_println(t9)
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/685_str_len_and_isempty.aic:3:1 ret 
+}

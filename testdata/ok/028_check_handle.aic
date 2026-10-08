@@ -1,0 +1,50 @@
+import print
+
+func parse(n i32) -> (i32, Err) {
+    if n < 0 {
+        return 0, Err(1, "negative")
+    }
+    return n * 2, nil
+}
+
+// v2：handle 退役——显式绑定 + 判 err（打印行为保持与 v1 输出逐位一致）。
+func total(n i32) -> (i32, Err) {
+    var a, e1 = parse(n)
+    if e1 != nil {
+        print.println(e1.msg)
+        return 0, e1
+    }
+    var b, e2 = parse(a)
+    if e2 != nil {
+        print.println(e2.msg)
+        return 0, e2
+    }
+    return a + b, nil
+}
+
+func checked(n i32) -> Err {
+    var a, err = parse(n)
+    if err != nil {
+        print.println(err.msg)
+        return err
+    }
+    return nil
+}
+
+func main() {
+    var v i32 = 0
+    var e1 = checked(2)
+    print.println(e1.code)
+
+    var e2 = checked(-5)
+    print.println(e2.code)
+
+    var sum, e3 = total(3)
+    print.println(sum)
+    print.println(e3.code)
+
+    var bad, e4 = total(-1)
+    print.println(bad)
+    print.println(e4.code)
+    print.println(e4.msg)
+}

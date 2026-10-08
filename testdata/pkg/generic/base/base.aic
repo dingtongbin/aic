@@ -1,0 +1,17 @@
+import option
+
+class Point {
+    var x i32
+    var y i32
+
+    func sum() -> i32 {
+        return this.x + this.y
+    }
+}
+
+func Pick(n i32) -> option.Option[i32] {
+    if n > 0 {
+        return option.ok(n)
+    }
+    return option.none()
+}

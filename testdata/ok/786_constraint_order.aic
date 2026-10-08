@@ -1,0 +1,25 @@
+import print
+
+// L4-c 锚点：**约束名的校验与声明顺序无关** —— 接口可以声明在用到它的泛型之后
+// （此前在收集期逐条校验 ⇒ "先写函数后写接口"报"未知泛型约束"）。
+// 这里刻意把 interface Shape 放在 sum 之后。
+func sum[T: Shape](xs [T; 2]) -> i32 {
+    return xs[0].area() + xs[1].area()
+}
+
+interface Shape {
+    func area() -> i32
+}
+
+class Sq {
+    var s i32
+
+    func area() -> i32 {
+        return this.s * this.s
+    }
+}
+
+func main() {
+    var xs [Sq; 2] = [Sq{s: 2}, Sq{s: 3}]
+    print.println(sum[Sq](xs))
+}

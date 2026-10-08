@@ -1,0 +1,26 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/036_std_str.aic:5:33 let t1 : bool = call str_startsWith(const "hello", const "he")
+    loc ../../testdata/ok/036_std_str.aic:5:18 let t2 : void = call print_println(t1)
+    loc ../../testdata/ok/036_std_str.aic:6:31 let t3 : bool = call str_endsWith(const "hello", const "lo")
+    loc ../../testdata/ok/036_std_str.aic:6:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/036_std_str.aic:7:30 let t5 : i64 = call str_indexOf(const "hello", const "ll")
+    loc ../../testdata/ok/036_std_str.aic:7:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/036_std_str.aic:8:27 let t7 : str = call str_trim(const "  pad	")
+    loc ../../testdata/ok/036_std_str.aic:8:41 let t8 : usize = call str_len(t7)
+    loc ../../testdata/ok/036_std_str.aic:8:18 let t9 : void = call print_println(t8)
+    loc ../../testdata/ok/036_std_str.aic:9:26 let t10 : str[] = call str_split(const "a,b,c", const ",")
+    loc ../../testdata/ok/036_std_str.aic:9:5 var parts : str[] = t10
+    loc ../../testdata/ok/036_std_str.aic:10:28 let t11 : usize = call list_str_len(parts)
+    loc ../../testdata/ok/036_std_str.aic:10:18 let t12 : void = call print_println(t11)
+    loc ../../testdata/ok/036_std_str.aic:11:24 let t13 : str = elem elem parts, const 0, const 0
+    loc ../../testdata/ok/036_std_str.aic:11:18 let t14 : void = call print_println(t13)
+    loc ../../testdata/ok/036_std_str.aic:12:24 let t15 : str = elem elem parts, const 2, const 2
+    loc ../../testdata/ok/036_std_str.aic:12:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/036_std_str.aic:13:33 let t17 : bool = call str_startsWith(const "abc", const "abcdef")
+    loc ../../testdata/ok/036_std_str.aic:13:18 let t18 : void = call print_println(t17)
+    loc ../../testdata/ok/036_std_str.aic:4:1 br exit
+  exit:
+    loc ../../testdata/ok/036_std_str.aic:4:1 ret 
+}

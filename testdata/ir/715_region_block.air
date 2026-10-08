@@ -1,0 +1,33 @@
+air v1 module ok
+type ok_Buf = struct
+    0:n:i32
+func ok_use(b:ok_Buf*) -> i32 {
+  entry:
+    loc ../../testdata/ok/715_region_block.aic:7:1 var ret0 : i32
+    loc ../../testdata/ok/715_region_block.aic:8:13 let t1 : i32 = field b, 0
+    loc ../../testdata/ok/715_region_block.aic:8:5 store ret0, t1
+    loc ../../testdata/ok/715_region_block.aic:8:5 br exit
+  exit:
+    loc ../../testdata/ok/715_region_block.aic:7:1 ret ret0
+}
+func ok_main() -> Err {
+  entry:
+    loc ../../testdata/ok/715_region_block.aic:11:1 var ret0 : Err
+    loc ../../testdata/ok/715_region_block.aic:12:5 region.enter r1
+    loc ../../testdata/ok/715_region_block.aic:13:17 let obj2 : ok_Buf* = alloc region(ok_Buf)
+    loc ../../testdata/ok/715_region_block.aic:13:21 store field obj2, 0, const 3
+    loc ../../testdata/ok/715_region_block.aic:13:9 var b : ok_Buf* = obj2
+    loc ../../testdata/ok/715_region_block.aic:14:26 let t3 : i32 = call ok_use(b)
+    loc ../../testdata/ok/715_region_block.aic:14:22 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/715_region_block.aic:12:5 region.exit
+    loc ../../testdata/ok/715_region_block.aic:16:5 region.enter r5
+    loc ../../testdata/ok/715_region_block.aic:17:9 region.enter r6
+    loc ../../testdata/ok/715_region_block.aic:18:26 let t7 : void = call print_println(const "nested")
+    loc ../../testdata/ok/715_region_block.aic:17:9 region.exit
+    loc ../../testdata/ok/715_region_block.aic:16:5 region.exit
+    loc ../../testdata/ok/715_region_block.aic:21:15 let t8 : Err = call Err(const 0, const "")
+    loc ../../testdata/ok/715_region_block.aic:21:5 store ret0, t8
+    loc ../../testdata/ok/715_region_block.aic:21:5 br exit
+  exit:
+    loc ../../testdata/ok/715_region_block.aic:11:1 ret ret0
+}

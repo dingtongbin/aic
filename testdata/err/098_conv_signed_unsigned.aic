@@ -1,0 +1,4 @@
+func f() -> u32 {
+    var x i32 = 1
+    return x
+}

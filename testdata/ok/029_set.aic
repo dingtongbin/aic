@@ -1,0 +1,24 @@
+import print
+
+func main() {
+    var s set[i32] = set.new()
+    s.add(3)
+    s.add(1)
+    s.add(3)
+    s.add(2)
+    print.println(s.len())
+    print.println(s.has(1))
+    print.println(s.has(9))
+    var i usize = 0
+    for i < s.len() {
+        print.println(s.at(i))
+        i = i + 1
+    }
+
+    var names set[str] = set.new()
+    names.add("b")
+    names.add("a")
+    names.add("b")
+    print.println(names.len())
+    print.println(names.has("a"))
+}

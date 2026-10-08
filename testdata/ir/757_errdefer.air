@@ -1,0 +1,69 @@
+air v1 module ok
+func ok_work(fail:bool) -> (i32, Err) {
+  entry:
+    loc ../../testdata/ok/757_errdefer.aic:8:1 var ret0 : i32
+    loc ../../testdata/ok/757_errdefer.aic:8:1 var ret1 : Err
+    loc ../../testdata/ok/757_errdefer.aic:9:25 let t1 : str = const "defer always"
+    loc ../../testdata/ok/757_errdefer.aic:9:5 defer.reg
+    loc ../../testdata/ok/757_errdefer.aic:9:5 defer.init 1, print_println(t1)
+    loc ../../testdata/ok/757_errdefer.aic:10:28 let t2 : str = const "rollback"
+    loc ../../testdata/ok/757_errdefer.aic:10:5 defer.reg.onerr
+    loc ../../testdata/ok/757_errdefer.aic:10:5 defer.init 2, print_println(t2)
+    loc ../../testdata/ok/757_errdefer.aic:11:5 cbr fail, then1, else2
+  then1:
+    loc ../../testdata/ok/757_errdefer.aic:12:9 store ret0, const 0
+    loc ../../testdata/ok/757_errdefer.aic:12:22 let t3 : Err = call Err(const 7, const "boom")
+    loc ../../testdata/ok/757_errdefer.aic:12:9 store ret1, t3
+    loc ../../testdata/ok/757_errdefer.aic:12:9 br exit
+  else2:
+    loc ../../testdata/ok/757_errdefer.aic:11:5 br join3
+  join3:
+    loc ../../testdata/ok/757_errdefer.aic:14:5 store ret0, const 42
+    loc ../../testdata/ok/757_errdefer.aic:14:5 store ret1, nil
+    loc ../../testdata/ok/757_errdefer.aic:14:5 br exit
+  exit:
+    loc ../../testdata/ok/757_errdefer.aic:8:1 defer.run ret1
+    loc ../../testdata/ok/757_errdefer.aic:8:1 ret ret0, ret1
+}
+func ok_argAt() -> (i32, Err) {
+  entry:
+    loc ../../testdata/ok/757_errdefer.aic:18:1 var ret0 : i32
+    loc ../../testdata/ok/757_errdefer.aic:18:1 var ret1 : Err
+    loc ../../testdata/ok/757_errdefer.aic:19:5 var x : i32 = const 1
+    loc ../../testdata/ok/757_errdefer.aic:20:5 defer.reg.onerr
+    loc ../../testdata/ok/757_errdefer.aic:20:5 defer.init 1, print_println(x)
+    loc ../../testdata/ok/757_errdefer.aic:21:7 store x, const 100
+    loc ../../testdata/ok/757_errdefer.aic:22:5 store ret0, const 0
+    loc ../../testdata/ok/757_errdefer.aic:22:18 let t1 : Err = call Err(const 9, const "late")
+    loc ../../testdata/ok/757_errdefer.aic:22:5 store ret1, t1
+    loc ../../testdata/ok/757_errdefer.aic:22:5 br exit
+  exit:
+    loc ../../testdata/ok/757_errdefer.aic:18:1 defer.run ret1
+    loc ../../testdata/ok/757_errdefer.aic:18:1 ret ret0, ret1
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/757_errdefer.aic:26:21 let t1 : (i32, Err) = call ok_work(const false)
+    loc ../../testdata/ok/757_errdefer.aic:26:5 let t2 : i32 = multi.extract t1, 0
+    loc ../../testdata/ok/757_errdefer.aic:26:9 var v : i32 = t2
+    loc ../../testdata/ok/757_errdefer.aic:26:5 let t3 : Err = multi.extract t1, 1
+    loc ../../testdata/ok/757_errdefer.aic:26:12 var e1 : Err = t3
+    loc ../../testdata/ok/757_errdefer.aic:27:18 let t4 : void = call print_println(v)
+    loc ../../testdata/ok/757_errdefer.aic:28:22 let t5 : bool = cmp == e1, nil
+    loc ../../testdata/ok/757_errdefer.aic:28:18 let t6 : void = call print_println(t5)
+    loc ../../testdata/ok/757_errdefer.aic:29:21 let t7 : (i32, Err) = call ok_work(const true)
+    loc ../../testdata/ok/757_errdefer.aic:29:5 let t8 : i32 = multi.extract t7, 0
+    loc ../../testdata/ok/757_errdefer.aic:29:5 let t9 : Err = multi.extract t7, 1
+    loc ../../testdata/ok/757_errdefer.aic:29:12 var e2 : Err = t9
+    loc ../../testdata/ok/757_errdefer.aic:30:21 let t10 : i32 = field e2, 0
+    loc ../../testdata/ok/757_errdefer.aic:30:18 let t11 : void = call print_println(t10)
+    loc ../../testdata/ok/757_errdefer.aic:31:22 let t12 : (i32, Err) = call ok_argAt()
+    loc ../../testdata/ok/757_errdefer.aic:31:5 let t13 : i32 = multi.extract t12, 0
+    loc ../../testdata/ok/757_errdefer.aic:31:5 let t14 : Err = multi.extract t12, 1
+    loc ../../testdata/ok/757_errdefer.aic:31:12 var e3 : Err = t14
+    loc ../../testdata/ok/757_errdefer.aic:32:21 let t15 : i32 = field e3, 0
+    loc ../../testdata/ok/757_errdefer.aic:32:18 let t16 : void = call print_println(t15)
+    loc ../../testdata/ok/757_errdefer.aic:25:1 br exit
+  exit:
+    loc ../../testdata/ok/757_errdefer.aic:25:1 ret 
+}

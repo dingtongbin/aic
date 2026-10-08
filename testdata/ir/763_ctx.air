@@ -1,0 +1,43 @@
+air v1 module ok
+func ok_handler(c:ctx_Ctx*) -> str {
+  entry:
+    loc ../../testdata/ok/763_ctx.aic:8:1 var ret0 : str
+    loc ../../testdata/ok/763_ctx.aic:9:24 let t1 : (str, bool) = call ctx_Ctx_get(c, const "user")
+    loc ../../testdata/ok/763_ctx.aic:9:5 let t2 : str = multi.extract t1, 0
+    loc ../../testdata/ok/763_ctx.aic:9:9 var who : str = t2
+    loc ../../testdata/ok/763_ctx.aic:9:5 let t3 : bool = multi.extract t1, 1
+    loc ../../testdata/ok/763_ctx.aic:9:14 var ok : bool = t3
+    loc ../../testdata/ok/763_ctx.aic:10:8 let t4 : bool = unop ! ok
+    loc ../../testdata/ok/763_ctx.aic:10:5 cbr t4, then1, else2
+  then1:
+    loc ../../testdata/ok/763_ctx.aic:11:9 store ret0, const "anonymous"
+    loc ../../testdata/ok/763_ctx.aic:11:9 br exit
+  else2:
+    loc ../../testdata/ok/763_ctx.aic:10:5 br join3
+  join3:
+    loc ../../testdata/ok/763_ctx.aic:13:5 store ret0, who
+    loc ../../testdata/ok/763_ctx.aic:13:5 br exit
+  exit:
+    loc ../../testdata/ok/763_ctx.aic:8:1 ret ret0
+}
+func ok_middleware(c:ctx_Ctx*) -> ctx_Ctx* {
+  entry:
+    loc ../../testdata/ok/763_ctx.aic:16:1 var ret0 : ctx_Ctx*
+    loc ../../testdata/ok/763_ctx.aic:17:18 let t1 : ctx_Ctx* = call ctx_Ctx_with(c, const "trace", const "t-1")
+    loc ../../testdata/ok/763_ctx.aic:17:5 store ret0, t1
+    loc ../../testdata/ok/763_ctx.aic:17:5 br exit
+  exit:
+    loc ../../testdata/ok/763_ctx.aic:16:1 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/763_ctx.aic:21:20 let t1 : ctx_Ctx* = call ctx_new()
+    loc ../../testdata/ok/763_ctx.aic:21:5 var c : ctx_Ctx* = t1
+    loc ../../testdata/ok/763_ctx.aic:22:24 let t2 : ctx_Ctx* = call ok_middleware(c)
+    loc ../../testdata/ok/763_ctx.aic:22:5 var c2 : ctx_Ctx* = t2
+    loc ../../testdata/ok/763_ctx.aic:23:26 let t3 : str = call ok_handler(c2)
+    loc ../../testdata/ok/763_ctx.aic:23:18 let t4 : void = call print_println(t3)
+    loc ../../testdata/ok/763_ctx.aic:20:1 br exit
+  exit:
+    loc ../../testdata/ok/763_ctx.aic:20:1 ret 
+}

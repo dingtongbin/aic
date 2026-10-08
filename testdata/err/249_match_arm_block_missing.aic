@@ -1,0 +1,9 @@
+enum E {
+    A
+}
+
+func f(e E) -> i32 {
+    match e {
+        A =>
+    }
+}

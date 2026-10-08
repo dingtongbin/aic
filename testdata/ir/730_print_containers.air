@@ -1,0 +1,57 @@
+air v1 module ok
+type ok_Color = enum
+    Red
+    Green
+    Blue
+type ok_Shape = enum
+    Dot
+    Circle(i32)
+    Square(str)
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/730_print_containers.aic:16:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/730_print_containers.aic:16:20 let t2 : void = call list.append[i32](lit1, const 1)
+    loc ../../testdata/ok/730_print_containers.aic:16:20 let t3 : void = call list.append[i32](lit1, const 2)
+    loc ../../testdata/ok/730_print_containers.aic:16:20 let t4 : void = call list.append[i32](lit1, const 3)
+    loc ../../testdata/ok/730_print_containers.aic:16:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/730_print_containers.aic:17:18 let t5 : void = call print_println(xs)
+    loc ../../testdata/ok/730_print_containers.aic:18:23 let lit6 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/730_print_containers.aic:18:5 var empty : i32[] = lit6
+    loc ../../testdata/ok/730_print_containers.aic:19:18 let t7 : void = call print_println(empty)
+    loc ../../testdata/ok/730_print_containers.aic:20:23 let lit8 : str[] = call list.new[str]()
+    loc ../../testdata/ok/730_print_containers.aic:20:23 let t9 : void = call list.append[str](lit8, const "a")
+    loc ../../testdata/ok/730_print_containers.aic:20:23 let t10 : void = call list.append[str](lit8, const "b")
+    loc ../../testdata/ok/730_print_containers.aic:20:5 var names : str[] = lit8
+    loc ../../testdata/ok/730_print_containers.aic:21:18 let t11 : void = call print_println(names)
+    loc ../../testdata/ok/730_print_containers.aic:22:24 let lit12 : bool[] = call list.new[bool]()
+    loc ../../testdata/ok/730_print_containers.aic:22:24 let t13 : void = call list.append[bool](lit12, const true)
+    loc ../../testdata/ok/730_print_containers.aic:22:24 let t14 : void = call list.append[bool](lit12, const false)
+    loc ../../testdata/ok/730_print_containers.aic:22:5 var flags : bool[] = lit12
+    loc ../../testdata/ok/730_print_containers.aic:23:18 let t15 : void = call print_println(flags)
+    loc ../../testdata/ok/730_print_containers.aic:24:29 let t16 : set[i32] = call set_new_i32()
+    loc ../../testdata/ok/730_print_containers.aic:24:5 var s : set[i32] = t16
+    loc ../../testdata/ok/730_print_containers.aic:25:10 let t17 : void = call set_i32_add(s, const 3)
+    loc ../../testdata/ok/730_print_containers.aic:26:10 let t18 : void = call set_i32_add(s, const 1)
+    loc ../../testdata/ok/730_print_containers.aic:27:18 let t19 : void = call print_println(s)
+    loc ../../testdata/ok/730_print_containers.aic:28:32 let t20 : map[str]i32 = call map_new_str_i32()
+    loc ../../testdata/ok/730_print_containers.aic:28:5 var m : map[str]i32 = t20
+    loc ../../testdata/ok/730_print_containers.aic:29:10 let t21 : void = call map_str_i32_put(m, const "x", const 7)
+    loc ../../testdata/ok/730_print_containers.aic:30:10 let t22 : void = call map_str_i32_put(m, const "y", const 8)
+    loc ../../testdata/ok/730_print_containers.aic:31:18 let t23 : void = call print_println(m)
+    loc ../../testdata/ok/730_print_containers.aic:32:24 let t24 : ok_Color = field ok_Color, 0
+    loc ../../testdata/ok/730_print_containers.aic:32:18 let t25 : void = call print_println(t24)
+    loc ../../testdata/ok/730_print_containers.aic:33:31 let t26 : ok_Shape = call Shape_Circle(const 5)
+    loc ../../testdata/ok/730_print_containers.aic:33:18 let t27 : void = call print_println(t26)
+    loc ../../testdata/ok/730_print_containers.aic:34:24 let t28 : ok_Shape = field ok_Shape, 0
+    loc ../../testdata/ok/730_print_containers.aic:34:18 let t29 : void = call print_println(t28)
+    loc ../../testdata/ok/730_print_containers.aic:35:21 var lit30 : [i32;3]
+    loc ../../testdata/ok/730_print_containers.aic:35:21 store elem lit30, const 0, const 4
+    loc ../../testdata/ok/730_print_containers.aic:35:21 store elem lit30, const 1, const 5
+    loc ../../testdata/ok/730_print_containers.aic:35:21 store elem lit30, const 2, const 6
+    loc ../../testdata/ok/730_print_containers.aic:35:5 var a : [i32;3] = lit30
+    loc ../../testdata/ok/730_print_containers.aic:36:18 let t31 : void = call print_println(a)
+    loc ../../testdata/ok/730_print_containers.aic:37:18 let t32 : void = call print_println(const 2.5)
+    loc ../../testdata/ok/730_print_containers.aic:15:1 br exit
+  exit:
+    loc ../../testdata/ok/730_print_containers.aic:15:1 ret 
+}

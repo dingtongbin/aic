@@ -1,0 +1,9 @@
+import print
+
+func main() {
+    print.println("abc".len())
+    print.println("".len())
+    print.println("abc".isEmpty())
+    print.println("".isEmpty())
+    print.println("héllo".len())
+}

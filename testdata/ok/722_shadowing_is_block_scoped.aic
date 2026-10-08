@@ -1,0 +1,10 @@
+import print
+
+func main() {
+    var x i32 = 1
+    {
+        var x i32 = 2
+        print.println(x)
+    }
+    print.println(x)
+}

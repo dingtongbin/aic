@@ -1,0 +1,5 @@
+import b
+
+func One() -> i32 {
+    return b.Two()
+}

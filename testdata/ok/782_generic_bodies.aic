@@ -1,0 +1,42 @@
+import print
+
+// L4 审计补锚点：**泛型在函数/方法体内可用** —— 类型参数、显式类型实参、嵌套实例、
+// 实例容器。这四种此前分别报"未知类型名 T"/"不可调用"/"无法解析类型实参"/
+// "元素类型未实例化"（审计实测）。
+class Box[T] {
+    var v T
+
+    func get() -> T {
+        return this.v
+    }
+
+    func dup() -> T {
+        var x T = this.v // 类型参数在方法体内有效
+        return x
+    }
+}
+
+func id[T](x T) -> T {
+    return x
+}
+
+func twice[T](x T) -> T {
+    var y T = x // 类型参数在函数体内有效
+    return y
+}
+
+func main() {
+    var b = Box[i32]{v: 7}
+    print.println(b.dup())
+    print.println(id[i32](6)) // 显式类型实参
+    print.println(twice("ab")) // 推断
+
+    var inner = Box[i32]{v: 5}
+    var outer Box[Box[i32]] = Box[Box[i32]]{v: inner} // 嵌套实例
+    print.println(outer.get().get())
+    var o = id[Box[i32]](inner) // 显式实参 + 嵌套类型
+    print.println(o.get())
+
+    var xs Box[i32][] = [] // 泛型实例的列表类型
+    print.println(xs.len())
+}

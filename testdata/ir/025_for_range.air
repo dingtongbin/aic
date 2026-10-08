@@ -1,0 +1,54 @@
+air v1 module ok
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/025_for_range.aic:4:20 let lit1 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/025_for_range.aic:4:20 let t2 : void = call list.append[i32](lit1, const 10)
+    loc ../../testdata/ok/025_for_range.aic:4:20 let t3 : void = call list.append[i32](lit1, const 20)
+    loc ../../testdata/ok/025_for_range.aic:4:20 let t4 : void = call list.append[i32](lit1, const 30)
+    loc ../../testdata/ok/025_for_range.aic:4:5 var xs : i32[] = lit1
+    loc ../../testdata/ok/025_for_range.aic:5:5 var total : i32 = const 0
+    loc ../../testdata/ok/025_for_range.aic:6:5 let t5 : usize = len xs
+    loc ../../testdata/ok/025_for_range.aic:6:5 var x : usize = const 0
+    loc ../../testdata/ok/025_for_range.aic:6:5 br forhead1
+  forhead1:
+    loc ../../testdata/ok/025_for_range.aic:6:5 let t6 : bool = cmp lt x, t5
+    loc ../../testdata/ok/025_for_range.aic:6:5 cbr t6, forbody2, fordone4
+  forbody2:
+    loc ../../testdata/ok/025_for_range.aic:6:5 let t7 : i32 = elem xs, x
+    loc ../../testdata/ok/025_for_range.aic:6:9 var x : i32 = t7
+    loc ../../testdata/ok/025_for_range.aic:7:23 let t8 : i32 = binop + total, x
+    loc ../../testdata/ok/025_for_range.aic:7:15 store total, t8
+    loc ../../testdata/ok/025_for_range.aic:8:22 let t9 : void = call print_println(x)
+    loc ../../testdata/ok/025_for_range.aic:6:5 br forpost3
+  forpost3:
+    loc ../../testdata/ok/025_for_range.aic:6:5 let t10 : usize = binop + x, const 1
+    loc ../../testdata/ok/025_for_range.aic:6:5 store x, t10
+    loc ../../testdata/ok/025_for_range.aic:6:5 br forhead1
+  fordone4:
+    loc ../../testdata/ok/025_for_range.aic:10:18 let t11 : void = call print_println(total)
+    loc ../../testdata/ok/025_for_range.aic:11:29 let t12 : bool = call list_i32_isEmpty(xs)
+    loc ../../testdata/ok/025_for_range.aic:11:18 let t13 : void = call print_println(t12)
+    loc ../../testdata/ok/025_for_range.aic:13:5 var s : str = const "abc"
+    loc ../../testdata/ok/025_for_range.aic:14:5 var bytes : i32 = const 0
+    loc ../../testdata/ok/025_for_range.aic:15:5 let t14 : usize = len s
+    loc ../../testdata/ok/025_for_range.aic:15:5 var b : usize = const 0
+    loc ../../testdata/ok/025_for_range.aic:15:5 br forhead5
+  forhead5:
+    loc ../../testdata/ok/025_for_range.aic:15:5 let t15 : bool = cmp lt b, t14
+    loc ../../testdata/ok/025_for_range.aic:15:5 cbr t15, forbody6, fordone8
+  forbody6:
+    loc ../../testdata/ok/025_for_range.aic:15:5 let t16 : u8 = elem s, b
+    loc ../../testdata/ok/025_for_range.aic:15:9 var b : u8 = t16
+    loc ../../testdata/ok/025_for_range.aic:16:23 let t17 : i32 = binop + bytes, const 1
+    loc ../../testdata/ok/025_for_range.aic:16:15 store bytes, t17
+    loc ../../testdata/ok/025_for_range.aic:15:5 br forpost7
+  forpost7:
+    loc ../../testdata/ok/025_for_range.aic:15:5 let t18 : usize = binop + b, const 1
+    loc ../../testdata/ok/025_for_range.aic:15:5 store b, t18
+    loc ../../testdata/ok/025_for_range.aic:15:5 br forhead5
+  fordone8:
+    loc ../../testdata/ok/025_for_range.aic:18:18 let t19 : void = call print_println(bytes)
+    loc ../../testdata/ok/025_for_range.aic:3:1 br exit
+  exit:
+    loc ../../testdata/ok/025_for_range.aic:3:1 ret 
+}

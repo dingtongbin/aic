@@ -1,0 +1,26 @@
+air v1 module ok
+type ok_Other = struct
+type ok_Packed = struct packed
+func ok_Packed_id(this__:ok_Packed) -> i32 {
+  entry:
+    loc ../../testdata/ok/005_annotations.aic:5:5 var ret0 : i32
+    loc ../../testdata/ok/005_annotations.aic:5:24 store ret0, const 1
+    loc ../../testdata/ok/005_annotations.aic:5:24 br exit
+  exit:
+    loc ../../testdata/ok/005_annotations.aic:5:5 ret ret0
+}
+func ok_Other_id(this__:ok_Other*) -> i32 {
+  entry:
+    loc ../../testdata/ok/005_annotations.aic:10:5 var ret0 : i32
+    loc ../../testdata/ok/005_annotations.aic:10:24 store ret0, const 2
+    loc ../../testdata/ok/005_annotations.aic:10:24 br exit
+  exit:
+    loc ../../testdata/ok/005_annotations.aic:10:5 ret ret0
+}
+func ok_main() {
+  entry:
+    loc ../../testdata/ok/005_annotations.aic:14:18 let t1 : void = call print_println(const "annotations ok")
+    loc ../../testdata/ok/005_annotations.aic:13:1 br exit
+  exit:
+    loc ../../testdata/ok/005_annotations.aic:13:1 ret 
+}

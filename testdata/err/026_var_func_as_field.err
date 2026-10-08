@@ -1,0 +1,12 @@
+testdata/err/026_var_func_as_field.aic:2:11: error: type name is missing
+    a type name is required here
+    fix: add a type name such as i32, str, or a class name; a type is never optional
+testdata/err/026_var_func_as_field.aic:2:22: error: missing `)`
+    got KW return
+    fix: parenthesised type is missing the closing `)`
+testdata/err/026_var_func_as_field.aic:2:29: error: a class body holds fields and methods only
+    got INT 1
+    fix: write a field as `var name Type`, a method as `func name(...)`, a constructor as `func init(...)`
+testdata/err/026_var_func_as_field.aic:3:1: error: a non-declaration statement at the top level
+    got PUNCT }
+    fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)

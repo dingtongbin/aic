@@ -1,0 +1,6 @@
+testdata/pkg/private_sig/lib/lib.aic:6:1: error: a public signature mentions a package-private type
+    result 1 has type secret
+    fix: capitalise the type's first letter, or make the function package-private (lowercase name) (core design §4 visibility)
+testdata/pkg/private_sig/main.aic:8:21: error: no such function in the package
+    lib.Make
+    fix: check the spelling; if lib is a user package, its public functions are declared in its own files, otherwise the std surface is core design §14

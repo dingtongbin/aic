@@ -1,0 +1,3 @@
+testdata/pkg/cycle/b/b.aic:1:1: error: cyclic package import
+    a → b → a
+    fix: extract the shared part into a third package (core design §4: a cyclic import is a compile error, red line 21)
