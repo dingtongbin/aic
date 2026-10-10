@@ -11,7 +11,7 @@
   H4  UBSan 常开            gate_h4（clang 配置固定开启，UBSan 报告即失败）
   H5  报错三段式            gate_h5（.err 快照逐位 + 形状校验）
   H6  无隐式转换            gate_h6（索引位例外锚点必须真跑）
-  H7  表面冻结              gate_h7（23 关键字 + 5 注解字面量表）
+  H7  表面冻结              gate_h7（24 关键字 + 4 注解字面量表）
   #20 禁 cgo                gate_no_cgo
 """
 
@@ -452,7 +452,7 @@ def gate_h7() -> GateResult:
     r = run(["go", "test", "./internal/lex", "-run", "TestFrozenSurface", "-count=1"], cwd=ROOT)
     if not r.ok:
         return fail("H7", "表面冻结测试失败：\n" + (r.stdout + r.stderr)[-1500:])
-    return ok("H7", "23 关键字 + 5 注解字面量表通过", 1)
+    return ok("H7", "24 关键字 + 4 注解字面量表通过", 1)
 
 
 # ------------------------------------------------------------- #20 禁 cgo

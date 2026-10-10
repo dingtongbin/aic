@@ -1,0 +1,78 @@
+import print
+import os
+import str
+
+// B10 长跑稳定性（内存探针）：三种"反复"在同一进程里各跑 N 轮 ——
+//   ① region 建/回收（对象驻留块内，退出整块复位）；
+//   ② 容器增长后清空再增长（list/map/set 容量不归还但不得泄漏）；
+//   ③ spawn 任务循环（任务区域根随任务结束归还全局页链）。
+// 判据 = 尾半 RSS 相对首半**收敛**（不随轮数线性增长）= 无泄漏；
+// 与 benches/c/b10_endurance.c 逐行同构。
+class Buf {
+    var n i32
+}
+
+func spin(n i64) -> i64 {
+    var acc i64 = 0
+    var i i64 = 0
+    for i < n {
+        acc = acc + i
+        i = i + 1
+    }
+    return acc
+}
+
+func main() -> Err {
+    var rounds i64 = 300
+    var args = os.args()
+    if args.len() >= 2 {
+        var v, e = str.toI64(args[1])
+        if e.code == 0 {
+            rounds = v
+        }
+    }
+    var acc i64 = 0
+    var r i64 = 0
+    for r < rounds {
+        // 每轮全部堆上活对象进**同一个 region 块**：退出即整块复位。
+        // 这是"每请求一区域"的惯用法（B5 常驻 server 的形态）—— 判据 = RSS 收敛。
+        region {
+            var b = Buf{n: i32(r)}
+            acc = acc + i64(b.n)
+            // ① 块内对象
+            // ② 容器：增长 → 用 → 删除 → 再增长（容量缓存不归还）
+            var xs i64[] = []
+            var i i64 = 0
+            for i < 2000 {
+                xs.append(i + r)
+                i = i + 1
+            }
+            var m map[i64]i64 = map.new()
+            i = 0
+            for i < 1000 {
+                m.put(i + r, i)
+                i = i + 1
+            }
+            var s set[i64] = set.new()
+            i = 0
+            for i < 1000 {
+                s.add(i + r)
+                i = i + 1
+            }
+            acc = acc + xs[0] + m.get(r) + i64(s.len())
+            i = 0
+            for i < 1000 {
+                m.remove(i + r)
+                i = i + 1
+            }
+        }
+        // ③ spawn：每轮起两个小任务，scope 退出 join（区域根归还）
+        scope {
+            spawn spin(1000)
+            spawn spin(1000)
+        }
+        r = r + 1
+    }
+    print.println(acc)
+    return nil
+}

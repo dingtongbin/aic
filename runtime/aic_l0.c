@@ -2,6 +2,12 @@
  * AIC runtime L0 —— 核心层实现（核心设计 §五/§九/§十四）.
  * 单文件不超 400 行；区域分配器 / 守卫 / trap / str / 最短往返浮点 / print·os.
  * ==========================================================================*/
+/* R19 分代区域的无锁空闲链用 __atomic 内建（gcc/clang；tcc 走互斥量分支）。
+ * 必须在 aic_l0.h 之前：其宏不与 AIC 的运行期宏互相干扰。 */
+#if !defined(__TINYC__)
+#include <stdatomic.h>
+#endif
+
 #include "aic_l0.h"
 
 #include <float.h>
@@ -14,20 +20,26 @@
 #include "aic_plat.h"
 static void aic_binary_stdout(void) { aic_plat_binary_stdout(); }
 
+
 /* ============================================================================
- * 区域分配器（L3：**跨任务正确**）
+ * 区域分配器（L3 跨任务正确 + R19 分代记账）
  * ----------------------------------------------------------------------------
- * 每个区域实例 = 一条页链，bump 其中。区域 id **全局唯一、单调递增、永不复用**
- * （陈旧引用查全局表必得 AIC_REGION_DEAD → trap）。
+ * 每个区域实例 = 一条页链，bump 其中。实例身份 = **(slot, gen)**（R19）：
+ * push 从空闲链取 (slot, gen) 并用一次 u32 存储换发槽状态；pop 把槽标 DEAD、
+ * 归还空闲链（gen 留给下一次 push 自增）。陈旧引用 = gen 不符或深度 DEAD
+ * ⇒ 存储守卫必 trap（F7 不变）。gen 到顶 ⇒ 槽永久退役；空闲链耗尽 = 耗尽
+ * （4096 槽 × 2^20 代 ≈ 4.3G 个实例）。记账 = 32B ×（存活 + 已退役），
+ * 与总实例数脱钩（B5：2M 轮只退役 2 槽 ≈ 64B）。
  *
  * 为什么区域表必须**全局**而不是线程局部（L3 实测踩到的真缺陷）：
  * 容器/通道是**跨任务共享**的（§七「spawn 实参 = 共享引用」），子任务往父任务创建的
  * 通道/列表里写会触发"**在父任务的区域里增长**"。若页链按线程局部登记，子任务就会
  * 把共享容器的缓冲分配进自己的区域（任务一结束整条链交还全局空闲链）⇒ 父任务读到
  * 的是被回收复用的内存（实测：两个通道的值互相串成同一个）。故：
- *   - `hdr.reg` = **全局** id（0 = 特殊值"本任务的根区域"，由 t_root 解析）；
- *   - 页链与深度/_行号都放全局分块表（分块 = 永不搬移，守卫可无锁读）；
- *   - 分配用**每区域一把自旋锁**（自己区域无竞争；共享容器增长时才真竞争）。
+ *   - `hdr.reg` = 打包的 (slot<<20 | gen)（0 = 特殊值"本任务的根区域"，由 t_root 解析）；
+ *   - 表与页链都在全局定长槽阵（永不搬移，守卫可无锁读）；
+ *   - 页链操作用**每区域一把自旋锁**（自己区域无竞争；共享容器增长时才真竞争）；
+ *     空闲链是 **Treiber 无锁栈**（tag 防 ABA；tcc 退回互斥量链，单线程无竞争）。
  * ==========================================================================*/
 
 typedef struct aic_page {
@@ -40,18 +52,168 @@ typedef struct aic_page {
 #define AIC_PAGE_DEFAULT (64u * 1024u)
 #define AIC_ALIGN        (16u)
 
-/* 全局区域槽（分块存放，块一旦分配就不再搬移）。结构定义在 aic_l0.h（守卫要内联读）。 */
-static aic_gslot   *aic_gchunk[AIC_GCHUNK_MAX];
-aic_gslot         **aic_gtab = aic_gchunk;
-static aic_mtx_t    aic_gtab_mtx;   /* 保护块分配与全局 id 分配器 */
-static int          aic_gtab_ready = 0;
-static aic_u32      aic_gnext = 1;  /* 全局 id 分配器（0 保留给"本任务根区域"） */
+/* R19：全局区域槽表 + 线程局部区域栈。 */
+aic_gslot aic_gslots[AIC_REGION_SLOTS];
 
-/* 线程局部：区域栈（栈顶 = 当前区域）、根区域 id、空闲页链、自旋计数。 */
+typedef struct {
+    aic_u16 slot;
+    aic_u32 gen;
+} aic_free_ent;
+
+/* 线程局部：区域栈（栈顶 = 当前区域）、根区域 reg、空闲页链。 */
 AIC_TLS aic_u32         aic_depth = 0;
 static AIC_TLS aic_u32  aic_region_ids[AIC_REGION_MAX_DEPTH + 1];
 static AIC_TLS aic_u32  aic_root_gid = 0;
 static AIC_TLS aic_page *aic_page_free = NULL;
+
+/* R19：全局区域槽表（定长，BSS 按需换页；只碰存活槽 ⇒ 守卫工作集 8KB）。
+ *
+ * 空闲链 = **Treiber 无锁栈**（gcc/clang；tcc 无原子内建 ⇒ 退回互斥量链，
+ * 该后端本来就把任务在同线程跑完，无竞争）。取槽/还槽是 region push/pop 的
+ * 必经路（每请求一次），旧形态在此取全局 id 也要过一次锁 —— 无锁化后单对
+ * push+pop 实测 62.4ns → 见 benches/report.md 的记账段。
+ *
+ * 链上只存槽索引；**待发的代龄存在槽自己的 state 里**（空闲态 state =
+ * (next_gen << 9) | DEAD），如此取到槽后读一次 state 即得 gen，且归还时
+ * 一次 u32 存储就把"下一代待发"写好（守卫无锁读因此相干）。
+ *
+ * ABA 防护：头 = u64 = (tag:32 << 32) | 槽索引，每次成功 CAS 把 tag +1。
+ * 读者要先读 next[idx] 再 CAS；只有"同 tag 同 idx"才能让陈旧读蒙混，而这需要
+ * tag 绕回 2^32 次成功操作——实际不可达。 */
+#define AIC_SLOT_NIL 0xFFFFFFFFu
+
+static aic_u32 aic_slot_next[AIC_REGION_SLOTS];
+static int     aic_slot_ready = 0;
+
+#if defined(__TINYC__)
+/* --- tcc：互斥量链 ------------------------------------------------------- */
+static aic_mtx_t aic_slot_mtx;
+static aic_u32   aic_slot_free[AIC_REGION_SLOTS];
+static aic_u32   aic_slot_free_n = 0;
+
+static void slots_bootstrap(void) {
+    if (aic_slot_ready) {
+        return;
+    }
+    aic_mtx_init(&aic_slot_mtx);
+    for (aic_u32 i = 0; i < AIC_REGION_SLOTS; i++) {
+        aic_slot_free[i] = i;
+        aic_gslots[i].state = AIC_REGION_STATE(1u, AIC_REGION_DEPTH_DEAD); /* 首发 gen = 1 */
+    }
+    aic_slot_free_n = AIC_REGION_SLOTS;
+    aic_slot_ready = 1;
+}
+
+static aic_u32 slot_chain_pop(void) {
+    aic_mtx_lock(&aic_slot_mtx);
+    aic_u32 idx = AIC_SLOT_NIL;
+    if (aic_slot_free_n > 0) {
+        idx = aic_slot_free[--aic_slot_free_n];
+    }
+    aic_mtx_unlock(&aic_slot_mtx);
+    return idx;
+}
+
+static void slot_chain_push(aic_u32 slot) {
+    aic_mtx_lock(&aic_slot_mtx);
+    if (aic_slot_free_n < AIC_REGION_SLOTS) {
+        aic_slot_free[aic_slot_free_n++] = slot;
+    }
+    aic_mtx_unlock(&aic_slot_mtx);
+}
+#else
+/* --- gcc/clang：Treiber 无锁栈 ------------------------------------------- */
+static aic_u64 aic_slot_head; /* (tag << 32) | slot */
+
+static void slots_bootstrap(void) {
+    /* gcc/clang：ready 用原子 CAS 置位。**置位前**不许任何线程看见半个初始化的链
+     * —— 实测 spawn churn 每轮新线程都会重跑 bootstrap（普通 static 非原子），
+     * 把别人在用的链整个冲掉，100 万轮即"实例空间耗尽"。 */
+    if (__atomic_load_n(&aic_slot_ready, __ATOMIC_ACQUIRE) != 0) {
+        return;
+    }
+    aic_u32 expect = 0;
+    if (!__atomic_compare_exchange_n(&aic_slot_ready, &expect, 1u, false,
+                                     __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+        return; /* 别的线程正在/已经初始化：链由它建 */
+    }
+    for (aic_u32 i = 0; i < AIC_REGION_SLOTS; i++) {
+        aic_slot_next[i] = (i + 1u < AIC_REGION_SLOTS) ? (i + 1u) : AIC_SLOT_NIL;
+        aic_gslots[i].state = AIC_REGION_STATE(1u, AIC_REGION_DEPTH_DEAD); /* 首发 gen = 1 */
+    }
+    __atomic_store_n(&aic_slot_head, 0ull, __ATOMIC_RELEASE); /* tag 0 + 槽 0 */
+    __sync_synchronize();
+}
+
+static aic_u32 slot_chain_pop(void) {
+    for (;;) {
+        aic_u64 h = aic_slot_head;
+        aic_u32 idx = (aic_u32)(h & 0xFFFFFFFFu);
+        if (idx == AIC_SLOT_NIL) {
+            return AIC_SLOT_NIL;
+        }
+        aic_u32 nx = aic_slot_next[idx];
+        aic_u64 want = (h & 0xFFFFFFFF00000000ull) + (1ull << 32) + (aic_u64)nx;
+        if (__sync_bool_compare_and_swap(&aic_slot_head, h, want)) {
+            return idx;
+        }
+    }
+}
+
+static void slot_chain_push(aic_u32 slot) {
+    for (;;) {
+        aic_u64 h = aic_slot_head;
+        aic_slot_next[slot] = (aic_u32)(h & 0xFFFFFFFFu);
+        /* __sync_bool_compare_and_swap 自身即全屏障 ⇒ next[slot] 先于新 head
+         * 可见，无需额外的 __sync_synchronize（实测省 ~5ns/对）。 */
+        aic_u64 want = (h & 0xFFFFFFFF00000000ull) + (1ull << 32) + (aic_u64)slot;
+        if (__sync_bool_compare_and_swap(&aic_slot_head, h, want)) {
+            return;
+        }
+    }
+}
+#endif
+
+/* 取一个可用槽（连同它要发的 gen）。调用后**独占**该槽：状态换发与页链操作都
+ * 不再需要链锁。gen 到顶 ⇒ 该槽永久退役（状态永记 DEAD、不再回流），换下一个；
+ * 链空 = 实例空间耗尽（含可操作修复的 trap）。 */
+static aic_free_ent slot_acquire(const char *file, aic_u32 line) {
+    aic_free_ent e;
+    /* 等 bootstrap 真正完成：另一线程正在初始化时 CAS 失败即返回，但链可能
+     * 还没建好 —— 必须自旋等 ready 确认后才能取槽。 */
+    for (;;) {
+        if (aic_slot_ready != 0) {
+            break;
+        }
+        slots_bootstrap();
+    }
+    for (;;) {
+        aic_u32 idx = slot_chain_pop();
+        if (idx == AIC_SLOT_NIL) {
+            aic_trap_ctx(AIC_TRAP_OUT_OF_MEMORY, file, (int)line,
+                         "region instance space exhausted: every slot is live or retired "
+                         "(4096 slots x 2^20 generations ~= 4.3 G instances; raise "
+                         "AIC_REGION_SLOTS/AIC_REGION_GEN_BITS and recompile the runtime)");
+        }
+        /* 槽已归我们独占：state 的无锁读安全（别的线程只有拿回链上控制权才能碰它）。 */
+        aic_u32 gen = AIC_REGION_STATE_GEN(aic_gslots[idx].state);
+        if (gen > AIC_REGION_GEN_MAX) {
+            /* 该槽第 2^20 代已发完：永久退役（任何陈旧引用读它必得 DEAD），
+             * 不再回流。退役速率 = 每百万次区域实例一个槽。 */
+            aic_gslots[idx].state = AIC_REGION_STATE(0u, AIC_REGION_DEPTH_DEAD);
+            continue;
+        }
+        e.slot = (aic_u16)idx;
+        e.gen = gen;
+        return e;
+    }
+}
+
+/* 归还一个槽：把"下一代待发"写进 state（一次 u32 存储），再挂回链尾策略（LIFO）。 */
+static void slot_release(aic_u32 slot, aic_u32 gen) {
+    aic_gslots[slot].state = AIC_REGION_STATE(gen + 1u, AIC_REGION_DEPTH_DEAD);
+    slot_chain_push(slot);
+}
 
 /* 全局空闲页链（跨任务复用；锁在首个 aic_task_init 里建好）。 */
 static aic_mtx_t aic_page_mtx;
@@ -73,67 +235,16 @@ static void rlock(aic_gslot *s) {
 static void runlock(aic_gslot *s) { __sync_lock_release(&s->lock); }
 #endif
 
-static void gtab_init(void) {
-    if (!aic_gtab_ready) {
-        /* 首个调用者必然是 main（单线程时刻）⇒ 惰性初始化无竞争。 */
-        aic_mtx_init(&aic_gtab_mtx);
-        aic_gtab_ready = 1;
-    }
-}
-
-/* 取全局槽（块不存在则返回 NULL；无锁读，供守卫热路径用）。 */
-static aic_gslot *gslot(aic_u32 gid) {
-    aic_u32 ci = gid >> AIC_GCHUNK_SHIFT;
-    if (ci >= AIC_GCHUNK_MAX) {
-        return NULL;
-    }
-    aic_gslot *c = aic_gchunk[ci];
-    if (c == NULL) {
-        return NULL;
-    }
-    return &c[gid & (AIC_GCHUNK_SIZE - 1u)];
-}
-
-/* 取全局槽（不存在则建块；只有建块与 id 分配走全局锁）。 */
-static aic_gslot *gslot_get(aic_u32 gid) {
-    aic_gslot *s = gslot(gid);
-    if (s != NULL) {
-        return s;
-    }
-    gtab_init();
-    aic_mtx_lock(&aic_gtab_mtx);
-    aic_u32 ci = gid >> AIC_GCHUNK_SHIFT;
-    if (ci < AIC_GCHUNK_MAX && aic_gchunk[ci] == NULL) {
-        aic_gslot *c = (aic_gslot *)calloc(AIC_GCHUNK_SIZE, sizeof(aic_gslot));
-        if (c == NULL) {
-            aic_mtx_unlock(&aic_gtab_mtx);
-            aic_trap(AIC_TRAP_OUT_OF_MEMORY, "<runtime: region table>", 0);
-        }
-        aic_gchunk[ci] = c;
-    }
-    aic_mtx_unlock(&aic_gtab_mtx);
-    s = gslot(gid);
-    if (s == NULL) {
-        aic_trap(AIC_TRAP_OUT_OF_MEMORY, "<runtime: region table>", 0); /* 区域 id 空间耗尽 */
-    }
-    return s;
-}
-
-static aic_u32 gid_new(void) {
-    gtab_init();
-    aic_mtx_lock(&aic_gtab_mtx);
-    aic_u32 gid = aic_gnext++;
-    aic_mtx_unlock(&aic_gtab_mtx);
-    return gid;
-}
-
-/* 诊断用：区域进入点（trap 消息的"创建处"）。 */
-void aic_region_site_of(aic_u32 gid, const char **file, aic_u32 *line) {
-    aic_gslot *s = gslot(gid);
-    if (s == NULL) {
-        if (file) *file = "<unknown>";
-        if (line) *line = 0;
+/* 诊断用：区域进入点（trap 消息的"创建处"）。reg 身份不符 = 已换代（已弹出）。 */
+void aic_region_site_of(aic_u32 reg, const char **file, aic_u32 *line) {
+    if (file) *file = "<unknown>";
+    if (line) *line = 0;
+    if (AIC_REGION_SLOT_OF(reg) >= AIC_REGION_SLOTS) {
         return;
+    }
+    aic_gslot *s = &aic_gslots[AIC_REGION_SLOT_OF(reg)];
+    if (AIC_REGION_STATE_GEN(s->state) != AIC_REGION_GEN_OF(reg)) {
+        return; /* 换了代：实例早已弹出（陈旧引用） */
     }
     if (file) *file = s->file ? s->file : "<unknown>";
     if (line) *line = s->line;
@@ -206,10 +317,13 @@ static void page_give_global(aic_page *p) {
 void aic_region_release_task(void) {
     /* 只走本任务的区域栈（TLS）：根区域 + 当前仍压着的各层。 */
     for (aic_u32 d = 0; d <= aic_depth && d <= AIC_REGION_MAX_DEPTH; d++) {
-        aic_u32 gid = aic_region_ids[d];
-        aic_gslot *s = gslot(gid);
-        if (s == NULL) {
+        aic_u32 reg = aic_region_ids[d];
+        if (AIC_REGION_SLOT_OF(reg) >= AIC_REGION_SLOTS) {
             continue;
+        }
+        aic_gslot *s = &aic_gslots[AIC_REGION_SLOT_OF(reg)];
+        if (AIC_REGION_STATE_GEN(s->state) != AIC_REGION_GEN_OF(reg)) {
+            continue; /* 已换代（不该发生：本任务自己的栈） */
         }
         rlock(s);
         aic_page *p = (aic_page *)s->pages;
@@ -222,7 +336,8 @@ void aic_region_release_task(void) {
         }
         s->pages = NULL;
         runlock(s);
-        s->depth = AIC_REGION_DEAD;
+        s->state = AIC_REGION_STATE(AIC_REGION_GEN_OF(reg), AIC_REGION_DEPTH_DEAD);
+        slot_release(AIC_REGION_SLOT_OF(reg), AIC_REGION_GEN_OF(reg));
     }
     while (aic_page_free != NULL) {
         aic_page *nx = aic_page_free->next;
@@ -233,14 +348,15 @@ void aic_region_release_task(void) {
     aic_root_gid = 0;
 }
 
-/* 在指定区域 bump（跨任务可调用：锁住该区域）。 */
-static void *region_bump(aic_u32 gid, aic_usize n, aic_u32 line) {
-    aic_gslot *s = gslot_get(gid);
-    if (s->depth == AIC_REGION_DEAD) {
+/* 在指定区域 bump（跨任务可调用：锁住该区域）。reg = 打包的 (slot, gen)。 */
+static void *region_bump(aic_u32 reg, aic_usize n, aic_u32 line) {
+    aic_gslot *s = &aic_gslots[AIC_REGION_SLOT_OF(reg)];
+    if (AIC_REGION_STATE_GEN(s->state) != AIC_REGION_GEN_OF(reg) ||
+        AIC_REGION_STATE_DEPTH(s->state) >= AIC_REGION_DEPTH_DEAD) {
         // **真实位点**：目标区域自己的进入点（`<alloc>` 这种伪路径 + 调用点行号会指错地方）。
         const char *rf = NULL;
         aic_u32 rl = 0;
-        aic_region_site_of(gid, &rf, &rl);
+        aic_region_site_of(reg, &rf, &rl);
         aic_trap_ctx(AIC_TRAP_REGION_ESCAPED, rf ? rf : "<runtime: region table>", (int)rl,
                      "allocation targets a region that has already been popped");
     }
@@ -264,22 +380,22 @@ static void *region_bump(aic_u32 gid, aic_usize n, aic_u32 line) {
 }
 
 void aic_task_init(const char *file, aic_u32 line) {
-    gtab_init();
     if (!aic_page_mtx_ready) {
         /* 首个 aic_task_init 必然是 main（单线程时刻）⇒ 这里的惰性初始化无竞争。 */
         aic_mtx_init(&aic_page_mtx);
         aic_page_mtx_ready = 1;
     }
-    /* 每个任务的根区域 = 一个**新的全局 id**（各任务的根互不相同）。 */
-    aic_u32 gid = gid_new();
-    aic_gslot *s = gslot_get(gid);
-    s->depth = 0;
+    /* 每个任务的根区域 = 一个**新取的槽**（各任务的根互不相同：不同 slot 或
+     * 同槽不同代；跨任务引用的守卫按"父任务最老"静态免除，见 §七）。 */
+    aic_free_ent e = slot_acquire(file, line);
+    aic_gslot *s = &aic_gslots[e.slot];
+    s->state = AIC_REGION_STATE(e.gen, 0u);
     s->line = line;
     s->file = file;
     s->pages = NULL;
     aic_depth = 0;
-    aic_root_gid = gid;
-    aic_region_ids[0] = gid;
+    aic_root_gid = AIC_REGION_PACK(e.slot, e.gen);
+    aic_region_ids[0] = aic_root_gid;
 }
 
 void aic_region_push(const char *file, aic_u32 line) {
@@ -287,35 +403,36 @@ void aic_region_push(const char *file, aic_u32 line) {
     if (nd >= AIC_REGION_MAX_DEPTH) {
         aic_trap(AIC_TRAP_STACK_OVERFLOW, file, (int)line);
     }
-    aic_u32 gid = gid_new();
-    aic_gslot *s = gslot_get(gid);
-    s->depth = nd;
+    aic_free_ent e = slot_acquire(file, line);
+    aic_gslot *s = &aic_gslots[e.slot];
+    s->state = AIC_REGION_STATE(e.gen, nd);
     s->line = line;
     s->file = file;
     s->pages = NULL;
     aic_depth = nd;
-    aic_region_ids[nd] = gid;
+    aic_region_ids[nd] = AIC_REGION_PACK(e.slot, e.gen);
 }
 
 void aic_region_pop(void) {
     if (aic_depth == 0) {
         return;
     }
-    aic_u32 gid = aic_region_ids[aic_depth];
-    aic_gslot *s = gslot(gid);
-    if (s != NULL) {
-        rlock(s);
-        aic_page *p = (aic_page *)s->pages;
-        while (p != NULL) {
-            aic_page *nx = p->next;
-            p->next = aic_page_free;
-            aic_page_free = p;
-            p = nx;
-        }
-        s->pages = NULL;
-        runlock(s);
-        s->depth = AIC_REGION_DEAD;
+    aic_u32 reg = aic_region_ids[aic_depth];
+    aic_u32 slot = AIC_REGION_SLOT_OF(reg);
+    aic_u32 gen = AIC_REGION_GEN_OF(reg);
+    aic_gslot *s = &aic_gslots[slot];
+    rlock(s);
+    aic_page *p = (aic_page *)s->pages;
+    while (p != NULL) {
+        aic_page *nx = p->next;
+        p->next = aic_page_free;
+        aic_page_free = p;
+        p = nx;
     }
+    s->pages = NULL;
+    runlock(s);
+    s->state = AIC_REGION_STATE(gen, AIC_REGION_DEPTH_DEAD);
+    slot_release(slot, gen);
     aic_depth--;
 }
 
@@ -381,6 +498,15 @@ AIC_COLD_NORETURN void aic_cold_guard_always(const char *file, aic_u32 line) {
     abort();
 }
 
+AIC_COLD_NORETURN void aic_cold_narrow_report(const char *file, int line, long long val) {
+    fprintf(stderr, "aic trap: narrowing conversion out of range\n");
+    fprintf(stderr, "  at %s:%d\n", file ? file : "<unknown>", line);
+    fprintf(stderr, "  value %lld does not fit the target type\n", val);
+    fprintf(stderr, "  fix: check the range before converting, or use a wider type\n");
+    fflush(stderr);
+    abort();
+}
+
 void aic_guard(void *obj, aic_u32 limit, const char *file, aic_u32 line) {
     if (obj == NULL) {
         return; /* 存 nil 合法 */
@@ -396,7 +522,7 @@ void aic_guard(void *obj, aic_u32 limit, const char *file, aic_u32 line) {
         fprintf(stderr, "  at %s:%u\n", file ? file : "<unknown>", (unsigned)line);
         fprintf(stderr, "  object created at line %u; its region was entered at %s:%u (popped)\n",
                 (unsigned)h->line, rfile, (unsigned)rline);
-        fprintf(stderr, "  fix: add @live at the creation, or create it in the task region\n");
+        fprintf(stderr, "  fix: add live at the creation, or create it in the task region\n");
         fflush(stderr);
         abort();
     }
@@ -406,7 +532,7 @@ void aic_guard(void *obj, aic_u32 limit, const char *file, aic_u32 line) {
         fprintf(stderr, "  object created at line %u (region depth %u > storage depth %u)\n",
                 (unsigned)h->line, (unsigned)d, (unsigned)limit);
         fprintf(stderr, "  its region was entered at %s:%u\n", rfile, (unsigned)rline);
-        fprintf(stderr, "  fix: add @live at the creation, or create it in an outer region\n");
+        fprintf(stderr, "  fix: add live at the creation, or create it in an outer region\n");
         fflush(stderr);
         abort();
     }
@@ -456,9 +582,9 @@ static const char *trap_fix(aic_trap_code code) {
     case AIC_TRAP_STACK_OVERFLOW:
         return "region nesting or defer depth exceeded the static capacity; split the function";
     case AIC_TRAP_REGION_ESCAPED:
-        return "add @live at the creation, or create the object in the task region";
+        return "add live at the creation, or create the object in the task region";
     case AIC_TRAP_REGION_DEEPER:
-        return "add @live at the creation, or create the object in an outer region";
+        return "add live at the creation, or create the object in an outer region";
     case AIC_TRAP_CHAN_FULL:
         return "receive before sending again, or size the channel for the peak queue (chan[T].new(cap))";
     case AIC_TRAP_DEADLOCK:

@@ -85,7 +85,19 @@ func (p *Parser) parseType() TypeExpr {
 
 	// `(T)` grouping or the function type `(P1, P2) -> R`.
 	if p.at(PUNCT, "(") {
-		return p.parseParenType(at)
+		grouped := p.parseParenType(at)
+		// 分组的**后缀**必须接在这里：`(map[str]i64)[]` = map 的列表
+		//（R21 审计 ④：`map[str]i64[]` 的 `[]` 天然绑给 map 的值类型
+		//⇒ 没有分组就写不出 ”map 的列表“）。此前直接 return
+		//⇒ `[]` 沦为表达式，报”赋值左侧必须是变量”。
+		if _, isFunc := grouped.(*FuncType); !isFunc {
+			for p.at(PUNCT, "[") && p.peekIs(PUNCT, "]") {
+				p.next()
+				p.next()
+				grouped = &SliceType{Elem: grouped, Pos: at}
+			}
+		}
+		return grouped
 	}
 
 	// set[T] and map[K]V are type constructors spelled as names, not keywords:

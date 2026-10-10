@@ -247,7 +247,7 @@ func (c *Checker) checkReturnBound(e parse.Expr, rb bound) {
 	if rb.exact {
 		c.errorAt(parse.ExprPos(e), "returning an object from a deeper region (a creation expression returned directly)",
 			"object created at depth "+itoa(rb.off)+", the function entry is 0",
-			"create it outside the block before returning, or add @live to the creation (core design §5 R5)")
+			"create it outside the block before returning, or add live to the creation (core design §5 R5)")
 		return
 	}
 	c.guards[e] = GuardSpec{Kind: GuardReturn}

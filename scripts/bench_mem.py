@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ctypes
 import statistics
+import os
 import subprocess
 import sys
 import threading
@@ -98,15 +99,18 @@ fn main() {
 # case → (AIC 源, C 源, 默认参数, rust 源文本 or None)
 CASES = {
     "B4-graph": ("b4_graph.aic", "c/b4_graph.c", "1000000", RUST_B4),
-    "B5-region": ("b5_region.aic", "c/b5_region.c", "200000", RUST_B5),
+    "B5-region": ("b5_region.aic", "c/b5_region.c", "2000000", RUST_B5),
+    "B10-endurance": ("b10_endurance.aic", "c/b10_endurance.c", "300", None),
 }
 
 
 def build(case: str, aic_src: str, c_src: str, rust_src: str | None) -> dict[str, Path]:
     exes: dict[str, Path] = {}
     exe = WORK / f"{case}-aic.exe"
+    # 与 C/Rust 同档优化（AIC_CFLAGS 默认空 = -O0；见 bench_full.py 同款说明）。
+    aic_env = dict(os.environ, AIC_CFLAGS="-O2")
     r = subprocess.run([str(AIC), "build", str(BENCH / aic_src), "-o", str(exe)],
-                       cwd=str(ROOT), capture_output=True)
+                       cwd=str(ROOT), capture_output=True, env=aic_env)
     if r.returncode == 0:
         exes["AIC"] = exe
     c_exe = WORK / f"{case}-c.exe"
@@ -178,9 +182,15 @@ def main() -> int:
             continue
         c_src_path.write_bytes(r.stdout)
         rt = ROOT / "runtime"
+        # L2（真并发/调度）不是每个 bench 都需要：spawn/scope/chan 出现才链
+        # aic_l2.c，否则 B10 这类含 spawn 的语料会 undefined symbol（aic_sched_init）。
+        needs_l2 = any(m in r.stdout for m in (b"aic_scope_", b"aic_task_", b"aic_chan"))
+        srcs = [str(rt / "aic_l0.c"), str(rt / "aic_std.c")]
+        if needs_l2:
+            srcs.append(str(rt / "aic_l2.c"))
         cc = subprocess.run([str(CLANG), "-std=c11", "-O1", "-fsanitize=undefined",
                              "-fno-sanitize-recover=all", "-I", str(rt), str(c_src_path),
-                             str(rt / "aic_l0.c"), str(rt / "aic_std.c"),
+                             *srcs,
                              "-o", str(aic_exe)], capture_output=True)
         if cc.returncode != 0:
             print(f"  {case}: UBSan 构建失败：{cc.stderr.decode('utf-8', 'replace')[:120]}")

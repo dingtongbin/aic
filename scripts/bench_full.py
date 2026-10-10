@@ -200,11 +200,104 @@ fn main() {
 }
 '''
 
+
+RUST_FIB = '''use std::env;
+fn fib(n: i64) -> i64 {
+    if n < 2 { return n; }
+    fib(n - 1) + fib(n - 2)
+}
+fn main() {
+    let mut n: i64 = 42;
+    if let Some(a) = env::args().nth(1) { if let Ok(v) = a.parse() { n = v; } }
+    println!("{}", fib(n));
+}
+'''
+
+RUST_STRING = '''use std::env;
+fn checksum(s: &[u8]) -> i64 {
+    let mut sum: i64 = 0;
+    for i in 0..s.len() { sum += s[i] as i64; }
+    sum
+}
+fn index_of(hay: &[u8], needle: &[u8]) -> i64 {
+    if needle.is_empty() { return 0; }
+    if needle.len() > hay.len() { return -1; }
+    let mut i = 0usize;
+    while i + needle.len() <= hay.len() {
+        if &hay[i..i + needle.len()] == needle { return i as i64; }
+        i += 1;
+    }
+    -1
+}
+fn main() {
+    let mut rounds: i64 = 2000;
+    if let Some(a) = env::args().nth(1) { if let Ok(v) = a.parse() { rounds = v; } }
+    let base = b"the quick brown fox jumps over the lazy dog 0123456789";
+    let mut acc: i64 = 0;
+    for _ in 0..rounds {
+        acc += checksum(&base[0..20]);
+        let pos = index_of(base, b"fox");
+        if pos >= 0 { acc += pos; }
+        acc += checksum(&base[10..30]);
+    }
+    println!("{}", acc);
+    println!("{}", base.len());
+}
+'''
+
+RUST_MAPSET = '''use std::collections::HashMap;
+use std::collections::HashSet;
+use std::env;
+fn main() {
+    let mut n: i64 = 200000;
+    if let Some(a) = env::args().nth(1) { if let Ok(v) = a.parse() { n = v; } }
+    let mut m: HashMap<i64, i64> = HashMap::new();
+    let mut s: HashSet<i64> = HashSet::new();
+    for i in 0..n { m.insert(i, i * 3); s.insert(i); }
+    let mut acc: i64 = 0;
+    for i in 0..n {
+        if let Some(v) = m.get(&i) { acc += *v; }
+        if s.contains(&i) { acc += 1; }
+    }
+    for i in 0..n / 2 { m.remove(&i); }
+    acc += (m.len() as i64) * 1000 + (s.len() as i64);
+    println!("{}", acc);
+}
+'''
+
+RUST_DISPATCH = '''use std::env;
+struct Counter { n: i64 }
+impl Counter {
+    fn add(&mut self, d: i64) -> i64 { self.n += d; self.n }
+}
+trait Adder { fn add(&mut self, d: i64) -> i64; }
+impl Adder for Counter {
+    fn add(&mut self, d: i64) -> i64 { Counter::add(self, d) }
+}
+fn drive(a: &mut dyn Adder, times: i64) -> i64 {
+    let mut acc: i64 = 0;
+    for _ in 0..times { acc = a.add(2); }
+    acc
+}
+fn main() {
+    let mut times: i64 = 2000000;
+    if let Some(a) = env::args().nth(1) { if let Ok(v) = a.parse() { times = v; } }
+    let mut c = Counter { n: 1 };
+    let r = drive(&mut c, times);
+    let direct = drive(&mut c, times);
+    println!("{}", r + direct);
+}
+'''
+
 RUST_SRC = {
     "B1-matmul": ("b1_matmul.rs", RUST_MATMUL),
     "B1-sieve": ("b1_sieve.rs", RUST_SIEVE),
     "B2-json": ("b2_json.rs", RUST_JSON),
     "B4-graph": ("b4_graph.rs", RUST_GRAPH),
+    "B6-fib": ("b6_fib.rs", RUST_FIB),
+    "B7-string": ("b7_string.rs", RUST_STRING),
+    "B8-mapset": ("b8_mapset.rs", RUST_MAPSET),
+    "B9-dispatch": ("b9_dispatch.rs", RUST_DISPATCH),
 }
 
 # case → (AIC 源, C 源, 默认参数, quick 参数)
@@ -213,6 +306,10 @@ CASES = {
     "B1-sieve": ("b1_sieve.aic", "c/b1_sieve.c", "100000000", "1000000"),
     "B2-json": ("b2_json.aic", "c/b2_json.c", "16000", "2000"),
     "B4-graph": ("b4_graph.aic", "c/b4_graph.c", "1000000", "100000"),
+    "B6-fib": ("b6_fib.aic", "c/b6_fib.c", "42", "30"),
+    "B7-string": ("b7_string.aic", "c/b7_string.c", "2000", "200"),
+    "B8-mapset": ("b8_mapset.aic", "c/b8_mapset.c", "200000", "20000"),
+    "B9-dispatch": ("b9_dispatch.aic", "c/b9_dispatch.c", "2000000", "200000"),
 }
 
 
@@ -264,8 +361,13 @@ def build_all(name: str) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     aic_src = CASES[name][0]
     exe = WORK / f"{name}-aic.exe"
+    # AIC 侧与 C/Rust 同档优化：AIC 编译产物经 AIC_CFLAGS 传给外部 C 编译器的
+    # flag 默认是空（-O0）；C/Rust 用 -O2。不同档 = 测的是优化档不是语言
+    # （2026-10 实测教训：fib 账面 3.2× 全是这个口径错误，同档后 1.10×）。
+    aic_env = dict(os.environ, AIC_CFLAGS="-O2")
     r = subprocess.run([str(AIC), "build", str((BENCH / aic_src).relative_to(ROOT)),
-                        "-o", str(exe)], cwd=str(ROOT), capture_output=True)
+                        "-o", str(exe)], cwd=str(ROOT), capture_output=True,
+                       env=aic_env)
     if r.returncode == 0:
         out["AIC"] = [str(exe)]
     c_exe = WORK / f"{name}-c.exe"

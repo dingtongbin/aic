@@ -56,7 +56,7 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 				return constText(sym.Const), nil
 			}
 		}
-		return v.Name, nil
+		return l.airVarName(v.Name), nil
 	case *parse.ThisExpr:
 		return "this__", nil
 	case *parse.Unary:
@@ -666,7 +666,7 @@ func (l *lowerer) composite(v *parse.CompositeLit) (string, error) {
 func (l *lowerer) place(e parse.Expr) (Place, error) {
 	switch v := e.(type) {
 	case *parse.Ident:
-		return &VarPlace{Name: v.Name}, nil
+		return &VarPlace{Name: l.airVarName(v.Name)}, nil
 	case *parse.Field:
 		base, err := l.basePlace(v.X)
 		if err != nil {
@@ -829,7 +829,11 @@ func tyText(t types.Type) string {
 	case *types.SetT:
 		return "set[" + tyText(v.Elem) + "]"
 	case *types.MapT:
-		return "map[" + tyText(v.Key) + "]" + tyText(v.Value)
+		// 值是**容器**时必须加括号：`map[str]i64[]` 否则同时是
+		//   Map{str, Slice}（list 的 map）与 Slice{Map}（map 的列表）的文本
+		// —— AIR 类型文本是 IR 的类型键，撞文本 = 类型表互相覆盖（审计 ④：
+		// `var lm (map[str]i64)[]` 编不过的根因）。
+		return "map[" + tyText(v.Key) + "]" + parenIfContainerText(tyText(v.Value), v.Value)
 	case *types.ArrayT:
 		return fmt.Sprintf("[%s;%d]", tyText(v.Elem), v.N)
 	case *types.ChanT:
@@ -1020,3 +1024,15 @@ func basicByName(name string) (types.Type, bool) {
 
 // errSelectArm 是 select 分支形态不合规格的内部错误（检查器已挡住，这里是防御）。
 var errSelectArm = fmt.Errorf("air: malformed select arm")
+
+// parenIfContainerText 在子类型是容器时给它的文本加括号（map 的值位专用：
+// `map[str](i64[])` vs `map[str]i64[]`）。slice 元素位**不加** —— emit 侧的
+// 元素解析靠 TrimSuffix(host, "[]") 取元素文本再加 irTab 查找，加了括号
+// 那个文本就查不到了（i64[][] / map[str]i64[] 的正常形态靠它工作）。
+func parenIfContainerText(text string, t types.Type) string {
+	switch t.(type) {
+	case *types.Slice, *types.MapT, *types.SetT, *types.ChanT, *types.FuncT:
+		return "(" + text + ")"
+	}
+	return text
+}

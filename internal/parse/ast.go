@@ -265,8 +265,8 @@ type (
 		Stmts []Stmt
 		Pos
 	}
-	// VarTarget is one name in a declaration. Live marks `var @live x` (外一层
-	// 区域创建，核心设计 §五 R4); Blank marks the `_` 弃位.
+	// VarTarget is one name in a declaration. Live marks `var live x` (外一层
+	// 区域创建，核心设计 §五 R4; R20 起是关键字不是注解); Blank marks the `_` 弃位.
 	VarTarget struct {
 		Name  string
 		Live  bool

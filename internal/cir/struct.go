@@ -92,6 +92,16 @@ type folder struct {
 	loops        []loopCtx
 	exit         string
 	edges        map[[2]string]bool // 已物化的边
+	// regOpen 跨块 region 的开放栈：enter 在这块、exit 在后续块时，平铺的
+	// RegionOpen/RegionClose 靠它找回配对（air V3.1 保证栈纪律）。
+	regOpen []regSpan
+	regSeq  int // scope 域的 aic_scope 变量名序号（确定性）
+}
+
+// regSpan 是一个跨块 region 的开放记录。
+type regSpan struct {
+	name  string // 非空 = scope 域的 aic_scope 变量名
+	scope bool
 }
 
 type loopCtx struct{ head, post, done string }
@@ -117,7 +127,7 @@ func buildFunc(f *air.Func) (*Func, error) {
 		}
 	}
 	out := &Func{Sym: f.Sym, Params: append([]air.Param{}, f.Params...), Rets: append([]string{}, f.Rets...),
-		Flags: append([]string{}, f.Flags...), Loc: f.Loc}
+		Flags: append([]string{}, f.Flags...), Loc: f.Loc, SrcHash: air.HashFunc(f)}
 	if len(f.Blocks) == 0 {
 		return out, nil
 	}
@@ -225,7 +235,11 @@ func (fl *folder) fold(start string) ([]Stmt, string, string, error) {
 		// 经 links 豁免内联的多前驱汇合点：先发标签。后到的路径会 goto 到这里
 		// （C 的标签可以位于块内，goto 跳进来合法；未使用的标签在无 -Wall 的
 		// 构建下也无警告）。
-		if len(fl.preds[cur]) > 1 && len(b.Insts) > 0 && !fl.emittedLabel[cur] {
+		// **零指令多前驱块也要标签**（D24 实测）：它照样会被第二条路径 goto
+		// （`len(Insts) > 0` 的老条件让它以"无标签的文字落空"被内联进第一条链
+		// ⇒ 第二条路径的 goto 悬空，自检 ③ 报 "goto-referenced but was emitted
+		// without a label"）。出口块（零指令）走 inlineExit 不受影响。
+		if len(fl.preds[cur]) > 1 && !fl.emittedLabel[cur] {
 			out = append(out, &Label{Name: cur, Loc: b.Loc})
 			fl.emittedLabel[cur] = true
 		}
@@ -311,8 +325,11 @@ func isForShape(t *air.Cbr) bool {
 	return strings.HasPrefix(t.Then, "forbody") && strings.HasPrefix(t.Else, "fordone")
 }
 
-// foldInsts 折块内指令；`region.enter/exit` 折成 Region 语句（同一块内成对时嵌套；
-// 跨块的 region 由块级折叠处理，见 foldRegionSpan）。
+// foldInsts 折块内指令。region 有两种折法：
+//   - 同块内 enter/exit 成对（词法括号匹配）→ Region{Body} 结构化块（原形态）；
+//   - 跨块（enter 在这块、exit 在降级后的后续块）→ 平铺 RegionOpen/RegionClose，
+//     配对由 fl.regOpen 栈跨块记录。air 层 V3.1 已沿 CFG 边保证结构化配平，
+//     故按遇到顺序平铺即保持执行序（goto 改 relabel 不改动态序）。
 func (fl *folder) foldInsts(b *air.Block, insts []air.Inst) ([]Stmt, error) {
 	var out []Stmt
 	for i := 0; i < len(insts); i++ {
@@ -336,18 +353,31 @@ func (fl *folder) foldInsts(b *air.Block, insts []air.Inst) ([]Stmt, error) {
 					break
 				}
 			}
-			if end < 0 {
-				// 跨块 region：交给块级 span 折叠
-				return nil, fmt.Errorf("region span crosses blocks (unsupported shape yet)")
+			if end >= 0 {
+				inner, err := fl.foldInsts(b, insts[i+1:end])
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, &Region{Body: inner, Scope: v.Scope, Loc: v.Loc})
+				i = end
+				continue
 			}
-		inner, err := fl.foldInsts(b, insts[i+1:end])
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, &Region{Body: inner, Scope: v.Scope, Loc: v.Loc})
-		i = end
+			// 跨块：平铺。scope 域的 aic_scope 变量名在此定下（确定性：函数内序号）。
+			fl.regSeq++
+			name := ""
+			if v.Scope {
+				name = fmt.Sprintf("aic_t_region_%d", fl.regSeq)
+			}
+			fl.regOpen = append(fl.regOpen, regSpan{name: name, scope: v.Scope})
+			out = append(out, &RegionOpen{Name: name, Scope: v.Scope, Loc: v.Loc})
 		case *air.RegionExit:
-			return nil, fmt.Errorf("region.exit without enter in block %s", b.Label)
+			// 同块配对已在上面的 RegionEnter 分支被吃掉；走到这里 = 跨块的 exit。
+			if len(fl.regOpen) == 0 {
+				return nil, fmt.Errorf("region.exit without enter in block %s", b.Label)
+			}
+			top := fl.regOpen[len(fl.regOpen)-1]
+			fl.regOpen = fl.regOpen[:len(fl.regOpen)-1]
+			out = append(out, &RegionClose{Name: top.name, Scope: top.scope, Loc: v.Loc})
 		default:
 			out = append(out, &Leaf{In: in, Loc: air.InstLoc(in)})
 		}
@@ -870,6 +900,7 @@ func collectLabels(list []Stmt, labels, gotos map[string]int) {
 }
 
 func verifyStmts(sym string, list []Stmt, loopDepth int) error {
+	open := 0 // 平铺 region 的开放数（ Region{Body} 自配平，不计 ）
 	for _, st := range list {
 		switch v := st.(type) {
 		case *Leaf:
@@ -929,6 +960,20 @@ func verifyStmts(sym string, list []Stmt, loopDepth int) error {
 			if err := verifyStmts(sym, v.Body, loopDepth); err != nil {
 				return err
 			}
+		case *RegionOpen:
+			// 平铺 region 入口：scope 域必须带 aic_scope 变量名（spawn 站点取用）。
+			if v.Scope && v.Name == "" {
+				return fmt.Errorf("cir: %s has a scope region-open without a name", sym)
+			}
+			open++
+		case *RegionClose:
+			if open == 0 {
+				return fmt.Errorf("cir: %s has a region-close without a region-open", sym)
+			}
+			if v.Scope && v.Name == "" {
+				return fmt.Errorf("cir: %s has a scope region-close without a name", sym)
+			}
+			open--
 		case *Scope:
 			if len(v.Body) == 0 {
 				return fmt.Errorf("cir: %s has an empty lexical scope", sym)
@@ -949,6 +994,9 @@ func verifyStmts(sym string, list []Stmt, loopDepth int) error {
 				return fmt.Errorf("cir: %s has a goto without a target", sym)
 			}
 		}
+	}
+	if open != 0 {
+		return fmt.Errorf("cir: %s has %d unclosed region-open(s)", sym, open)
 	}
 	return nil
 }
@@ -1013,6 +1061,10 @@ func CountKinds(list []Stmt) map[string]int {
 			case *Region:
 				out["region"]++
 				walk(v.Body)
+			case *RegionOpen:
+				out["region-open"]++
+			case *RegionClose:
+				out["region-close"]++
 			case *Scope:
 				out["scope"]++
 				walk(v.Body)

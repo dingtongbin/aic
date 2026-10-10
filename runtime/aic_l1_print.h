@@ -118,9 +118,9 @@ AIC_SET_PRINT(str)
         aic_pr_lbrace(); \
         for (i = 0; i < m->len; i++) { \
             if (i != 0) aic_pr_sep(); \
-            aic_pr_##KS(m->keys[m->order[i]], depth + 1); \
+            aic_pr_##KS(AIC_MAP_SLOT_KEY(m, m->order[i]), depth + 1); \
             aic_pr_colon(); \
-            aic_pr_##VS(m->vals[m->order[i]], depth + 1); \
+            aic_pr_##VS(AIC_MAP_SLOT_VAL(m, m->order[i]), depth + 1); \
         } \
         aic_pr_rbrace(); \
     }

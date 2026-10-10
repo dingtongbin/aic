@@ -185,10 +185,27 @@ type Ctx struct {
 	// irScopeCur 是当前所在的 `scope { }` 的 C 变量名（spawn 站点往它上面挂任务）；
 	// 空 = 不在 scope 里（spawn 会出现即编译错，词法规则由检查器保证）。
 	irScopeCur string
+	// irRegionScopes 是**跨块** scope 域（平铺 RegionOpen/RegionClose）的进入前
+	// 名录：每进一层压 (外层名, 本层名) 两个，退出时恢复外层名。结构化
+	// Region{Scope:true} 用自己的 savedScope 局部量，不经过这里。
+	irRegionScopes []string
 	// irSpawns/irSpawnSeq 是本遍发现的 spawn 站点（原型在原型段发、定义在函数体段后发；
 	// 序号按发现序 = 确定性，H2）。
 	irSpawns   []irSpawnSite
 	irSpawnSeq int
+	// FuncCache 是 F1 增量翻译的函数级缓存（nil = 不用；--emit-c 与门禁路径必须
+	// 保持 nil —— H2/H3 判的就是发射文本的确定性与可编译性，走缓存会把门禁判据
+	// 变成缓存命中）。见 func_cache.go。
+	FuncCache *FuncCache
+}
+
+// emitRaw 把一段缓存文本原样追加进主输出（F1 命中路径：跳过全部发射）。
+// 文本自身已含行尾，故不追加换行；probe 模式（空跑）不写。
+func (c *Ctx) emitRaw(b []byte) {
+	if c.probe {
+		return
+	}
+	c.buf.Write(b)
 }
 
 // substT 应用当前上下文的类型代换（无代换时原样返回）。

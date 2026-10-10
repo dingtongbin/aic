@@ -160,6 +160,12 @@ func (v *verifier) checkFunc(f *Func) {
 			}
 		}
 	}
+	// V3.1/V3.2/V3.3/V7.3 的地基：沿 CFG 边把每块入口的区域深度算出来。
+	// 结构化配平 = 同一块从任何路径到达时深度一致；不一致即 enter/exit 不是词法
+	// 配对的（如 exit 走岔路漏弹一级）。per-block 扫描从入口深度起算——
+	// 循环体块**继承**区域深度，按块从 0 起算会把 region 里的 exit 误判成未配平
+	// （B10 "每请求一 region" 惯用法实测）。
+	regionDepth := regionDepths(f, v)
 	// V2.4/V2.5/V2.6：定义先于使用、临时量恰定义一次、同块变量不重复声明
 	defs := map[string]Loc{}
 	blockVars := map[string]map[string]bool{}
@@ -208,8 +214,17 @@ func (v *verifier) checkFunc(f *Func) {
 				v.fail("V2.4", "value "+name+" used before definition in "+f.Sym, termLoc(b.Term))
 			}
 		}
-		// V3.1/V3.2/V7.3：区域配平与深度（V7.3 必须在**边走边算**的深度里判）
-		depth := 0
+		// V3.1/V3.2/V3.3/V7.3：区域配平与深度。
+		//
+		// 顺序很重要：**先**沿 CFG 边把每块入口深度算出来（结构化配平：同一块从任何
+		// 路径到达深度必须一致），**再**从入口深度起逐指令走。旧的按块判"块内
+		// depth 必须归零"是错的：region 块里含 for/if 时 enter 与 exit 天然在不同块，
+		// 且循环体块**继承**区域深度（exit 在块里出现不等于没配平）—— B10（每请求一
+		// region + 循环）实测被误报成 "leaves 1 region(s) unclosed"。
+		depth, known := regionDepth[b.Label]
+		if !known {
+			continue // 不可达块：AIR 已剪枝，没有深度
+		}
 		for _, in := range b.Insts {
 			switch t := in.(type) {
 			case *RegionEnter:
@@ -236,8 +251,9 @@ func (v *verifier) checkFunc(f *Func) {
 				}
 			}
 		}
-		if depth != 0 {
-			v.fail("V3.1", fmt.Sprintf("block %s leaves %d region(s) unclosed", b.Label, depth), b.Loc)
+		// V3.3：ret 时区域必须已全部 pop（区域未闭合就返回 = 泄漏区域帧）
+		if _, isRet := b.Term.(*Ret); isRet && depth != 0 {
+			v.fail("V3.3", "ret bypasses an unclosed region in "+f.Sym, termLoc(b.Term))
 		}
 		// V5.1/V5.3：守卫只作为 store 修饰符，且被守卫的值必须是**带头的引用**。
 		// 判定按类型（值→类型表来自 param/let/var），不用名字启发式 —— 临时量名
@@ -254,24 +270,6 @@ func (v *verifier) checkFunc(f *Func) {
 			if !isRefType(ty) {
 				v.fail("V5.3", "guarded store of a non-reference value "+st.Val+" : "+ty, st.Loc)
 			}
-		}
-	}
-	// V3.3：无 ret 绕过未 pop 的 region
-	for _, b := range f.Blocks {
-		if _, isRet := b.Term.(*Ret); !isRet {
-			continue
-		}
-		depth := 0
-		for _, in := range b.Insts {
-			switch in.(type) {
-			case *RegionEnter:
-				depth++
-			case *RegionExit:
-				depth--
-			}
-		}
-		if depth != 0 {
-			v.fail("V3.3", "ret bypasses an unclosed region in "+f.Sym, termLoc(b.Term))
 		}
 	}
 	// V4.2：checkfail 只在有 Err 位的函数里
@@ -297,6 +295,66 @@ func (v *verifier) checkFunc(f *Func) {
 			v.fail("V7.1", "terminator without loc in "+f.Sym, b.Loc)
 		}
 	}
+}
+
+// regionDepths 沿 CFG 边传播区域深度，返回**每块入口深度**。
+//
+// 结构化配平判定：同一块从不同路径到达时，入口深度必须一致 —— 不一致说明
+// enter/exit 在控制流上不是词法配对的（漏 exit / 多 exit / exit 走岔路）。
+// 这正是"region 块里含 for/if"的正确口径：enter 与 exit 天然在不同块、循环体块
+// 继承区域深度，都不是未配平。失败时直接 v.fail(V3.1) 并返回 nil。
+func regionDepths(f *Func, v *verifier) map[string]int {
+	out := map[string]int{}
+	if len(f.Blocks) == 0 {
+		return out
+	}
+	byLabel := make(map[string]*Block, len(f.Blocks))
+	for _, b := range f.Blocks {
+		if _, dup := byLabel[b.Label]; dup {
+			v.fail("V2.x", "block "+b.Label+" declared twice in "+f.Sym, b.Loc)
+			return nil
+		}
+		byLabel[b.Label] = b
+	}
+	// 入口块 = 函数第一块（lowerer 约定：entry 在最前）
+	entry := f.Blocks[0]
+	out[entry.Label] = 0
+	queue := []string{entry.Label}
+	bad := func(loc Loc) map[string]int {
+		v.fail("V3.1", "region nesting is not structured in "+f.Sym, loc)
+		return nil
+	}
+	for len(queue) > 0 {
+		lbl := queue[0]
+		queue = queue[1:]
+		b := byLabel[lbl]
+		d := out[lbl]
+		for _, in := range b.Insts {
+			switch in.(type) {
+			case *RegionEnter:
+				d++
+			case *RegionExit:
+				d--
+			}
+			if d < 0 {
+				v.fail("V3.1", "region.exit without matching region.enter in "+f.Sym, inLoc(in))
+				return nil
+			}
+		}
+		for _, s := range termTargets(b.Term) {
+			sb, ok := byLabel[s]
+			if !ok {
+				continue // 未知后继：V2.x 已报
+			}
+			if old, seen := out[s]; !seen {
+				out[s] = d
+				queue = append(queue, s)
+			} else if old != d {
+				return bad(sb.Loc)
+			}
+		}
+	}
+	return out
 }
 
 // isRefType 判定类型文本是否为**带头引用**（指针 / 接口 / 容器句柄）。

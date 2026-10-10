@@ -160,6 +160,13 @@ type lowerer struct {
 	deferErr bool
 	depth    int // 当前 region 嵌套深度（守卫 limit 的计算依据）
 	loops    []loopCtx
+	// blockVars 记录每个 AIR 块里已声明的变量名（V2.6 的判据源）。循环变量若与
+	// **同一块**里的外层变量同名 ⇒ 重命名成 fresh 名并走 loopAlias 改写体内引用
+	// （审计 D1：`var v i64 = 1; for v in xs` 旧行为 = V2.6 误报"重复声明"）。
+	// 只在真冲突时改名 ⇒ 无冲突程序的 IR 快照不动（H8）。
+	blockVars  map[*Block]map[string]bool
+	loopAlias  map[string]string
+	renameSeq  int
 	lamSeq   int // lambda 提升编号（确定性）
 	// envCur 非空 = 正在降级一个闭包体：捕获引用读 `field envCur, <槽>`（N1）。
 	envCur string
@@ -315,6 +322,13 @@ func (l *lowerer) funcDecl(d *parse.FuncDecl, recv string) error {
 	entry := l.newBlock("entry", d.Pos)
 	f.Blocks = append(f.Blocks, entry)
 	saved := l.begin(f, entry, d.Pos)
+	// V2.6 判据源：形参 / this / 返回槽都住在入口块
+	for _, p := range f.Params {
+		l.noteBlockVar(p.Name)
+	}
+	for i := range f.Rets {
+		l.noteBlockVar(fmt.Sprintf("ret%d", i))
+	}
 	// 返回槽（§10.1 V4.4）：全部出口先 store 进槽再 br 到唯一收尾块，
 	// 收尾块统一 ret —— 无 phi 也满足「每临时量恰定义一次」。
 	for i, r := range f.Rets {
@@ -343,13 +357,18 @@ type fnState struct {
 	blkSeq    int
 	deferSeq  int
 	deferErr  bool
+	blockVars map[*Block]map[string]bool
+	loopAlias map[string]string
+	renameSeq int
 }
 
 func (l *lowerer) begin(f *Func, entry *Block, at parse.Pos) fnState {
 	st := fnState{fn: l.fn, cur: l.cur, exitLabel: l.exitLabel, depth: l.depth,
-		tmpSeq: l.tmpSeq, blkSeq: l.blkSeq, deferSeq: l.deferSeq, deferErr: l.deferErr}
+		tmpSeq: l.tmpSeq, blkSeq: l.blkSeq, deferSeq: l.deferSeq, deferErr: l.deferErr,
+		blockVars: l.blockVars, loopAlias: l.loopAlias, renameSeq: l.renameSeq}
 	l.fn, l.cur, l.exitLabel, l.depth = f, entry, "exit", 0
 	l.tmpSeq, l.blkSeq, l.deferSeq, l.deferErr = 0, 0, 0, false
+	l.blockVars, l.loopAlias, l.renameSeq = map[*Block]map[string]bool{}, map[string]string{}, 0
 	return st
 }
 
@@ -357,6 +376,57 @@ func (l *lowerer) end(st fnState) {
 	l.fn, l.cur, l.exitLabel, l.depth = st.fn, st.cur, st.exitLabel, st.depth
 	l.tmpSeq, l.blkSeq = st.tmpSeq, st.blkSeq
 	l.deferSeq, l.deferErr = st.deferSeq, st.deferErr
+	l.blockVars, l.loopAlias, l.renameSeq = st.blockVars, st.loopAlias, st.renameSeq
+}
+
+// airVarName 取一个源变量名在 AIR 里的名字（循环变量重命名时走别名表，
+// 其余原名）。放在 lowerer 上的唯一查找点 = value/place 的 Ident 分支。
+func (l *lowerer) airVarName(src string) string {
+	if a, ok := l.loopAlias[src]; ok {
+		return a
+	}
+	return src
+}
+
+// noteBlockVar 记录一个变量声明落在当前块（V2.6 的判据源；参数与返回槽在入口块）。
+func (l *lowerer) noteBlockVar(name string) {
+	if name == "" {
+		return
+	}
+	if l.blockVars[l.cur] == nil {
+		l.blockVars[l.cur] = map[string]bool{}
+	}
+	l.blockVars[l.cur][name] = true
+}
+
+// loopVarName 取循环变量在 AIR 里的名字：与当前块已有变量同名时重命名
+// （源级遮蔽合法，但 AIR 的 Var 全落在同块会被 V2.6 误报），并登记 loopAlias
+// 供循环体里的引用改写。返回值 = AIR 名。
+func (l *lowerer) loopVarName(src string, wantAlias bool) string {
+	if src == "" || src == "_" {
+		return src
+	}
+	if l.blockVars[l.cur] != nil && l.blockVars[l.cur][src] {
+		l.renameSeq++
+		fresh := fmt.Sprintf("%s__l%d", src, l.renameSeq)
+		if wantAlias {
+			if l.loopAlias == nil {
+				l.loopAlias = map[string]string{}
+			}
+			l.loopAlias[src] = fresh
+		}
+		l.noteBlockVar(fresh)
+		return fresh
+	}
+	l.noteBlockVar(src)
+	return src
+}
+
+// unaliasLoopVar 循环体降级结束：撤掉本层循环的循环变量别名（外层遮蔽关系恢复）。
+func (l *lowerer) unaliasLoopVar(src, airName string) {
+	if airName != src {
+		delete(l.loopAlias, src)
+	}
 }
 
 // finish 发射唯一收尾块：全部出口先 br 到它（V4.4），由它执行 ret；
@@ -538,6 +608,7 @@ func (l *lowerer) varDecl(v *parse.VarDecl) error {
 		inst.Init = l.coerce(val, v.Init, slot)
 	}
 	l.cur.Insts = append(l.cur.Insts, inst)
+	l.noteBlockVar(tgt.Name)
 	return nil
 }
 
@@ -695,7 +766,7 @@ func (l *lowerer) rangeFor(v *parse.ForStmt) error {
 	if err != nil {
 		return err
 	}
-	name := v.Names[0].Name
+	name := l.loopVarName(v.Names[0].Name, true)
 	l.cur.Insts = append(l.cur.Insts, &Var{Name: name, Ty: "usize", Init: lo, Loc: LocOf(v.Pos)})
 	head := l.newBlock("forhead", v.Pos)
 	body := l.newBlock("forbody", v.Pos)
@@ -714,6 +785,7 @@ func (l *lowerer) rangeFor(v *parse.ForStmt) error {
 		return err
 	}
 	l.loops = l.loops[:len(l.loops)-1]
+	l.unaliasLoopVar(v.Names[0].Name, name)
 	if l.cur.Term == nil {
 		l.cur.Term = &Br{Label: post.Label, Loc: LocOf(v.Pos)}
 	}

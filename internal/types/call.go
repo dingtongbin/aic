@@ -711,7 +711,7 @@ func (c *Checker) markStoreGuard(value parse.Expr, targetBound bound, what strin
 	if vb.exact {
 		c.errorAt(parse.ExprPos(value), "a block-local object escapes: stored into a shallower region's "+what,
 			"object created at depth "+itoa(vb.off)+", the target storage sits at depth "+itoa(targetBound.off),
-			"move the creation into the target storage's region, or add @live to raise its level (core design §5 R5)")
+			"move the creation into the target storage's region, or add live to raise its level (core design §5 R5)")
 		return
 	}
 	c.guards[value] = GuardSpec{Kind: GuardStore, Dynamic: targetBound.param}

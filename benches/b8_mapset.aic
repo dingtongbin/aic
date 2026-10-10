@@ -1,0 +1,44 @@
+import print
+import os
+import str
+
+// B8 容器核 · map/set 混用压力（插入 + 查找 + 删除；默认 n = 200000）。
+// 与 benches/c/b8_mapset.c 逐行同构：同一组键、同样的插入/查找/删除次序。
+func main() -> Err {
+    var n i64 = 200000
+    var args = os.args()
+    if args.len() >= 2 {
+        var v, e = str.toI64(args[1])
+        if e.code == 0 {
+            n = v
+        }
+    }
+    var m map[str]i64 = map.new()
+    var s set[i64] = set.new()
+    var i i64 = 0
+    for i < n {
+        var k = str.fromI64(i)
+        m.put(k, i * 3)
+        s.add(i)
+        i = i + 1
+    }
+    var acc i64 = 0
+    i = 0
+    for i < n {
+        var k = str.fromI64(i)
+        acc = acc + m.get(k)
+        if s.has(i) {
+            acc = acc + 1
+        }
+        i = i + 1
+    }
+    i = 0
+    for i < n / 2 {
+        var k = str.fromI64(i)
+        m.remove(k)
+        i = i + 1
+    }
+    acc = acc + i64(m.len()) * 1000 + i64(s.len())
+    print.println(acc)
+    return nil
+}

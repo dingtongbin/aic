@@ -212,7 +212,8 @@ func (p *Parser) parseConst(annotations []string) Decl {
 
 // parseVar handles local declarations and class fields (isDecl 只控制错误
 // 恢复的同步范围)。顶层 var 由 parseDecl 拒绝，不经过这里。
-// 目标形：`name` / `@live name` / `_`（弃位）。
+// 目标形：`name` / `live name` / `_`（弃位）。R20：`live` 是关键字（不再是
+// `@live` 注解）—— 与 var/const 同属声明层修饰语。
 func (p *Parser) parseVar(isDecl bool) *VarDecl {
 	at := p.pos()
 	p.next() // var
@@ -266,7 +267,7 @@ func targetNames(ts []VarTarget) string {
 		case t.Blank:
 			parts = append(parts, "_")
 		case t.Live:
-			parts = append(parts, "@live "+t.Name)
+			parts = append(parts, "live "+t.Name)
 		default:
 			parts = append(parts, t.Name)
 		}
@@ -274,11 +275,11 @@ func targetNames(ts []VarTarget) string {
 	return strings.Join(parts, ", ")
 }
 
-// parseVarTarget reads `name` / `@live name` / `_`.
+// parseVarTarget reads `name` / `live name` / `_`.
 func (p *Parser) parseVarTarget() (VarTarget, bool) {
 	at := p.pos()
 	tgt := VarTarget{Pos: at}
-	if p.at(ANNOT, "@live") {
+	if p.at(KW, "live") {
 		p.next()
 		tgt.Live = true
 	}

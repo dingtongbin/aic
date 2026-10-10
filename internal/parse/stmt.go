@@ -108,6 +108,15 @@ func (p *Parser) parseStmt() Stmt {
 		p.next()
 		return p.parseScopeTail(at)
 
+	case p.at(KW, "live"):
+		// R20：`live` 是变量目标修饰语，不是语句。定向报错而不是
+		// "unexpected token"（防坑清单：错误必须可照做）。
+		p.errorHere(at, "live is a variable modifier, not a statement",
+			"got live",
+			"write a declaration: var live x = C{...} (live raises the allocation to the outer region, core design §5 R4)")
+		p.synchronize(true)
+		return nil
+
 	case p.atIdent("select"):
 		// N6：`select` 是**上下文关键字**（H7 的 23 关键字不变），只在语句位识别。
 		return p.parseSelect(at)

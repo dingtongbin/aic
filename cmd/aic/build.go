@@ -91,6 +91,12 @@ func buildArgs(cc, cPath, rt, out string, needL2 bool) []string {
 	if !isTCC {
 		args = append(args, "-finput-charset=UTF-8")
 	}
+	// 用户在 AIC_CFLAGS 里给的额外 flag（按空白切分）。**门禁/H2/H3 走自己的
+	// 四配置、不经这里**（aici_exec.py 自己拼 CBackend）。默认不带 -O：门禁
+	// 要的就是与实际部署一致的未经优化产物，-O0 是默认档（tcc 无 -O 支持）。
+	if extra := strings.Fields(os.Getenv("AIC_CFLAGS")); len(extra) > 0 {
+		args = append(args, extra...)
+	}
 	args = append(args, "-I", rt, cPath,
 		filepath.Join(rt, "aic_l0.c"), filepath.Join(rt, "aic_std.c"))
 	if needL2 {

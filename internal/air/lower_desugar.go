@@ -186,10 +186,14 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 		Rhs: &LenRHS{Place: &VarPlace{Name: xs}}, Loc: LocOf(v.Pos)})
 	// **map 迭代的名字位不是下标**（§2.5：单名 = 键，两名 = (键, 值)），故内部
 	// 下标变量一律用 i__；其他容器 Names[0] 才是使用者写的下标名。
+	// 索引名只在**两名形态**才对用户可见（`for i, x in xs` 的 i）⇒ 只有那时要
+	// 别名；单名形态下源名指的是元素，索引是隐形的（D1 的重命名不该把体内的
+	// 元素引用改到索引上）。
 	isMap := types.IsMap(xt)
+	idxVisible := !isMap && len(v.Names) >= 2
 	idxName := "i__"
 	if !isMap && len(v.Names) >= 1 && v.Names[0].Name != "_" {
-		idxName = v.Names[0].Name
+		idxName = l.loopVarName(v.Names[0].Name, idxVisible)
 	}
 	l.cur.Insts = append(l.cur.Insts, &Var{Name: idxName, Ty: "usize", Init: "const 0", Loc: LocOf(v.Pos)})
 
@@ -213,7 +217,9 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	} else if len(v.Names) >= 2 {
 		elemIdx = 1
 	}
+	elemName := ""
 	if len(v.Names) > 0 && v.Names[elemIdx].Name != "_" {
+		elemName = v.Names[elemIdx].Name
 		// **map 迭代：单名 = 键，两名 = (键, 值)**（§2.5）。键/值按插入序下标取
 		// （runtime 的 key_at/val_at）。曾经走通用的 elem 读 ⇒ "element read on
 		// the host type map[str]i32 is not covered"（031/700 实测）。
@@ -225,19 +231,21 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 			// **str 单名迭代 = 单字节视图（str）**（§2.5：`for ch in s` 打印该字符）；
 			// 只有 `for i, b in s` 的两名形态才出 u8 字节。曾经两种都发 u8，
 			// `println(ch)` 打出 104/101/121（693 实测）。
+			elemName = l.loopVarName(elemName, true)
 			hi := l.tmp("t")
 			l.cur.Insts = append(l.cur.Insts, &Let{Tmp: hi, Ty: "usize",
 				Rhs: &Binop{Op: "+", A: idxName, B: "const 1"}, Loc: LocOf(v.Pos)})
 			el := l.tmp("t")
 			l.cur.Insts = append(l.cur.Insts, &Let{Tmp: el, Ty: "str",
 				Rhs: &StrViewRHS{Base: xs, Lo: idxName, Hi: hi}, Loc: LocOf(v.Pos)})
-			l.cur.Insts = append(l.cur.Insts, &Var{Name: v.Names[0].Name,
+			l.cur.Insts = append(l.cur.Insts, &Var{Name: elemName,
 				Ty: "str", Init: el, Loc: LocOf(v.Names[0].Pos)})
 		} else {
 			el := l.tmp("t")
 			l.cur.Insts = append(l.cur.Insts, &Let{Tmp: el, Ty: l.elemTypeText(xt),
 				Rhs: &ElemRHS{Place: &VarPlace{Name: xs}, Idx: idxName}, Loc: LocOf(v.Pos)})
-			l.cur.Insts = append(l.cur.Insts, &Var{Name: v.Names[elemIdx].Name,
+			elemName = l.loopVarName(elemName, true)
+			l.cur.Insts = append(l.cur.Insts, &Var{Name: elemName,
 				Ty: l.elemTypeText(xt), Init: el, Loc: LocOf(v.Names[elemIdx].Pos)})
 		}
 	}
@@ -246,6 +254,13 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 		return err
 	}
 	l.loops = l.loops[:len(l.loops)-1]
+	// 循环体降级结束：撤掉本层循环的别名（源名指回外层变量）。
+	if idxVisible {
+		l.unaliasLoopVar(v.Names[0].Name, idxName)
+	}
+	if elemName != "" {
+		l.unaliasLoopVar(v.Names[elemIdx].Name, elemName)
+	}
 	if l.cur.Term == nil {
 		l.cur.Term = &Br{Label: post.Label, Loc: LocOf(v.Pos)}
 	}
@@ -270,15 +285,16 @@ func (l *lowerer) bindMapIter(xt types.Type, xs, idxName string, v *parse.ForStm
 		t := l.tmp("t")
 		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: l.ty(k),
 			Rhs: &Call{Sym: sym + "_keyAt", Args: []string{xs, idxName}}, Loc: LocOf(v.Names[0].Pos)})
-		l.cur.Insts = append(l.cur.Insts, &Var{Name: v.Names[0].Name, Ty: l.ty(k), Init: t,
+		key = l.loopVarName(v.Names[0].Name, true)
+		l.cur.Insts = append(l.cur.Insts, &Var{Name: key, Ty: l.ty(k), Init: t,
 			Loc: LocOf(v.Names[0].Pos)})
-		key = v.Names[0].Name
 	}
 	if len(v.Names) >= 2 && v.Names[1].Name != "_" {
 		t := l.tmp("t")
 		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: l.ty(val),
 			Rhs: &Call{Sym: sym + "_valAt", Args: []string{xs, idxName}}, Loc: LocOf(v.Names[1].Pos)})
-		l.cur.Insts = append(l.cur.Insts, &Var{Name: v.Names[1].Name, Ty: l.ty(val), Init: t,
+		valName := l.loopVarName(v.Names[1].Name, true)
+		l.cur.Insts = append(l.cur.Insts, &Var{Name: valName, Ty: l.ty(val), Init: t,
 			Loc: LocOf(v.Names[1].Pos)})
 	}
 	_ = key
@@ -369,6 +385,7 @@ func (l *lowerer) multiBind(v *parse.VarDecl) error {
 			continue
 		}
 		l.cur.Insts = append(l.cur.Insts, &Var{Name: tgt.Name, Ty: ty, Init: t, Loc: LocOf(tgt.Pos)})
+		l.noteBlockVar(tgt.Name)
 	}
 	return nil
 }

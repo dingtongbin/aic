@@ -182,7 +182,9 @@ func cmdBuild(args []string) int {
 	// 只发射 C 文本（门禁自掌四配置）：**不过缓存**——H2/H3 判的就是发射文本的
 	// 确定性与可编译性，走缓存会把门禁判据变成缓存命中（门禁是规划者的资产）。
 	if flagValueIsEmitC(args) {
-		res, err := emitProgram(prog, args)
+		// 门禁路径**永不走函数缓存**：H2/H3 判的就是发射文本的确定性与可编译性，
+		// 走缓存等于把判据换成缓存命中（缓存是构建优化，不是正确性证明）。
+		res, err := emitProgramCached(prog, args, false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "aic build: emit failed: %v\n", err)
 			fmt.Fprintln(os.Stderr, "fix: this construct is not supported by the current code generator yet; rewrite it with the constructs listed in core design §16.0 (the IR path supports more than the C backend does today)")
@@ -241,7 +243,7 @@ func buildCached(prog *Program, out string, noCache bool) error {
 			return os.WriteFile(out, data, 0o755)
 		}
 	}
-	res, err := emitProgram(prog, args)
+	res, err := emitProgramCached(prog, args, !noCache)
 	if err != nil {
 		return fmt.Errorf("emit failed: %v\nfix: this construct is not supported by the current code generator yet; rewrite it with the constructs listed in core design §16.0 (the IR path supports more than the C backend does today)", err)
 	}
@@ -482,6 +484,18 @@ func needsL2(needed []string) bool {
 // 用户直令（2026-10）：**直译路径去掉，不能再用了** —— 不存在"模式选择"，也不存在回退。
 // 未覆盖的 IR 形态一律**编译失败**（红线 23：绝不发半截），失败清单就是施工清单。
 func emitProgram(prog *Program, args []string) (*emit.Result, error) {
+	return emitProgramCached(prog, args, false)
+}
+
+// emitProgramCached 与 emitProgram 同管线，区别是可按 open 开函数级增量翻译
+// 缓存（F1：翻译段 47ms → 命中段 ~0ms；键含编译器身份与 IR 体哈希）。
+// open=false（门禁 --emit-c / dump-c / --no-cache）时行为与裸管线完全一致。
+func emitProgramCached(prog *Program, args []string, open bool) (*emit.Result, error) {
+	if !open {
+		return emitIRUnit(prog)
+	}
+	emit.SetFuncCache(emit.NewFuncCache(pkg.CacheDir(), pkg.CompilerID()+"/funccache-v1", false))
+	defer emit.SetFuncCache(nil)
 	return emitIRUnit(prog)
 }
 
