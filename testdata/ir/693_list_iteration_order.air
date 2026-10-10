@@ -29,13 +29,14 @@ func ok_main() {
     loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t11 : bool = cmp lt ch, t10
     loc ../../testdata/ok/693_list_iteration_order.aic:8:5 cbr t11, forbody6, fordone8
   forbody6:
-    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t12 : u8 = elem const "hey", ch
-    loc ../../testdata/ok/693_list_iteration_order.aic:8:9 var ch : u8 = t12
-    loc ../../testdata/ok/693_list_iteration_order.aic:9:22 let t13 : void = call print_println(ch)
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t12 : usize = binop + ch, const 1
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t13 : str = str.view const "hey", ch, t12
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:9 var ch : str = t13
+    loc ../../testdata/ok/693_list_iteration_order.aic:9:22 let t14 : void = call print_println(ch)
     loc ../../testdata/ok/693_list_iteration_order.aic:8:5 br forpost7
   forpost7:
-    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t14 : usize = binop + ch, const 1
-    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 store ch, t14
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 let t15 : usize = binop + ch, const 1
+    loc ../../testdata/ok/693_list_iteration_order.aic:8:5 store ch, t15
     loc ../../testdata/ok/693_list_iteration_order.aic:8:5 br forhead5
   fordone8:
     loc ../../testdata/ok/693_list_iteration_order.aic:3:1 br exit

@@ -101,10 +101,23 @@ func TestVerifyRejects(t *testing.T) {
 			m.Funcs[0].Blocks[0].Insts = append(m.Funcs[0].Blocks[0].Insts,
 				&Let{Tmp: "t1", Ty: "i32", Rhs: &Const{Lit: "2"}, Loc: loc})
 		}},
-		{"V3.1 region 未配平", "V3.1", func(m *Module) {
+		{"V3.1 region exit 无对应 enter", "V3.1", func(m *Module) {
 			m.Funcs[0].Blocks[0].Insts = append([]Inst{
-				&RegionEnter{TypeID: "r1", Loc: loc},
+				&RegionExit{Loc: loc},
 			}, m.Funcs[0].Blocks[0].Insts...)
+		}},
+		{"V3.1 跨块区域嵌套不结构化", "V3.1", func(m *Module) {
+			// enter 后分岔：一支 pop、一支不 pop，汇合点深度不一致。
+			// 这正是"region 含循环"的正确口径要**通过**、而漏 pop 要**拒**的分界。
+			f := m.Funcs[0]
+			f.Blocks[0].Insts = append([]Inst{&RegionEnter{TypeID: "r1", Loc: loc}},
+				f.Blocks[0].Insts...)
+			f.Blocks[0].Term = &Cbr{Cond: "t1", Then: "b_pop", Else: "b_nopop", Loc: loc}
+			f.Blocks = append(f.Blocks,
+				&Block{Label: "b_pop", Insts: []Inst{&RegionExit{Loc: loc}},
+					Term: &Br{Label: "b_join", Loc: loc}},
+				&Block{Label: "b_nopop", Term: &Br{Label: "b_join", Loc: loc}},
+				&Block{Label: "b_join", Term: &Ret{Vals: []string{"t1"}, Loc: loc}})
 		}},
 		{"V4.2 无 Err 位却 checkfail", "V4.2", func(m *Module) {
 			m.Funcs[0].Blocks[0].Term = &CheckFail{Err: "t1", Tmp: "t2", Loc: loc}

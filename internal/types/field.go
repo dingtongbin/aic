@@ -30,16 +30,20 @@ func (c *Checker) checkField(v *parse.Field, expect Type) (Type, bound, untyped)
 	// 包限定：str.utf8At / util.add —— 包名.成员
 	if id, ok := v.X.(*parse.Ident); ok {
 		if _, isPkg := c.imports[id.Name]; isPkg {
-			// 跨包常量 util.Limit：常量是值，可直接读（函数/类型只能调用或构造）
-			if sym, found := c.depConst(id.Name, v.Name, v.Pos); found {
-				if sym == nil {
-					return nil, nilBound, untyped{}
-				}
-				if sym.Type == nil {
-					return nil, nilBound, c.untypedFromConst(sym.Const, v.Pos)
-				}
-				return sym.Type, nilBound, untyped{}
+		// 跨包常量 util.Limit：常量是值，可直接读（函数/类型只能调用或构造）
+		if sym, found := c.depConst(id.Name, v.Name, v.Pos); found {
+			if sym == nil {
+				return nil, nilBound, untyped{}
 			}
+			// **按限定名登记进本包 Consts**（`base.Limit`）：AIR 降级只拿得到
+			// 本包 Info，不登记就把跨包常量当成字段访问（chain3 实测：字段下标
+			// 解析失败）。限定名带点，源码标识符不可能撞名。
+			c.consts[id.Name+"."+v.Name] = sym
+			if sym.Type == nil {
+				return nil, nilBound, c.untypedFromConst(sym.Const, v.Pos)
+			}
+			return sym.Type, nilBound, untyped{}
+		}
 			if c.depInfo(id.Name) != nil {
 				c.errorAt(v.Pos, "a package member is not a value", id.Name+"."+v.Name,
 					"across packages only functions (call them), types (construct them), and constants are visible; functions are not first-class (core design §4)")

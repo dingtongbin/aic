@@ -76,7 +76,7 @@ func ok_main() {
     loc ../../testdata/ok/756_closure.aic:36:20 let t7 : i32 = call.closure f(const 1)
     loc ../../testdata/ok/756_closure.aic:36:18 let t8 : void = call print_println(t7)
     loc ../../testdata/ok/756_closure.aic:39:13 let obj9 : ok_Counter* = alloc task(ok_Counter)
-    loc ../../testdata/ok/756_closure.aic:39:21 store field obj9, 0, const 0
+    loc ../../testdata/ok/756_closure.aic:39:13 store field obj9, 0, const 0
     loc ../../testdata/ok/756_closure.aic:39:5 var c : ok_Counter* = obj9
     loc ../../testdata/ok/756_closure.aic:40:16 let clo10 : fn()->i32 = closure ok_lambda3 [c]
     loc ../../testdata/ok/756_closure.aic:40:5 var tick : fn()->i32 = clo10

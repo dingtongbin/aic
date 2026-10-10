@@ -1,0 +1,39 @@
+import print
+import os
+import str
+
+// B7 字符串核 · 重复切片拼接 + 查找（默认 rounds × len；str 视图与 concat 的分配压力）。
+// 与 benches/c/b7_string.c 逐行同构：同一个文本、同样的切片/查找/拼接次序。
+func checksum(s str) -> i64 {
+    var sum i64 = 0
+    for i in 0..s.len() {
+        sum = sum + i64(s[i])
+    }
+    return sum
+}
+
+func main() -> Err {
+    var rounds i64 = 2000
+    var args = os.args()
+    if args.len() >= 2 {
+        var v, e = str.toI64(args[1])
+        if e.code == 0 {
+            rounds = v
+        }
+    }
+    var base str = "the quick brown fox jumps over the lazy dog 0123456789"
+    var acc i64 = 0
+    for r in 0..rounds {
+        var v = base[0..20]
+        acc = acc + checksum(v)
+        var pos = str.indexOf(base, "fox")
+        if pos >= 0 {
+            acc = acc + i64(pos)
+        }
+        var j = base[10..30]
+        acc = acc + checksum(j)
+    }
+    print.println(acc)
+    print.println(base.len())
+    return nil
+}

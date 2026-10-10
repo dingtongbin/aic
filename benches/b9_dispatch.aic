@@ -1,0 +1,45 @@
+import print
+import os
+import str
+
+// B9 分发核 · 接口虚调用 + 泛型单态化（默认 n = 2000000 次 add）。
+// 与 benches/c/b9_dispatch.c 逐行同构：同一个 Counter、同样的调用/累加次序。
+class Counter {
+    var n i64
+
+    func add(d i64) -> i64 {
+        this.n = this.n + d
+        return this.n
+    }
+}
+
+interface Adder {
+    func add(d i64) -> i64
+}
+
+func drive(a Adder, times i64) -> i64 {
+    var acc i64 = 0
+    var i i64 = 0
+    for i < times {
+        acc = a.add(2)
+        i = i + 1
+    }
+    return acc
+}
+
+func main() -> Err {
+    var times i64 = 2000000
+    var args = os.args()
+    if args.len() >= 2 {
+        var v, e = str.toI64(args[1])
+        if e.code == 0 {
+            times = v
+        }
+    }
+    var c = Counter{n: 1}
+    var acc Adder = c
+    var r = drive(acc, times)
+    var direct = drive(c, times)
+    print.println(r + direct)
+    return nil
+}

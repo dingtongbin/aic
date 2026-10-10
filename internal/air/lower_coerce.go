@@ -91,6 +91,9 @@ func isRefClassValue(t types.Type) bool {
 
 // coerceArgs 按被调形参表把实参逐个装箱（实参处是隐式装箱最常出现的地方：
 // `describe(b)` 的 b 是具体类，describe 的形参是接口）。
+//
+// 同时给**裸 `None` 实参**定型：它的 C 零值形态取决于 Option 实例（`.tag =
+// X_None`），不给目标类型就发不出 C（706 实测）。目标类型 = 形参的 Option 实例。
 func (l *lowerer) coerceArgs(argExprs []parse.Expr, vals []string, params []types.Type) []string {
 	if len(params) == 0 {
 		return vals
@@ -99,23 +102,49 @@ func (l *lowerer) coerceArgs(argExprs []parse.Expr, vals []string, params []type
 		if i >= len(params) || i >= len(argExprs) || params[i] == nil {
 			continue
 		}
+		if vals[i] == "const None" {
+			if _, isOpt := types.IsOptionInstance(params[i]); isOpt {
+				t := l.tmp("t")
+				l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: l.ty(params[i]),
+					Rhs: &Const{Lit: "None"}, Loc: LocOf(parse.ExprPos(argExprs[i]))})
+				vals[i] = t
+				continue
+			}
+		}
 		vals[i] = l.coerce(vals[i], argExprs[i], l.ty(params[i]))
 	}
 	return vals
 }
 
 // callParams 取被调签名的形参类型（与 callResults 同源；实参装箱的依据）。
+//
+// **泛型调用必须按实例实参代换**：模板签名里 T 还是 TypeParam（`func f[T](x T)`），
+// 拿它当槽位类型会把「实参是 T」误判成隐式装箱（`box m1, TT`：762 实测，箱进一个
+// 类型形参）。代换依据 = 检查器在调用点登记的实例实参（CallTypeArgs，按形参声明序）。
 func (l *lowerer) callParams(v *parse.Call) []types.Type {
 	switch fn := v.Fn.(type) {
 	case *parse.Ident:
 		if sig, ok := l.info.Funcs[fn.Name]; ok {
-			return sig.ParamTypes
+			return l.substParams(sig.ParamTypes, sig.TypeParams, l.callTypeArgs(v))
 		}
 	case *parse.Field:
 		if rt := l.typeOf(fn.X); rt != nil {
+			// 容器内建方法（map.put / list.append / set.add …）：规则只有 types 那一份
+			// （`m.put("sq", Sq{})` 的值实参是具体类、值槽是接口 ⇒ 必须显式装箱，788 实测）。
+			if sig, ok := types.ContainerMethodSig(rt, fn.Name); ok {
+				return sig.ParamTypes
+			}
 			if cl, isCl := types.IsClass(rt); isCl {
 				if sig, ok := cl.Method(fn.Name); ok {
 					return sig.ParamTypes
+				}
+			}
+			// 泛型类**实例**的方法：按实例实参代换（Box[i32].with(n T) 的 n 是 i32）。
+			if inst, isInst := rt.(*types.Instance); isInst {
+				if cl, isCl := types.IsClass(inst.Base); isCl {
+					if sig, ok := cl.Method(fn.Name); ok {
+						return l.substParams(sig.ParamTypes, cl.TypeParams, inst.Args)
+					}
 				}
 			}
 			if ifc, isIfc := types.IsInterface(rt); isIfc {
@@ -124,6 +153,27 @@ func (l *lowerer) callParams(v *parse.Call) []types.Type {
 		}
 	}
 	return nil
+}
+
+// callTypeArgs 取调用点的实例实参（检查器登记；没有登记 = 不是泛型调用）。
+func (l *lowerer) callTypeArgs(v *parse.Call) []types.Type {
+	if l.info == nil {
+		return nil
+	}
+	return l.info.CallTypeArgs[v]
+}
+
+// substParams 把形参类型表按 (形参名 → 实参) 代换（实例上下文下再套一层 l.sub）。
+// 代换表为空时原样返回 —— 非泛型调用走的就是这条路。
+func (l *lowerer) substParams(pts []types.Type, params []string, args []types.Type) []types.Type {
+	if len(params) == 0 || len(args) != len(params) {
+		return pts
+	}
+	out := make([]types.Type, len(pts))
+	for i, p := range pts {
+		out[i] = l.sub(types.Subst(p, params, args))
+	}
+	return out
 }
 
 // ifcSlotParams 取接口槽位的形参类型（槽位表就是 `Methods[name].ParamTypes`）。

@@ -14,37 +14,37 @@ type ok_Kind = enum
 func ok_main() {
   entry:
     loc ../../testdata/ok/733_derive_compare_hash.aic:25:13 let obj1 : ok_Item* = alloc task(ok_Item)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:25:18 store field obj1, 0, const 1
-    loc ../../testdata/ok/733_derive_compare_hash.aic:25:25 store field obj1, 1, const "alpha"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:25:13 store field obj1, 0, const 1
+    loc ../../testdata/ok/733_derive_compare_hash.aic:25:13 store field obj1, 1, const "alpha"
     loc ../../testdata/ok/733_derive_compare_hash.aic:25:47 let obj2 : ok_Score = alloc task(ok_Score)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:25:53 store field obj2, 0, const 3
-    loc ../../testdata/ok/733_derive_compare_hash.aic:25:59 store field obj2, 1, const "x"
-    loc ../../testdata/ok/733_derive_compare_hash.aic:25:40 store field obj1, 2, obj2
+    loc ../../testdata/ok/733_derive_compare_hash.aic:25:47 store field obj2, 0, const 3
+    loc ../../testdata/ok/733_derive_compare_hash.aic:25:47 store field obj2, 1, const "x"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:25:13 store field obj1, 2, obj2
     loc ../../testdata/ok/733_derive_compare_hash.aic:25:80 let t3 : ok_Kind = field ok_Kind, 0
-    loc ../../testdata/ok/733_derive_compare_hash.aic:25:70 store field obj1, 3, t3
-    loc ../../testdata/ok/733_derive_compare_hash.aic:25:86 store field obj1, 4, const true
+    loc ../../testdata/ok/733_derive_compare_hash.aic:25:13 store field obj1, 3, t3
+    loc ../../testdata/ok/733_derive_compare_hash.aic:25:13 store field obj1, 4, const true
     loc ../../testdata/ok/733_derive_compare_hash.aic:25:5 var a : ok_Item* = obj1
     loc ../../testdata/ok/733_derive_compare_hash.aic:26:13 let obj4 : ok_Item* = alloc task(ok_Item)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:26:18 store field obj4, 0, const 1
-    loc ../../testdata/ok/733_derive_compare_hash.aic:26:25 store field obj4, 1, const "alpha"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:26:13 store field obj4, 0, const 1
+    loc ../../testdata/ok/733_derive_compare_hash.aic:26:13 store field obj4, 1, const "alpha"
     loc ../../testdata/ok/733_derive_compare_hash.aic:26:47 let obj5 : ok_Score = alloc task(ok_Score)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:26:53 store field obj5, 0, const 3
-    loc ../../testdata/ok/733_derive_compare_hash.aic:26:59 store field obj5, 1, const "x"
-    loc ../../testdata/ok/733_derive_compare_hash.aic:26:40 store field obj4, 2, obj5
+    loc ../../testdata/ok/733_derive_compare_hash.aic:26:47 store field obj5, 0, const 3
+    loc ../../testdata/ok/733_derive_compare_hash.aic:26:47 store field obj5, 1, const "x"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:26:13 store field obj4, 2, obj5
     loc ../../testdata/ok/733_derive_compare_hash.aic:26:80 let t6 : ok_Kind = field ok_Kind, 0
-    loc ../../testdata/ok/733_derive_compare_hash.aic:26:70 store field obj4, 3, t6
-    loc ../../testdata/ok/733_derive_compare_hash.aic:26:86 store field obj4, 4, const true
+    loc ../../testdata/ok/733_derive_compare_hash.aic:26:13 store field obj4, 3, t6
+    loc ../../testdata/ok/733_derive_compare_hash.aic:26:13 store field obj4, 4, const true
     loc ../../testdata/ok/733_derive_compare_hash.aic:26:5 var b : ok_Item* = obj4
     loc ../../testdata/ok/733_derive_compare_hash.aic:27:13 let obj7 : ok_Item* = alloc task(ok_Item)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:27:18 store field obj7, 0, const 2
-    loc ../../testdata/ok/733_derive_compare_hash.aic:27:25 store field obj7, 1, const "alpha"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:27:13 store field obj7, 0, const 2
+    loc ../../testdata/ok/733_derive_compare_hash.aic:27:13 store field obj7, 1, const "alpha"
     loc ../../testdata/ok/733_derive_compare_hash.aic:27:47 let obj8 : ok_Score = alloc task(ok_Score)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:27:53 store field obj8, 0, const 3
-    loc ../../testdata/ok/733_derive_compare_hash.aic:27:59 store field obj8, 1, const "x"
-    loc ../../testdata/ok/733_derive_compare_hash.aic:27:40 store field obj7, 2, obj8
+    loc ../../testdata/ok/733_derive_compare_hash.aic:27:47 store field obj8, 0, const 3
+    loc ../../testdata/ok/733_derive_compare_hash.aic:27:47 store field obj8, 1, const "x"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:27:13 store field obj7, 2, obj8
     loc ../../testdata/ok/733_derive_compare_hash.aic:27:80 let t9 : ok_Kind = field ok_Kind, 0
-    loc ../../testdata/ok/733_derive_compare_hash.aic:27:70 store field obj7, 3, t9
-    loc ../../testdata/ok/733_derive_compare_hash.aic:27:86 store field obj7, 4, const true
+    loc ../../testdata/ok/733_derive_compare_hash.aic:27:13 store field obj7, 3, t9
+    loc ../../testdata/ok/733_derive_compare_hash.aic:27:13 store field obj7, 4, const true
     loc ../../testdata/ok/733_derive_compare_hash.aic:27:5 var c : ok_Item* = obj7
     loc ../../testdata/ok/733_derive_compare_hash.aic:28:28 let t10 : i32 = call ok_Item_compare(a, b)
     loc ../../testdata/ok/733_derive_compare_hash.aic:28:18 let t11 : void = call print_println(t10)
@@ -61,12 +61,12 @@ func ok_main() {
     loc ../../testdata/ok/733_derive_compare_hash.aic:32:28 let t22 : bool = cmp == t20, t21
     loc ../../testdata/ok/733_derive_compare_hash.aic:32:18 let t23 : void = call print_println(t22)
     loc ../../testdata/ok/733_derive_compare_hash.aic:33:14 let obj24 : ok_Score = alloc task(ok_Score)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:33:20 store field obj24, 0, const 1
-    loc ../../testdata/ok/733_derive_compare_hash.aic:33:26 store field obj24, 1, const "b"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:33:14 store field obj24, 0, const 1
+    loc ../../testdata/ok/733_derive_compare_hash.aic:33:14 store field obj24, 1, const "b"
     loc ../../testdata/ok/733_derive_compare_hash.aic:33:5 var s1 : ok_Score = obj24
     loc ../../testdata/ok/733_derive_compare_hash.aic:34:14 let obj25 : ok_Score = alloc task(ok_Score)
-    loc ../../testdata/ok/733_derive_compare_hash.aic:34:20 store field obj25, 0, const 1
-    loc ../../testdata/ok/733_derive_compare_hash.aic:34:26 store field obj25, 1, const "a"
+    loc ../../testdata/ok/733_derive_compare_hash.aic:34:14 store field obj25, 0, const 1
+    loc ../../testdata/ok/733_derive_compare_hash.aic:34:14 store field obj25, 1, const "a"
     loc ../../testdata/ok/733_derive_compare_hash.aic:34:5 var s2 : ok_Score = obj25
     loc ../../testdata/ok/733_derive_compare_hash.aic:35:29 let t26 : i32 = call ok_Score_compare(s2, s1)
     loc ../../testdata/ok/733_derive_compare_hash.aic:35:18 let t27 : void = call print_println(t26)

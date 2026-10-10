@@ -27,9 +27,9 @@ func ok_label(u:ok_User*) -> str {
 func ok_main() {
   entry:
     loc ../../testdata/ok/755_string_interp.aic:19:13 let obj1 : ok_User* = alloc task(ok_User)
-    loc ../../testdata/ok/755_string_interp.aic:19:18 store field obj1, 0, const 42
-    loc ../../testdata/ok/755_string_interp.aic:19:26 store field obj1, 1, const "a@b.c"
-    loc ../../testdata/ok/755_string_interp.aic:19:42 store field obj1, 2, const true
+    loc ../../testdata/ok/755_string_interp.aic:19:13 store field obj1, 0, const 42
+    loc ../../testdata/ok/755_string_interp.aic:19:13 store field obj1, 1, const "a@b.c"
+    loc ../../testdata/ok/755_string_interp.aic:19:13 store field obj1, 2, const true
     loc ../../testdata/ok/755_string_interp.aic:19:5 var u : ok_User* = obj1
     loc ../../testdata/ok/755_string_interp.aic:20:24 let t2 : str = call ok_label(u)
     loc ../../testdata/ok/755_string_interp.aic:20:18 let t3 : void = call print_println(t2)

@@ -14,7 +14,7 @@ func ok_main() -> Err {
     loc ../../testdata/ok/748_guard_same_region.aic:15:1 var ret0 : Err
     loc ../../testdata/ok/748_guard_same_region.aic:16:5 var outer : ok_Buf* = nil
     loc ../../testdata/ok/748_guard_same_region.aic:17:16 let obj1 : ok_Buf* = alloc task(ok_Buf)
-    loc ../../testdata/ok/748_guard_same_region.aic:17:20 store field obj1, 0, const 7
+    loc ../../testdata/ok/748_guard_same_region.aic:17:16 store field obj1, 0, const 7
     loc ../../testdata/ok/748_guard_same_region.aic:17:5 var base : ok_Buf* = obj1
     loc ../../testdata/ok/748_guard_same_region.aic:18:5 region.enter r2
     loc ../../testdata/ok/748_guard_same_region.aic:19:21 let t3 : ok_Buf* = call ok_pick(base)

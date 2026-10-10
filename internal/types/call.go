@@ -575,6 +575,14 @@ func (c *Checker) constraintMethod(param, method string, tp *TypeParam, at parse
 	return nil, false
 }
 
+// ContainerMethodSig 导出容器内建方法签名（AIR 降级的实参装箱要用：
+// `m.put(k, v)` 的 v 是具体类而值槽是接口时，IR 里必须显式 box —— 规则只有这一份，
+// 不在 air 侧重列一张方法表）。
+func ContainerMethodSig(t Type, name string) (*FuncSig, bool) {
+	sig, _, ok := containerMethod(t, name)
+	return sig, ok
+}
+
 // containerMethod 返回容器内建方法签名（核心设计 §二.2）。
 func containerMethod(t Type, name string) (*FuncSig, Type, bool) {
 	switch cv := t.(type) {
@@ -703,7 +711,7 @@ func (c *Checker) markStoreGuard(value parse.Expr, targetBound bound, what strin
 	if vb.exact {
 		c.errorAt(parse.ExprPos(value), "a block-local object escapes: stored into a shallower region's "+what,
 			"object created at depth "+itoa(vb.off)+", the target storage sits at depth "+itoa(targetBound.off),
-			"move the creation into the target storage's region, or add @live to raise its level (core design §5 R5)")
+			"move the creation into the target storage's region, or add live to raise its level (core design §5 R5)")
 		return
 	}
 	c.guards[value] = GuardSpec{Kind: GuardStore, Dynamic: targetBound.param}

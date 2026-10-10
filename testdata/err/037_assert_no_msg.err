@@ -1,3 +1,3 @@
 testdata/err/037_assert_no_msg.aic:2:5: error: unknown annotation @assert
     @assert
-    fix: use one of the five annotations: @packed @live @derive @noblock @blocking
+    fix: use one of the four annotations: @packed @derive @noblock @blocking

@@ -253,21 +253,23 @@ func (c *Ctx) emitContainerPrinterBody(e printerEntry) error {
 		if err != nil {
 			return err
 		}
-		c.line("        %s(v->keys[v->order[i]], depth + 1);", kn)
+		c.line("        %s(AIC_MAP_SLOT_KEY(v, v->order[i]), depth + 1);", kn)
 		c.line("        aic_pr_colon();")
 	}
 	en, err := c.printerFor(elem)
 	if err != nil {
 		return err
 	}
-	// 元素访问器：list 用 data[i]，set 用 slots[order[i]]，map 用 vals[order[i]]。
+	// 元素访问器：list 用 data[i]，set 用 AIC_SET_SLOT(s, order[i])，map 用
+	// AIC_MAP_SLOT_*。都走运行期的布局中立宏 —— emit 不硬编码槽字段名
+	// （曾经这里直接写 `v->slots[...]`/`v->keys[...]`，运行期一改布局就失配）。
 	switch {
 	case types.IsSlice(e.ty):
 		c.line("        %s(v->data[i], depth + 1);", en)
 	case types.IsSet(e.ty):
-		c.line("        %s(v->slots[v->order[i]], depth + 1);", en)
+		c.line("        %s(AIC_SET_SLOT(v, v->order[i]), depth + 1);", en)
 	default:
-		c.line("        %s(v->vals[v->order[i]], depth + 1);", en)
+		c.line("        %s(AIC_MAP_SLOT_VAL(v, v->order[i]), depth + 1);", en)
 	}
 	c.line("    }")
 	c.line("    %s;", close)

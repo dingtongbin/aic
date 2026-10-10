@@ -1,6 +1,6 @@
 testdata/err/285_annotation_unknown.aic:1:1: error: unknown annotation @nonsense
     @nonsense
-    fix: use one of the five annotations: @packed @live @derive @noblock @blocking
+    fix: use one of the four annotations: @packed @derive @noblock @blocking
 testdata/err/285_annotation_unknown.aic:2:8: error: a non-declaration statement at the top level
     got IDENT str
     fix: the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)

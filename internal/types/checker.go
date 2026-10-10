@@ -405,6 +405,14 @@ func (c *Checker) finishClass(v *parse.ClassDecl) {
 			continue
 		}
 		for _, tgt := range fd.Targets {
+			if tgt.Live {
+				// R20：live 只修饰**局部变量目标**（§五 R4 的分配位提升）。
+				// 字段的生命周期归宿主对象，没有"提升一层"可言。
+				c.errorAt(tgt.Pos, "live applies to local variables only",
+					"field "+cl.Name+"."+tgt.Name+" is marked live",
+					"drop live from the field; write var live x = C{...} on a local declaration inside a function body (core design §5 R4)")
+				continue
+			}
 			if _, dup := cl.fieldIdx[tgt.Name]; dup {
 				c.errorAt(tgt.Pos, "duplicate field declaration", cl.Name+"."+tgt.Name,
 					"one field per name per class; rename or delete one")
@@ -1154,6 +1162,21 @@ func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
 				"a key allows numeric / bool / str / payload-free enum / @packed only; class references and containers cannot be keys")
 			return nil
 		}
+		// 审计 ③：**键/值槽位表**（runtime aic_l1_map.h 的实例表，rtsuffix.go 是
+		// 唯一事实源）在检查期就验 —— 旧行为是检查器放行、emit 才炸
+		// "malformed map symbol"（不可操作的晚期错误）。
+		if _, ok := RuntimeMapKeySuffix(k); !ok {
+			c.errorAt(v.Pos, "the map key type has no runtime instance", typeText(k),
+				"keys available today: i32 / i64 / u32 / u64 / usize / bool / str "+
+					"(struct keys and enum keys need per-type hashing, which lands with monomorphized containers)")
+			return nil
+		}
+		if _, ok := RuntimeMapValueSuffix(val); !ok {
+			c.errorAt(v.Pos, "the map value type has no runtime instance", typeText(val),
+				"values available today: i32 / i64 / f64 / bool / str or a reference (class / interface); "+
+					"for byte counters store i64 and narrow on read")
+			return nil
+		}
 		return &MapT{Key: k, Value: val}
 	case *parse.SetType:
 		elem := c.resolveType(v.Elem)
@@ -1163,6 +1186,13 @@ func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
 		if !hashable(elem) {
 			c.errorAt(v.Pos, "the set element type is not hashable", typeText(elem),
 				"elements allow numeric / bool / str / payload-free enum / @packed only")
+			return nil
+		}
+		// 审计 ③：set 的元素槽位表同样在检查期验（旧行为 = emit 期才炸）。
+		if _, ok := RuntimeSuffix(elem); !ok {
+			c.errorAt(v.Pos, "the set element type has no runtime instance", typeText(elem),
+				"elements available today: i8 / i16 / i32 / i64 / u8 / u16 / u32 / u64 / usize / f64 / bool / str "+
+					"or a class reference; containers and interfaces are not instantiated yet")
 			return nil
 		}
 		return &SetT{Elem: elem}

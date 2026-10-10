@@ -7,12 +7,14 @@ package lex
 //
 // v2 换基（2026-10-06）：23 关键字 + 5 注解；v1 的 implements/elseif/while/
 // errdefer/handle/await/del 全部退场（附录 A），region 入场。
+// R20（2026-10）：`@live` 注解退役为第 24 个关键字 `live`（注解恒在声明上方，
+// 不该与变量同行）→ 24 关键字 + 4 注解。
 // ---------------------------------------------------------------------------
 
-// Keywords holds exactly the 23 frozen keywords — no more, no fewer.
+// Keywords holds exactly the 24 frozen keywords — no more, no fewer.
 var Keywords = map[string]bool{
 	"class": true, "interface": true, "enum": true, "var": true,
-	"const": true, "func": true,
+	"const": true, "live": true, "func": true,
 	"if": true, "else": true,
 	"for": true, "in": true,
 	"return": true, "break": true, "continue": true,
@@ -24,7 +26,7 @@ var Keywords = map[string]bool{
 
 // KeywordNames lists the frozen spellings in the order of 核心设计 §一.
 var KeywordNames = []string{
-	"class", "interface", "enum", "var", "const", "func",
+	"class", "interface", "enum", "var", "const", "live", "func",
 	"if", "else", "for", "in",
 	"return", "break", "continue",
 	"match", "defer", "check",
@@ -46,10 +48,10 @@ var RetiredNames = []string{
 // (核心设计 §二.3), not a lexical one.
 var ReservedNames = []string{"true", "false", "nil"}
 
-// Annotations is the complete frozen set (核心设计 §一: 5 注解).
+// Annotations is the complete frozen set (核心设计 §一: 4 注解 —— R20 起 @live
+// 退役为 live 关键字).
 var Annotations = map[string]bool{
 	"packed":   true,
-	"live":     true,
 	"derive":   true,
 	"noblock":  true,
 	"blocking": true,
@@ -57,7 +59,7 @@ var Annotations = map[string]bool{
 
 // AnnotationNames in the order they appear in the core design text.
 var AnnotationNames = []string{
-	"packed", "live", "derive", "noblock", "blocking",
+	"packed", "derive", "noblock", "blocking",
 }
 
 // isIdentStart: an identifier begins with an **ASCII letter or `_`**

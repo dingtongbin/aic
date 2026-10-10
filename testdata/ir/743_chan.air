@@ -39,16 +39,16 @@ func ok_main() {
     loc ../../testdata/ok/743_chan.aic:22:18 let t26 : void = call print_println(sok)
     loc ../../testdata/ok/743_chan.aic:24:38 let t27 : chan[i32] = call chan_new_i32()
     loc ../../testdata/ok/743_chan.aic:24:5 var out : chan[i32] = t27
-    loc ../../testdata/ok/743_chan.aic:25:5 region.enter sc28
-    loc ../../testdata/ok/743_chan.aic:26:22 let t29 : void = call ok_produce(out)
-    loc ../../testdata/ok/743_chan.aic:25:5 region.exit
-    loc ../../testdata/ok/743_chan.aic:28:26 let t30 : (i32, bool) = call chan_i32_recv(out)
-    loc ../../testdata/ok/743_chan.aic:28:5 let t31 : i32 = multi.extract t30, 0
-    loc ../../testdata/ok/743_chan.aic:28:9 var v : i32 = t31
-    loc ../../testdata/ok/743_chan.aic:28:5 let t32 : bool = multi.extract t30, 1
-    loc ../../testdata/ok/743_chan.aic:28:12 var vok : bool = t32
-    loc ../../testdata/ok/743_chan.aic:29:18 let t33 : void = call print_println(v)
-    loc ../../testdata/ok/743_chan.aic:30:18 let t34 : void = call print_println(vok)
+    loc ../../testdata/ok/743_chan.aic:25:5 scope.enter sc28
+    loc ../../testdata/ok/743_chan.aic:26:9 spawn ok_produce(out)
+    loc ../../testdata/ok/743_chan.aic:25:5 scope.exit
+    loc ../../testdata/ok/743_chan.aic:28:26 let t29 : (i32, bool) = call chan_i32_recv(out)
+    loc ../../testdata/ok/743_chan.aic:28:5 let t30 : i32 = multi.extract t29, 0
+    loc ../../testdata/ok/743_chan.aic:28:9 var v : i32 = t30
+    loc ../../testdata/ok/743_chan.aic:28:5 let t31 : bool = multi.extract t29, 1
+    loc ../../testdata/ok/743_chan.aic:28:12 var vok : bool = t31
+    loc ../../testdata/ok/743_chan.aic:29:18 let t32 : void = call print_println(v)
+    loc ../../testdata/ok/743_chan.aic:30:18 let t33 : void = call print_println(vok)
     loc ../../testdata/ok/743_chan.aic:3:1 br exit
   exit:
     loc ../../testdata/ok/743_chan.aic:3:1 ret 

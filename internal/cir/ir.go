@@ -40,6 +40,11 @@ type Func struct {
 	Flags  []string
 	Body   []Stmt
 	Loc    air.Loc
+	// SrcHash 是**降级前**的 AIR 函数体内容哈希（F1 增量翻译的缓存键原料：
+	// CIR 是折叠后的形态，缺了折叠期的注释/边界信息，直接哈希 CIR 会让
+	// "同一个源函数的合法再折叠"误失效；用 AIR 原文哈希则稳定）。空 = 未填
+	// （老路径/测试），此时调用方自行退化为 CIR 形态哈希。
+	SrcHash string
 }
 
 // Stmt 是结构化语句。
@@ -93,9 +98,33 @@ type Switch struct {
 }
 
 // Region 是一个 region 块（进入/退出显式成对，V3.1 在 air 层已保证）。
+// Scope = `scope { }` 任务域（退出 join spawn 的任务），非 Scope = `region { }` 内存区域。
 type Region struct {
-	Body []Stmt
-	Loc  air.Loc
+	Body  []Stmt
+	Scope bool
+	Loc   air.Loc
+}
+
+// RegionOpen / RegionClose 是**跨块** region 的平铺形态：enter 与 exit 降级后不在
+// 同一个 air 块里（典型 = region 块含 for/if，体被折进循环/分支树）。同块内成对的
+// 仍折成 Region{Body}；跨块只能平铺——"出口在后面的块"这条边在树形结构里无处安放。
+//
+// 这是"每请求一区域"的标准写法（B10 实测）：region 包住每轮的容器/循环，退出整块
+// 回滚。air 层 V3.1 已保证结构化配平（沿 CFG 边传播深度），折叠器只需按遇到顺序
+// 平铺，配对由 fl.regOpen 栈跨块记录。
+//
+// Scope = `scope { }` 任务域（Name = 该域的 aic_scope 变量名，spawn 站点取用）；
+// 非 Scope = `region { }` 内存区域（Name 空）。
+type RegionOpen struct {
+	Name  string
+	Scope bool
+	Loc   air.Loc
+}
+
+type RegionClose struct {
+	Name  string
+	Scope bool
+	Loc   air.Loc
 }
 
 // Scope 是一个**词法块**（源码里的 `{ … }`；air 里是 scopeN → scopeendM 这一对块）。
@@ -145,6 +174,8 @@ func (*If) cirStmt()       {}
 func (*For) cirStmt()      {}
 func (*Switch) cirStmt()   {}
 func (*Region) cirStmt()   {}
+func (*RegionOpen) cirStmt()  {}
+func (*RegionClose) cirStmt() {}
 func (*Scope) cirStmt()    {}
 func (*Return) cirStmt()   {}
 func (*Break) cirStmt()    {}
@@ -283,6 +314,18 @@ func printStmt(b *strings.Builder, s Stmt, ind string) {
 		fmt.Fprintf(b, "%sregion {\n", ind)
 		printStmts(b, v.Body, ind+"  ")
 		fmt.Fprintf(b, "%s}\n", ind)
+	case *RegionOpen:
+		if v.Scope {
+			fmt.Fprintf(b, "%sregion-open scope %s\n", ind, v.Name)
+		} else {
+			fmt.Fprintf(b, "%sregion-open\n", ind)
+		}
+	case *RegionClose:
+		if v.Scope {
+			fmt.Fprintf(b, "%sregion-close scope %s\n", ind, v.Name)
+		} else {
+			fmt.Fprintf(b, "%sregion-close\n", ind)
+		}
 	case *Scope:
 		fmt.Fprintf(b, "%sscope {\n", ind)
 		printStmts(b, v.Body, ind+"  ")
@@ -306,7 +349,8 @@ func printStmt(b *strings.Builder, s Stmt, ind string) {
 func CountStmts(stmts []Stmt) (leaves, nodes int) {
 	for _, s := range stmts {
 		switch v := s.(type) {
-		case *Leaf, *Guard, *Return, *Break, *Continue, *Exit, *Label, *Goto:
+		case *Leaf, *Guard, *Return, *Break, *Continue, *Exit, *Label, *Goto,
+			*RegionOpen, *RegionClose:
 			leaves++
 		case *If:
 			nodes++

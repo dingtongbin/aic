@@ -153,3 +153,62 @@ func (u *Unit) PkgList() string {
 	}
 	return strings.Join(names, " → ")
 }
+
+// ---------------------------------------------------------------------------
+// CacheStore：带命名空间前缀的对象式缓存句柄（F1 函数级缓存用）。
+// 与 CacheGet/Put 同一目录同一原子写口径，只是把前缀并进键，避免不同用途
+// （整 exe 产物 / 函数 C 文本）互相覆盖。
+// ---------------------------------------------------------------------------
+
+// CacheStore 是一个命名空间化的缓存（dir 为根，prefix 内所有键共享）。
+type CacheStore struct {
+	dir    string
+	prefix string
+}
+
+// NewCacheStore 建缓存句柄（dir 空 = CacheDir()；prefix 空 = 无前缀）。
+func NewCacheStore(dir, prefix string) *CacheStore {
+	if dir == "" {
+		dir = CacheDir()
+	}
+	return &CacheStore{dir: dir, prefix: prefix}
+}
+
+// Get 读一条（键含命名空间前缀）。
+func (cs *CacheStore) Get(key string) ([]byte, bool) {
+	b, err := os.ReadFile(cs.path(key))
+	if err != nil {
+		return nil, false
+	}
+	return b, true
+}
+
+// Put 写一条（原子替换）。
+func (cs *CacheStore) Put(key string, data []byte) error {
+	path := cs.path(key)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// path 把（前缀 + 键）映射到两级目录下的文件路径。
+func (cs *CacheStore) path(key string) string {
+	k := key
+	if cs.prefix != "" {
+		k = Hash(cs.prefix, key)
+	}
+	if len(k) < 4 {
+		k = Hash(k)
+	}
+	return filepath.Join(cs.dir, k[:2], k[2:4], k+".bin")
+}

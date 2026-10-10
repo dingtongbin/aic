@@ -22,9 +22,69 @@ static aic_u32   g_waiting = 0;  /* 停在**无截止点**等待上的任务数 
 static aic_u32   g_quiet_rounds = 0; /* "全体等待且无进展"的连续轮数 */
 static aic_i64   g_quiet_since = 0;  /* 该状态起始时刻（单调毫秒；0 = 无） */
 static aic_mtx_t g_token;        /* 串行模式的全局令牌 */
+static aic_u64   g_progress_seq = 0; /* 单调进展计数（无 TLS 等待点让步的零进展判定） */
 static aic_mtx_t g_mtx_init_lock;/* 惰性初始化 aic_mutex 的全局锁 */
 static int       g_ready = 0;
 static int       g_serial = -1;  /* -1 未探测；0 并行；1 串行 */
+
+/* --------------------------------------------------------------------------
+ * tcc 退化后端（AIC_NO_TLS）的**协作式让步**（773 实测的缺口）
+ *
+ * 无 TLS 后端没有真线程：spawn 只是把任务挂进 scope 的队里，等 scope 退出才
+ * 按登记序跑完。于是 main 在通道上等待时"看不到"那些还没跑的任务 ——
+ * `live_tasks() <= 1` 立刻成立 ⇒ recv 返回 (零值, false)，两个互相等待的任务
+ * 永远碰不到面，**死锁不报**（trap/773 在 tcc 配置下 exit 0）。
+ *
+ * 修法（与 AIC_SCHED_SERIAL 的"等待点让出"同语义，R10 决策三）：等待点准备
+ * 放弃之前，先把当前 scope 里**还没跑过**的任务跑掉一个，再重新检查等待条件。
+ * 全部跑完仍无人能推进时，照旧走 park ⇒ 死锁判定照常触发（773 两模式都 trap）。
+ *
+ * 递归安全：被让出的任务自己又在等待时会递归再让一层；任务数 = 递归深度，
+ * 而每个任务只会被跑一次（started 标记），故深度有上界（scope 内的 spawn 数）。
+ * ------------------------------------------------------------------------*/
+#if AIC_NO_TLS
+static aic_scope *g_scope_cur = NULL; /* 当前正在执行的 scope（嵌套用栈式保存） */
+
+/* aic_run_pending_scope_tasks 跑完当前 scope 里**全部**未启动的任务；一个都没跑
+// = false。区域状态逐个搬开再搬回（R10 决策四，scope_exit 的同一套舞步）。
+// 无 TLS ⇒ 单线程，进展计数直接读不上锁。 */
+static bool aic_run_pending_scope_tasks(void) {
+    if (g_scope_cur == NULL) {
+        return false;
+    }
+    bool ran = false;
+    for (aic_task *t = g_scope_cur->head; t != NULL; t = t->next) {
+        if (t->ran) {
+            continue;
+        }
+        t->ran = true;
+        aic_region_state st;
+        aic_region_state_save(&st);
+        aic_task_run(t->fn, t->env);
+        aic_region_state_restore(&st);
+        ran = true;
+    }
+    return ran;
+}
+
+/* aic_yield_for_deadlock 是无 TLS 后端的等待点让步：把 scope 里没跑过的任务
+ * 全部跑掉再让调用方重新评估。**跑完仍零进展**（没有任何通道收发/任务结束）
+ * = 这个 scope 里没人能唤醒等待者 ⇒ 当场死锁 trap（773：并行/串行两模式一致）。 */
+/* aic_yield_scope_tasks 是无 TLS 后端的等待点让步：把 scope 里没跑过的任务
+ * 全部跑掉再让调用方重新评估。**跑完仍零进展**（没有任何通道收发/任务结束）
+ * = 这个 scope 里没人能唤醒等待者 ⇒ 当场死锁 trap（773：并行/串行两模式一致）。
+ * 返回值 = 是否让出过（没让出 ⇒ 调用方照旧放弃/背压 trap）。 */
+static bool aic_yield_scope_tasks(const char *file, int line) {
+    aic_u64 before = g_progress_seq;
+    if (!aic_run_pending_scope_tasks()) {
+        return false;
+    }
+    if (g_progress_seq == before) {
+        aic_trap(AIC_TRAP_DEADLOCK, file, line);
+    }
+    return true;
+}
+#endif
 
 /* 死锁判定 = **全体等待 + 连续 K 轮无进展 + 静默 T 毫秒**（两个条件都要）：
  *   - "全体等待"只说明此刻没人跑，不等于死锁 —— 某个等待者的条件可能**已经成立**
@@ -46,7 +106,9 @@ static int       g_serial = -1;  /* -1 未探测；0 并行；1 串行 */
 #define AIC_DEADLOCK_QUIET_ROUNDS 8u
 #define AIC_DEADLOCK_QUIET_MS     3000
 
-/* 任何可能唤醒别的任务的状态变化都走这里（通道收发、任务结束）。 */
+/* 任何可能唤醒别的任务的状态变化都走这里（通道收发、任务结束）。
+ * 单调进展计数 g_progress_seq 声明在文件顶部的全局状态块（无 TLS 的等待点
+ * 让步要用它判"让出过但零进展"，那里在本文之前）。 */
 void aic_sched_note_progress(void) {
     if (!g_ready) {
         return;
@@ -54,6 +116,7 @@ void aic_sched_note_progress(void) {
     aic_mtx_lock(&g_mtx);
     g_quiet_rounds = 0;
     g_quiet_since = 0;
+    g_progress_seq++;
     aic_mtx_unlock(&g_mtx);
 }
 
@@ -217,6 +280,13 @@ void aic_chan_wait_send(const void *ch, const char *file, int line) {
         /* 只有"别的任务可能来收"才值得等；否则满 = 无处可去 ⇒ 背压点 trap
          * （与串行 L2 的观测一致：`AIC_TRAP_CHAN_FULL`，§16 N11）。 */
         if (aic_sched_live_tasks() <= 1) {
+#if AIC_NO_TLS
+            /* 退化后端：先让出给还没跑的 spawn 任务（与 recv 同语义）；
+             * 让出过就重新评估（对方可能已经收掉一个），没人可让才背压 trap。 */
+            if (aic_yield_scope_tasks(file, line)) {
+                continue;
+            }
+#endif
             aic_trap(AIC_TRAP_CHAN_FULL, file, line);
         }
         if (aic_sched_cancelled()) {
@@ -233,6 +303,13 @@ bool aic_chan_wait_recv(const void *ch, const char *file, int line) {
         }
         /* §七【O2】：本 scope 已无存活任务 ⇒ 永远不会有值了 ⇒ (零值, false)。 */
         if (aic_sched_live_tasks() <= 1) {
+#if AIC_NO_TLS
+            /* 退化后端：先让出给还没跑的 spawn 任务（773），确实没人了才放弃。
+             * 零进展的让出 = 死锁（yield 内直接 trap），有进展则重新评估。 */
+            if (aic_yield_scope_tasks(file, line)) {
+                continue;
+            }
+#endif
             return false;
         }
         if (aic_sched_cancelled()) {
@@ -286,6 +363,12 @@ void aic_scope_enter(aic_scope *s) {
     s->head = NULL;
     s->tail = NULL;
     s->live = 0;
+#if AIC_NO_TLS
+    /* 等待点的协作式让步要找"当前 scope"（无 TLS ⇒ 用全局 + 调用方栈式保存）。
+     * 嵌套 scope：里层退出时恢复外层（g_scope_cur 在 exit 里按 s 匹配清除）。 */
+    s->prev = g_scope_cur;
+    g_scope_cur = s;
+#endif
 }
 
 void *aic_task_env(aic_usize n) {
@@ -328,6 +411,9 @@ void aic_scope_spawn(aic_scope *s, void (*fn)(void *), void *env) {
     t->fn = fn;
     t->env = env;
     t->started = false;
+    t->ran = false; /* 无 TLS 后端按它跳过已跑任务：不初始化 = malloc 垃圾非零时
+                     * 任务被整段跳过（742 实测：第二个 scope 的通道全空，
+                     * 且是否踩雷取决于堆/环境块布局）。 */
     t->next = NULL;
     if (s->tail == NULL) {
         s->head = t;
@@ -359,15 +445,23 @@ void aic_scope_exit(aic_scope *s) {
 #if AIC_NO_TLS
     /* 退化后端：按登记序**在同线程**串行跑完（旧 T1 行为）。
      * 区域栈是全局的，故必须把调用者的区域状态搬开再搬回 —— 否则任务体覆盖了
-     * 调用者的区域栈，任务结束后调用者的分配会落进"已被弹出的区域"（实测 trap）。 */
+     * 调用者的区域栈，任务结束后调用者的分配会落进"已被弹出的区域"（实测 trap）。
+     * **已在等待点让出过的任务跳过**（t->started）：协作式让步跑过的绝不重跑
+     * （否则 defer/打印全部双份，773 实测）。 */
     aic_region_state st;
     aic_region_state_save(&st);
     aic_u32 saved_cancel = t_cancel;
     aic_i64 saved_deadline = t_deadline;
+    if (g_scope_cur == s) {
+        g_scope_cur = s->prev;
+    }
     aic_task *t = s->head;
     while (t != NULL) {
         aic_task *next = t->next;
-        aic_task_run(t->fn, t->env);
+        if (!t->ran) {
+            t->ran = true;
+            aic_task_run(t->fn, t->env);
+        }
         free(t);
         t = next;
     }

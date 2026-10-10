@@ -37,16 +37,20 @@ func ok_work(c:ok_Counter*, times:i32) {
 func ok_main() {
   entry:
     loc ../../testdata/ok/772_mutex_shared.aic:26:13 let obj1 : ok_Counter* = alloc task(ok_Counter)
-    loc ../../testdata/ok/772_mutex_shared.aic:26:21 store field obj1, 0, const 0
+    loc ../../testdata/ok/772_mutex_shared.aic:26:13 store field obj1, 0, const 0
     loc ../../testdata/ok/772_mutex_shared.aic:26:44 let t2 : sync_Mutex = call sync_Mutex_new()
-    loc ../../testdata/ok/772_mutex_shared.aic:26:27 store field obj1, 1, t2
+    loc ../../testdata/ok/772_mutex_shared.aic:26:13 store field obj1, 1, t2
     loc ../../testdata/ok/772_mutex_shared.aic:26:5 var c : ok_Counter* = obj1
-    loc ../../testdata/ok/772_mutex_shared.aic:27:5 region.enter sc3
-    loc ../../testdata/ok/772_mutex_shared.aic:28:19 let t4 : void = call ok_work(c, const 100)
-    loc ../../testdata/ok/772_mutex_shared.aic:29:19 let t5 : void = call ok_work(c, const 100)
-    loc ../../testdata/ok/772_mutex_shared.aic:30:19 let t6 : void = call ok_work(c, const 100)
-    loc ../../testdata/ok/772_mutex_shared.aic:31:19 let t7 : void = call ok_work(c, const 100)
-    loc ../../testdata/ok/772_mutex_shared.aic:27:5 region.exit
+    loc ../../testdata/ok/772_mutex_shared.aic:27:5 scope.enter sc3
+    loc ../../testdata/ok/772_mutex_shared.aic:28:23 let t4 : i32 = const 100
+    loc ../../testdata/ok/772_mutex_shared.aic:28:9 spawn ok_work(c, t4)
+    loc ../../testdata/ok/772_mutex_shared.aic:29:23 let t5 : i32 = const 100
+    loc ../../testdata/ok/772_mutex_shared.aic:29:9 spawn ok_work(c, t5)
+    loc ../../testdata/ok/772_mutex_shared.aic:30:23 let t6 : i32 = const 100
+    loc ../../testdata/ok/772_mutex_shared.aic:30:9 spawn ok_work(c, t6)
+    loc ../../testdata/ok/772_mutex_shared.aic:31:23 let t7 : i32 = const 100
+    loc ../../testdata/ok/772_mutex_shared.aic:31:9 spawn ok_work(c, t7)
+    loc ../../testdata/ok/772_mutex_shared.aic:27:5 scope.exit
     loc ../../testdata/ok/772_mutex_shared.aic:33:20 let t8 : i32 = field c, 0
     loc ../../testdata/ok/772_mutex_shared.aic:33:18 let t9 : void = call print_println(t8)
     loc ../../testdata/ok/772_mutex_shared.aic:25:1 br exit

@@ -272,8 +272,15 @@ func (s *Scanner) scanAnnotation(at Pos) {
 	}
 	name := b.String()[1:]
 	if !Annotations[name] {
+		// R20：`@live` 已退役为 `live` 关键字 —— 旧形态给定向迁移提示，
+		// 不是干巴巴的"未知注解"。
+		if name == "live" {
+			s.fail(at, "unknown annotation @live", b.String(),
+				"live is a keyword now (R20): write `var live x = C{...}` (core design §5 R4)")
+			return
+		}
 		s.fail(at, "unknown annotation @"+name, b.String(),
-			"use one of the five annotations: @packed @live @derive @noblock @blocking")
+			"use one of the four annotations: @packed @derive @noblock @blocking")
 		return
 	}
 	s.emit(ANNOT, b.String(), at)

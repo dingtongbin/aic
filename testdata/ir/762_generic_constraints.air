@@ -30,35 +30,33 @@ func ok_main() {
     loc ../../testdata/ok/762_generic_constraints.aic:49:24 let t1 : i32 = call ok_maxOf[i32](const 3, const 9)
     loc ../../testdata/ok/762_generic_constraints.aic:49:18 let t2 : void = call print_println(t1)
     loc ../../testdata/ok/762_generic_constraints.aic:50:14 let obj3 : ok_Money* = alloc task(ok_Money)
-    loc ../../testdata/ok/762_generic_constraints.aic:50:20 store field obj3, 0, const 500
+    loc ../../testdata/ok/762_generic_constraints.aic:50:14 store field obj3, 0, const 500
     loc ../../testdata/ok/762_generic_constraints.aic:50:5 var m1 : ok_Money* = obj3
     loc ../../testdata/ok/762_generic_constraints.aic:51:14 let obj4 : ok_Money* = alloc task(ok_Money)
-    loc ../../testdata/ok/762_generic_constraints.aic:51:20 store field obj4, 0, const 900
+    loc ../../testdata/ok/762_generic_constraints.aic:51:14 store field obj4, 0, const 900
     loc ../../testdata/ok/762_generic_constraints.aic:51:5 var m2 : ok_Money* = obj4
-    loc ../../testdata/ok/762_generic_constraints.aic:52:25 let t5 : TT = box m1, TT
-    loc ../../testdata/ok/762_generic_constraints.aic:52:29 let t6 : TT = box m2, TT
-    loc ../../testdata/ok/762_generic_constraints.aic:52:24 let t7 : ok_Money* = call ok_maxOf[ok_Money*](t5, t6)
-    loc ../../testdata/ok/762_generic_constraints.aic:52:24 let t8 : ok_Money* = tmp t7
-    loc ../../testdata/ok/762_generic_constraints.aic:52:32 let t9 : i64 = field t8, 0
-    loc ../../testdata/ok/762_generic_constraints.aic:52:18 let t10 : void = call print_println(t9)
-    loc ../../testdata/ok/762_generic_constraints.aic:53:14 let obj11 : ok_Square* = alloc task(ok_Square)
-    loc ../../testdata/ok/762_generic_constraints.aic:53:21 store field obj11, 0, const 3
-    loc ../../testdata/ok/762_generic_constraints.aic:53:5 var sq : ok_Square* = obj11
-    loc ../../testdata/ok/762_generic_constraints.aic:54:23 let lit12 : ok_Square*[] = call list.new[ok_Square*]()
-    loc ../../testdata/ok/762_generic_constraints.aic:54:23 let t13 : void = call list.append[ok_Square*](lit12, sq)
-    loc ../../testdata/ok/762_generic_constraints.aic:54:28 let obj14 : ok_Square* = alloc task(ok_Square)
-    loc ../../testdata/ok/762_generic_constraints.aic:54:35 store field obj14, 0, const 4
-    loc ../../testdata/ok/762_generic_constraints.aic:54:23 let t15 : void = call list.append[ok_Square*](lit12, obj14)
-    loc ../../testdata/ok/762_generic_constraints.aic:54:5 var ss : ok_Square*[] = lit12
-    loc ../../testdata/ok/762_generic_constraints.aic:55:24 let t16 : i32 = call ok_total[ok_Square*](ss)
-    loc ../../testdata/ok/762_generic_constraints.aic:55:18 let t17 : void = call print_println(t16)
-    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let lit18 : i32[] = call list.new[i32]()
-    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let t19 : void = call list.append[i32](lit18, const 7)
-    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let t20 : void = call list.append[i32](lit18, const 8)
-    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let t21 : void = call list.append[i32](lit18, const 9)
-    loc ../../testdata/ok/762_generic_constraints.aic:56:5 var ns : i32[] = lit18
-    loc ../../testdata/ok/762_generic_constraints.aic:57:26 let t22 : i32 = call ok_firstOf[i32](ns)
-    loc ../../testdata/ok/762_generic_constraints.aic:57:18 let t23 : void = call print_println(t22)
+    loc ../../testdata/ok/762_generic_constraints.aic:52:24 let t5 : ok_Money* = call ok_maxOf[ok_Money*](m1, m2)
+    loc ../../testdata/ok/762_generic_constraints.aic:52:24 let t6 : ok_Money* = tmp t5
+    loc ../../testdata/ok/762_generic_constraints.aic:52:32 let t7 : i64 = field t6, 0
+    loc ../../testdata/ok/762_generic_constraints.aic:52:18 let t8 : void = call print_println(t7)
+    loc ../../testdata/ok/762_generic_constraints.aic:53:14 let obj9 : ok_Square* = alloc task(ok_Square)
+    loc ../../testdata/ok/762_generic_constraints.aic:53:14 store field obj9, 0, const 3
+    loc ../../testdata/ok/762_generic_constraints.aic:53:5 var sq : ok_Square* = obj9
+    loc ../../testdata/ok/762_generic_constraints.aic:54:23 let lit10 : ok_Square*[] = call list.new[ok_Square*]()
+    loc ../../testdata/ok/762_generic_constraints.aic:54:23 let t11 : void = call list.append[ok_Square*](lit10, sq)
+    loc ../../testdata/ok/762_generic_constraints.aic:54:28 let obj12 : ok_Square* = alloc task(ok_Square)
+    loc ../../testdata/ok/762_generic_constraints.aic:54:28 store field obj12, 0, const 4
+    loc ../../testdata/ok/762_generic_constraints.aic:54:23 let t13 : void = call list.append[ok_Square*](lit10, obj12)
+    loc ../../testdata/ok/762_generic_constraints.aic:54:5 var ss : ok_Square*[] = lit10
+    loc ../../testdata/ok/762_generic_constraints.aic:55:24 let t14 : i32 = call ok_total[ok_Square*](ss)
+    loc ../../testdata/ok/762_generic_constraints.aic:55:18 let t15 : void = call print_println(t14)
+    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let lit16 : i32[] = call list.new[i32]()
+    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let t17 : void = call list.append[i32](lit16, const 7)
+    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let t18 : void = call list.append[i32](lit16, const 8)
+    loc ../../testdata/ok/762_generic_constraints.aic:56:20 let t19 : void = call list.append[i32](lit16, const 9)
+    loc ../../testdata/ok/762_generic_constraints.aic:56:5 var ns : i32[] = lit16
+    loc ../../testdata/ok/762_generic_constraints.aic:57:26 let t20 : i32 = call ok_firstOf[i32](ns)
+    loc ../../testdata/ok/762_generic_constraints.aic:57:18 let t21 : void = call print_println(t20)
     loc ../../testdata/ok/762_generic_constraints.aic:48:1 br exit
   exit:
     loc ../../testdata/ok/762_generic_constraints.aic:48:1 ret 

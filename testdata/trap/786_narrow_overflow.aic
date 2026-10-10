@@ -1,0 +1,9 @@
+import print
+
+// 窄化转换越界 = trap（§一：窄化带 trap；R23 D1 —— 旧行为是裸 C 强转、
+// `i32(5000000000i64)` 静默回绕成 705032704，UBSan 才抓得到）。
+func main() {
+    var big i64 = 5000000000
+    var small = i32(big) // 越界：本行即 trap 点
+    print.println(small)
+}

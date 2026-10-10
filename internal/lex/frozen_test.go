@@ -1,25 +1,29 @@
 package lex
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // TestFrozenSurface is the H7 gate (核心设计 §一/§十三): the literal surface
 // tables must match the frozen lists exactly — no additions, no removals.
-// v2 = 23 keywords + 5 annotations (R0 换基；v1 的 29+8 全部随附录 A 退役).
+// v2 = 24 keywords + 4 annotations (R0 换基 + R20：@live 退役为 live 关键字;
+// v1 的 29+8 全部随附录 A 退役).
 func TestFrozenSurface(t *testing.T) {
 	t.Run("keywords", func(t *testing.T) {
 		want := []string{
-			"class", "interface", "enum", "var", "const", "func",
+			"class", "interface", "enum", "var", "const", "live", "func",
 			"if", "else", "for", "in",
 			"return", "break", "continue",
 			"match", "defer", "check",
 			"spawn", "scope", "region", "this",
 			"import", "export", "extern",
 		}
-		if len(want) != 23 {
-			t.Fatalf("冻结清单自身出错：期望 23 个关键字，清单含 %d 个", len(want))
+		if len(want) != 24 {
+			t.Fatalf("冻结清单自身出错：期望 24 个关键字，清单含 %d 个", len(want))
 		}
-		if len(Keywords) != 23 {
-			t.Fatalf("Keywords 表大小 = %d，期望 23（H7：表面不许增减）", len(Keywords))
+		if len(Keywords) != 24 {
+			t.Fatalf("Keywords 表大小 = %d，期望 24（H7：表面不许增减）", len(Keywords))
 		}
 		if len(KeywordNames) != len(want) {
 			t.Fatalf("KeywordNames 长度 = %d，期望 %d", len(KeywordNames), len(want))
@@ -95,12 +99,12 @@ func TestFrozenSurface(t *testing.T) {
 	})
 
 	t.Run("annotations", func(t *testing.T) {
-		want := []string{"packed", "live", "derive", "noblock", "blocking"}
-		if len(want) != 5 {
-			t.Fatalf("冻结清单自身出错：期望 5 个注解，清单含 %d 个", len(want))
+		want := []string{"packed", "derive", "noblock", "blocking"}
+		if len(want) != 4 {
+			t.Fatalf("冻结清单自身出错：期望 4 个注解，清单含 %d 个", len(want))
 		}
 		if len(Annotations) != len(want) {
-			t.Fatalf("Annotations 表大小 = %d，期望 %d（H7 = 5 注解）", len(Annotations), len(want))
+			t.Fatalf("Annotations 表大小 = %d，期望 %d（H7 = 4 注解）", len(Annotations), len(want))
 		}
 		if len(AnnotationNames) != len(want) {
 			t.Fatalf("AnnotationNames 长度 = %d，期望 %d", len(AnnotationNames), len(want))
@@ -124,6 +128,29 @@ func TestFrozenSurface(t *testing.T) {
 			if !found {
 				t.Errorf("Annotations 含冻结名单外条目 %q（H7 违规）", a)
 			}
+		}
+	})
+
+	t.Run("live-is-a-keyword", func(t *testing.T) {
+		// R20：`live` 是第 24 个关键字（变量存储层级修饰），不是注解、不是标识符。
+		// 旧形态 @live 必须有迁移提示（不是裸"未知注解"）。
+		toks, errs := File("t.aic", "var live x")
+		if len(errs) != 0 {
+			t.Fatalf("`var live x` 应词法干净: %v", errs)
+		}
+		wantKinds := []Kind{KW, KW, IDENT, EOF}
+		for i, k := range wantKinds {
+			if toks[i].Kind != k {
+				t.Errorf("token[%d] kind = %s，期望 %s", i, toks[i].Kind, k)
+			}
+		}
+		if toks[0].Text != "var" || toks[1].Text != "live" {
+			t.Errorf("token 文本 = %q %q，期望 \"var\" \"live\"", toks[0].Text, toks[1].Text)
+		}
+		if _, errs := File("t.aic", "@live x"); len(errs) != 1 {
+			t.Fatalf("旧 @live 应恰好一个词法错误，实际 %d 个: %v", len(errs), errs)
+		} else if !strings.Contains(errs[0].Fix, "live is a keyword now") {
+			t.Errorf("旧 @live 的错误缺迁移提示：%q", errs[0].Fix)
 		}
 	})
 

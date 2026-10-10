@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"aic/internal/air"
 	"aic/internal/parse"
 	"aic/internal/types"
 )
@@ -182,6 +183,11 @@ func (c *Ctx) isMain(sig *types.FuncSig) bool {
 
 // emitProtos 发射合成返回结构与全部函数原型 (C 无前向声明也能编译, 但原型让
 // 相互递归与声明序无关, 且是 extern 绑定的唯一落点)。
+//
+// **IR 路径**：函数体一律从 IR 取（emitIRFuncs），其签名由 irRetCT/irParamList
+// 渲染（含 [T;N] 出参 ABI）。原型若走 AST 侧渲染就会与定义不一致（审计 D11：
+// 原型 `aic_i32[3] f(void)` vs 定义 `void f(aic_i32 out[3])` ⇒ C 直接拒）。
+// 故 IR 体存在时原型也按 IR 渲染（同源同形）。
 func (c *Ctx) emitProtos() error {
 	sigs := c.allSigs()
 	c.emitRetStructs(sigs)
@@ -197,10 +203,39 @@ func (c *Ctx) emitProtos() error {
 			// 发原型会让 static 定义跟在非 static 声明之后 (C 不允许)。
 			continue
 		}
-		c.line("%s%s %s(%s);", c.storageClass(sig), c.retCT(sig), c.cFuncName(sig), c.paramList(sig))
+		retCT, params, name := c.retCT(sig), c.paramList(sig), c.cFuncName(sig)
+		if c.ir != nil {
+			if sym, ok := c.irBodySymFor(sig); ok {
+				r, err := c.irRetCT(c.ir.Bodies[sym])
+				if err != nil {
+					return err
+				}
+				p, err := c.irParamList(c.ir.Bodies[sym])
+				if err != nil {
+					return err
+				}
+				retCT, params, name = r, p, c.irFuncCName(sym, sig)
+			}
+		}
+		c.line("%s%s %s(%s);", c.storageClass(sig), retCT, name, params)
 	}
 	c.line("")
 	return nil
+}
+
+// irBodySymFor 找签名对应的 IR 体符号（普通函数 / 类方法两种拼法；找不到 = false）。
+func (c *Ctx) irBodySymFor(sig *types.FuncSig) (string, bool) {
+	for _, sym := range []string{
+		air.FuncSym(c.pkg(), "", sig.Name),
+		air.FuncSym(c.pkg(), sig.Recv, sig.Name),
+	} {
+		if c.ir != nil {
+			if _, has := c.ir.Bodies[sym]; has {
+				return sym, true
+			}
+		}
+	}
+	return "", false
 }
 
 // storageClass 返回函数定义的存储类（10.4 第 4 条：生成函数一律 static）。

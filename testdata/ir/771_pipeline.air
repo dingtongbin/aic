@@ -22,9 +22,10 @@ func ok_main() {
   entry:
     loc ../../testdata/ok/771_pipeline.aic:17:37 let t1 : chan[i32] = call chan_new_i32(const 4)
     loc ../../testdata/ok/771_pipeline.aic:17:5 var ch : chan[i32] = t1
-    loc ../../testdata/ok/771_pipeline.aic:18:5 region.enter sc2
-    loc ../../testdata/ok/771_pipeline.aic:19:22 let t3 : void = call ok_produce(ch, const 4)
-    loc ../../testdata/ok/771_pipeline.aic:18:5 region.exit
+    loc ../../testdata/ok/771_pipeline.aic:18:5 scope.enter sc2
+    loc ../../testdata/ok/771_pipeline.aic:19:27 let t3 : i32 = const 4
+    loc ../../testdata/ok/771_pipeline.aic:19:9 spawn ok_produce(ch, t3)
+    loc ../../testdata/ok/771_pipeline.aic:18:5 scope.exit
     loc ../../testdata/ok/771_pipeline.aic:21:5 var sum : i32 = const 0
     loc ../../testdata/ok/771_pipeline.aic:22:5 var k : i32 = const 0
     loc ../../testdata/ok/771_pipeline.aic:23:5 br forhead1

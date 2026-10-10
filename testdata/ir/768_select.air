@@ -53,14 +53,14 @@ func ok_main() {
     loc ../../testdata/ok/768_select.aic:28:9 cbr t15, selarm8, selnone9
   seljoin11:
     loc ../../testdata/ok/768_select.aic:43:5 let t29 : void = call scope_timeout(const 50)
-    loc ../../testdata/ok/768_select.aic:43:5 region.enter sc30
+    loc ../../testdata/ok/768_select.aic:43:5 scope.enter sc30
     loc ../../testdata/ok/768_select.aic:44:44 let t31 : chan[i32] = call chan_new_i32()
     loc ../../testdata/ok/768_select.aic:44:9 var inner : chan[i32] = t31
     loc ../../testdata/ok/768_select.aic:45:19 let t32 : void = call chan_i32_send(inner, const 9)
     loc ../../testdata/ok/768_select.aic:46:28 let t33 : usize = call chan_i32_len(inner)
     loc ../../testdata/ok/768_select.aic:46:9 var got : usize = t33
     loc ../../testdata/ok/768_select.aic:47:22 let t34 : void = call print_println(got)
-    loc ../../testdata/ok/768_select.aic:43:5 region.exit
+    loc ../../testdata/ok/768_select.aic:43:5 scope.exit
     loc ../../testdata/ok/768_select.aic:11:1 br exit
   selarm12:
     loc ../../testdata/ok/768_select.aic:36:9 let t24 : (i32, bool) = call chan_recv_i32(solo)

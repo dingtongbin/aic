@@ -67,6 +67,7 @@ KEYWORD_ANCHORS: dict[str, tuple[str, ...]] = {
     "enum": ("026_match_enum",),
     "var": ("001_hello",),
     "const": ("021_globals_and_locals",),
+    "live": ("745_live_annotation",),
     "func": ("015_functions",),
     "if": ("011_if_chain",),
     "else": ("701_if_else_chain",),
@@ -89,7 +90,6 @@ KEYWORD_ANCHORS: dict[str, tuple[str, ...]] = {
 
 ANNOTATION_ANCHORS: dict[str, tuple[str, ...]] = {
     "@packed": ("005_annotations", "741_generic_methods"),
-    "@live": ("745_live_annotation",),
     "@derive": ("733_derive_compare_hash",),
     "@noblock": ("746_c_boundary_annotations",),
     "@blocking": ("746_c_boundary_annotations",),

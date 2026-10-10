@@ -128,15 +128,16 @@ func (c *Checker) checkVarDecl(v *parse.VarDecl) {
 	if v.Init != nil && c.types[v.Init] == nil {
 		c.types[v.Init] = declared
 	}
-	// @live 语义（R4）：仅对构造表达式有意义；创建发生在外一层
+	// live 语义（R4）：仅对构造表达式有意义；创建发生在外一层。
+	// R20 起 live 是关键字（`var live x = ...`），诊断文案同步换拼写。
 	if tgt.Live {
 		if isStr(declared) || (isValueType(declared) && !containsReference(declared)) {
-			c.errorAt(tgt.Pos, "@live is meaningless for value types and str", "@live "+tgt.Name,
-				"a value type has no region header; drop @live (core design §5 R4)")
+			c.errorAt(tgt.Pos, "live is meaningless for value types and str", "live "+tgt.Name,
+				"a value type has no region header; drop live (core design §5 R4)")
 		} else if vb.exact && vb.off == c.regionOff {
 			vb.off-- // 创建下沉到外一层
 		} else {
-			c.errorAt(tgt.Pos, "@live only makes sense on a creation expression", "@live "+tgt.Name+" = …",
+			c.errorAt(tgt.Pos, "live only makes sense on a creation expression", "live "+tgt.Name+" = …",
 				"write Class{...} or Class(...) on the right (inlining the creation at the declaration keeps it in the outer region)")
 		}
 	}
@@ -149,10 +150,10 @@ func (c *Checker) checkVarDecl(v *parse.VarDecl) {
 func (c *Checker) declareVar(tgt parse.VarTarget, ty Type, init parse.Expr) {
 	off := c.regionOff
 	if tgt.Live {
-		off-- // @live = 外一层创建（R4）；块外 @live 由 parse 层约束 + 这里校验
+		off-- // live = 外一层创建（R4）；块外 live 由 parse 层约束 + 这里校验
 		if off < 0 {
-			c.errorAt(tgt.Pos, "@live is meaningless at the outermost function level (already the task region)", "@live "+tgt.Name,
-				"drop @live: an object in the task region already lives as long as the task (core design §5 R4)")
+			c.errorAt(tgt.Pos, "live is meaningless at the outermost function level (already the task region)", "live "+tgt.Name,
+				"drop live: an object in the task region already lives as long as the task (core design §5 R4)")
 			off = 0
 		}
 	}
@@ -333,12 +334,12 @@ func (c *Checker) markVarStoreAt(value parse.Expr, markNode parse.Expr, sym *Sym
 		if ft, isFn := vt.(*FuncT); isFn && ft.HasRefCapture() {
 			c.errorAt(parse.ExprPos(value), "closure captures a reference that does not outlive the closure",
 				"the closure is created at depth "+itoa(vb.off)+", variable "+name+" lives at depth "+itoa(sym.DeclOffset),
-				"create the closure in the variable's region, capture by value instead (copy the fields you need), or add @live to the declaration (core design §16 N1)")
+				"create the closure in the variable's region, capture by value instead (copy the fields you need), or add live to the declaration (core design §16 N1)")
 			return
 		}
 		c.errorAt(parse.ExprPos(value), "a block-local object escapes: assigned to a name outside the block",
 			"object created at depth "+itoa(vb.off)+", variable "+name+" declared at depth "+itoa(sym.DeclOffset),
-			"move the creation into the variable's region, or add @live to the declaration (core design §5 R5)")
+			"move the creation into the variable's region, or add live to the declaration (core design §5 R5)")
 		return
 	}
 	kind := GuardStore
@@ -361,6 +362,11 @@ func (c *Checker) checkFieldStore(v *parse.Assign, lhs *parse.Field, rhs Type, r
 			return
 		}
 		owner = c.thisClass
+		// 赋值目标的 `this` 也必须在类型表里：AIR 的 fieldIndex 按接收者类型定字段
+		// 下标，这张表缺了 `this` 就静默回落 0（`this.b = 2` 会写进字段 a —— 752 实测）。
+		if c.types[lhs.X] == nil {
+			c.types[lhs.X] = owner
+		}
 	} else {
 		xt, _, _ := c.checkExprFull(lhs.X, nil)
 		if cl, ok := xt.(*Class); ok {
@@ -380,6 +386,9 @@ func (c *Checker) checkFieldStore(v *parse.Assign, lhs *parse.Field, rhs Type, r
 		return
 	}
 	ft = owner.Fields[idx].Type
+	// 整个目标节点也落表（`this.b = …` 的 LHS 从不走 checkExprFull，不记 lowers
+	// 侧拿不到字段类型：复合赋值的读回定型会兜底成 i32）。
+	c.types[lhs] = ft
 	if v.Op != "=" {
 		c.checkCompound(v, rhs, ft, rinfo, "this."+lhs.Name)
 		return

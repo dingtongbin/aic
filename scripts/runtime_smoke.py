@@ -53,6 +53,16 @@ def run(exe: Path) -> tuple[int, bytes, bytes]:
     return r.returncode, r.stdout, r.stderr
 
 
+def tsan_available(cc: str) -> bool:
+    """探测工具链是否带 TSan 运行时（minGW 的 clang/gcc 都没有 ⇒ 显式 SKIP）。"""
+    probe = BIN / "tsan_probe.c"
+    probe.write_text("int main(void){return 0;}\n", encoding="utf-8")
+    out = BIN / "tsan_probe.exe"
+    r = subprocess.run([cc, "-fsanitize=thread", str(probe), "-o", str(out)],
+                       capture_output=True, text=True)
+    return r.returncode == 0 and out.exists()
+
+
 def main() -> int:
     core = [RUNTIME / "aic_l0.c", RUNTIME / "aic_std.c"]
     ok_src = [RUNTIME / "smoke" / "smoke_ok.c", *core]
@@ -86,9 +96,55 @@ def main() -> int:
             return 1
         print(f"[smoke] OK: {name}")
 
+    # --- R19：分代区域的并发锚点（无锁空闲链 + 每槽状态字）--------------------
+    # 4 个真线程同时「task_init → region push/pop + 区域分配」各 2 万轮。
+    # 判据 = ① 各配置 stdout 逐位确定（没有槽被两线程同时拿到：那会让两个区域
+    # 共享一条页链，表现为数字错乱/崩溃）；② TSan 零报告（本机工具链不带 TSan
+    # 运行时 ⇒ 探测可用性，不可用则显式 SKIP，不静默放过）。
+    thr_src = [RUNTIME / "smoke" / "smoke_threads.c", *core]
+    thr_base: bytes | None = None
+    thr_configs = [("gcc-O0", GCC, ["-O0"]), ("gcc-O2", GCC, ["-O2"])]
+    if CLANG:
+        thr_configs.append(("clang-O2", CLANG, ["-O2"]))
+    for name, cc, flags in thr_configs:
+        exe = BIN / f"smoke_threads_{name}.exe"
+        compile(cc, flags, thr_src, exe)
+        code, out, err = run(exe)
+        if code != 0:
+            print(f"[smoke] FAIL: threads {name} exited {code}")
+            print(err.decode("utf-8", "replace"))
+            return 1
+        if thr_base is None:
+            thr_base = out
+        elif out != thr_base:
+            print(f"[smoke] FAIL: threads {name} stdout differs ({out!r} vs {thr_base!r})")
+            return 1
+        print(f"[smoke] OK threads: {name} ({out.decode().strip()})")
+
+    if CLANG and tsan_available(CLANG):
+        exe = BIN / "smoke_threads_clang-TSan.exe"
+        compile(CLANG, ["-O1", "-fsanitize=thread", "-fno-sanitize-recover=all"], thr_src, exe)
+        code, out, err = run(exe)
+        rep = err.decode("utf-8", "replace")
+        if code != 0 or "ThreadSanitizer" in rep:
+            print("[smoke] FAIL: threads clang-TSan:")
+            print(rep[:2000])
+            return 1
+        if out != thr_base:
+            print(f"[smoke] FAIL: threads clang-TSan stdout differs ({out!r} vs {thr_base!r})")
+            return 1
+        print(f"[smoke] OK threads: clang-TSan ({out.decode().strip()})")
+    else:
+        print("[smoke] SKIP threads TSan: no TSan runtime in this toolchain "
+              "(minGW clang/gcc); determinism checks above still ran")
+
     trap_cases = [
         (RUNTIME / "smoke" / "smoke_deeper.c", "reference outlives its region"),
         (RUNTIME / "smoke" / "smoke_escape.c", "reference to a popped region"),
+        # R19：槽位回收后，持有旧一代（同槽不同 gen）引用的程序仍须 trap
+        # （新形态用 gen 比对取代旧的"id 单调不复用"）。同文件也验证新对象
+        # 不被误拦（先过一次活守卫才会走到旧对象那条）。
+        (RUNTIME / "smoke" / "smoke_recycle.c", "reference to a popped region"),
     ]
     for src, prefix in trap_cases:
         exe = BIN / f"smoke_{src.stem}.exe"
@@ -127,6 +183,47 @@ def main() -> int:
                 print(f"  got {r.stdout!r}\n  want {l3_base!r}")
                 return 1
             print(f"[smoke] OK: L3 pipeline {mode}/{name}")
+    # --- L3 coroutine（T1：协程载体 + 区域根 + C10K）------------------------
+    # 协程层是新增的：门禁必须证明它在两种 gcc 优化级下输出一致（区域根独立、
+    # 令牌串行 ⇒ 与单线程语义同构），且 tcc 上整体空转不参与链接。
+    coro_src = [RUNTIME / "smoke" / "smoke_coro.c", *core,
+                RUNTIME / "aic_l2.c", RUNTIME / "aic_l3.c"]
+    coro_base: bytes | None = None
+    for name, cc, flags in configs[:2]:
+        exe = BIN / f"smoke_coro_{name}.exe"
+        compile(cc, flags, coro_src, exe)
+        r = subprocess.run([str(exe)], capture_output=True, timeout=300)
+        if r.returncode != 0:
+            print(f"[smoke] FAIL: coro {name} exited {r.returncode}")
+            print(r.stderr.decode("utf-8", "replace"))
+            return 1
+        if coro_base is None:
+            coro_base = r.stdout
+            print(f"[smoke] coro baseline ({name}): {coro_base!r}")
+        elif r.stdout != coro_base:
+            print(f"[smoke] FAIL: coro {name} stdout differs")
+            print(f"  got {r.stdout!r}\n  want {coro_base!r}")
+            return 1
+        print(f"[smoke] OK coro: {name}")
+
+    # 协程 churn：N 轮「create → 区域分配 → destroy」必须**稳态**（无泄漏）。
+    # RSS 稳态判据（尾段后半 < 1% 且峰值 < 32MB；Windows 堆/线程栈的一次性
+    # 水位与 N 无关 —— 实测 400 万轮与 1000 万轮尾段一致）见 build/coro_residency.py。
+    churn_src = [RUNTIME / "smoke" / "smoke_coro_churn.c", *core,
+                 RUNTIME / "aic_l2.c", RUNTIME / "aic_l3.c"]
+    exe = BIN / "smoke_coro_churn.exe"
+    compile(GCC, ["-O2"], churn_src, exe)
+    r = subprocess.run([str(exe)], capture_output=True, timeout=600,
+                       env=dict(os.environ, N="1000000"))
+    if r.returncode != 0:
+        print(f"[smoke] FAIL: coro churn exited {r.returncode}")
+        print(r.stderr.decode("utf-8", "replace"))
+        return 1
+    if b"coro-churn 1000000 ok" not in r.stdout:
+        print(f"[smoke] FAIL: coro churn stdout {r.stdout!r}")
+        return 1
+    print("[smoke] OK coro: churn 1M rounds")
+
     # 真死锁：必须 trap（不是挂死）——超时即判负。
     dl_src = [RUNTIME / "smoke" / "smoke_l3_deadlock.c", *core, RUNTIME / "aic_l2.c"]
     for mode, env_extra in (("parallel", {}), ("serial", {"AIC_SCHED_SERIAL": "1"})):

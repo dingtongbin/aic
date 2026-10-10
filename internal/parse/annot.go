@@ -3,18 +3,20 @@ package parse
 import "strings"
 
 // ---------------------------------------------------------------------------
-// 注解落点白名单（核心设计 §一 的 5 个注解）。
+// 注解落点白名单（核心设计 §一 的 4 个注解；R20 起 @live 退役为 live 关键字）。
 //
-// 为什么必须校验：注解此前**只被"用到的地方"读**（@packed/@derive 在类上、@live 在
-// 局部目标上），写在别的声明上会被**静默忽略** —— `@packed func` / `@derive(Hash) func`
-// / `@noblock class` / `@packed enum` 全部通过编译，用户以为生效了，实际什么都没发生。
-// 注解写错必须报（与"非法能力名 = 编译错"同一条纪律）。
+// 为什么必须校验：注解此前**只被"用到的地方"读**（@packed/@derive 在类上、
+// @noblock/@blocking 在 extern func 上），写在别的声明上会被**静默忽略** ——
+// `@packed func` / `@derive(Hash) func` / `@noblock class` 全部通过编译，
+// 用户以为生效了，实际什么都没发生。注解写错必须报（与"非法能力名 =
+// 编译错"同一条纪律）。
 //
 // 落点表：
 //   @packed            类（值类型布局）
 //   @derive(...)       类（派生能力集）
-//   @live              局部变量目标（在 parseVar 里校验，不在这里）
 //   @noblock/@blocking extern 函数（C 边界三层；当前只记录，阶段 O 生效）
+//   live               不是注解 —— R20 起是关键字，只出现在 `var live x`
+//                      （parseVarTarget；误用由 parseStmt/checker 定向报错）
 // ---------------------------------------------------------------------------
 
 // checkAnnotationPlacement 校验顶层声明上的注解落点。
@@ -45,11 +47,8 @@ func (p *Parser) checkAnnotationPlacement(d Decl, annotations []string) {
 				p.errorHere(at, name+" applies to extern functions only", name+" "+declKindName(d),
 					"the C boundary annotations describe how an extern call blocks: write them on an `extern func` binding (core design §7)")
 			}
-		case "@live":
-			p.errorHere(at, "@live applies to local variables only", "@live "+declKindName(d),
-				"write it on a local declaration: var @live x = C{...} (core design §5 R4)")
 		default:
-			// 未知注解由词法/检查器负责（H7 冻结表）；这里不重复报。
+			// 未知注解由词法负责（H7 冻结表 + @live 的迁移提示）；这里不重复报。
 		}
 	}
 }

@@ -182,6 +182,30 @@ type Ctx struct {
 	// irRetTypes/irRetOrder 是 IR 路径发现的多返回值结构体（名 → 元素类型，按发现序）。
 	irRetTypes map[string][]types.Type
 	irRetOrder []string
+	// irScopeCur 是当前所在的 `scope { }` 的 C 变量名（spawn 站点往它上面挂任务）；
+	// 空 = 不在 scope 里（spawn 会出现即编译错，词法规则由检查器保证）。
+	irScopeCur string
+	// irRegionScopes 是**跨块** scope 域（平铺 RegionOpen/RegionClose）的进入前
+	// 名录：每进一层压 (外层名, 本层名) 两个，退出时恢复外层名。结构化
+	// Region{Scope:true} 用自己的 savedScope 局部量，不经过这里。
+	irRegionScopes []string
+	// irSpawns/irSpawnSeq 是本遍发现的 spawn 站点（原型在原型段发、定义在函数体段后发；
+	// 序号按发现序 = 确定性，H2）。
+	irSpawns   []irSpawnSite
+	irSpawnSeq int
+	// FuncCache 是 F1 增量翻译的函数级缓存（nil = 不用；--emit-c 与门禁路径必须
+	// 保持 nil —— H2/H3 判的就是发射文本的确定性与可编译性，走缓存会把门禁判据
+	// 变成缓存命中）。见 func_cache.go。
+	FuncCache *FuncCache
+}
+
+// emitRaw 把一段缓存文本原样追加进主输出（F1 命中路径：跳过全部发射）。
+// 文本自身已含行尾，故不追加换行；probe 模式（空跑）不写。
+func (c *Ctx) emitRaw(b []byte) {
+	if c.probe {
+		return
+	}
+	c.buf.Write(b)
 }
 
 // substT 应用当前上下文的类型代换（无代换时原样返回）。
@@ -237,6 +261,8 @@ type seed struct {
 	// irRets/irRetT 是 IR 路径的多返回结构体（第一遍发现，第二遍在类型段统一发）。
 	irRets []string
 	irRetT map[string][]types.Type
+	// irSpawns 是 IR 路径的 spawn 站点表（第一遍发现，第二遍据此发原型/定义）。
+	irSpawns []irSpawnSite
 }
 
 // runEmit 跑一遍完整发射，返回产物与本次发现的实例/打印函数表。
@@ -265,6 +291,10 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		c.ir = ir
 		c.buildIRTypeTab()
 		c.buildIRCallMap()
+		// **used 表按遍重置**：它记的是"这一遍消费了哪些函数体"，两遍共用同一张表
+		// 会让第二遍把 lambda 提升体当成"已消费"而整个跳过（718 实测：引用在、
+		// 定义没了）。收口的 verifyAllUsed 在第二遍末尾跑，看到的仍是完整的第二遍。
+		ir.resetUsed()
 	}
 	if pre != nil {
 		c.seeded = true
@@ -307,6 +337,8 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 			for k, v := range pre.irRetT {
 				c.irRetTypes[k] = v
 			}
+			// spawn 站点表同理（原型段跑在函数体之前，只能吃第一遍的发现）。
+			c.irSpawns = append([]irSpawnSite{}, pre.irSpawns...)
 		}
 		// spawn thunk：第一遍发现，第二遍 TU 末尾统一发（调用点只发块作用域原型）。
 		c.spawnThunks = append([]*spawnThunk{}, pre.spawn...)
@@ -353,6 +385,17 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if err := c.emitFuncInsts(u); err != nil {
 		return nil, nil, err
 	}
+	if ir != nil {
+		// lambda 提升体的原型（签名表里没有它们，单独发；体在函数体段之后）。
+		if err := c.emitIRLambdaProtos(); err != nil {
+			return nil, nil, err
+		}
+		// spawn：上下文块定义（文件作用域）+ thunk 原型（站点表来自第一遍）。
+		if err := c.emitIRSpawnCtxStructs(); err != nil {
+			return nil, nil, err
+		}
+		c.emitIRSpawnProtos()
+	}
 	if ir == nil {
 		c.emitSpawnThunkProtos()
 	}
@@ -375,11 +418,19 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if ir != nil {
 		// IR 路径发现的多返回结构体：在原型段之后、函数体之前发 typedef。
 		c.irEmitRetStructs()
+		// **站点表按遍重建**：seed 里的表只服务于原型段（它跑在函数体之前）；
+		// 函数体段会重新发现全部站点（编号规则与第一遍一致 ⇒ 同名）。两份叠加
+		// 会让 thunk 定义发两遍（773 实测：redefinition of aic_spth_0）。
+		c.irSpawns = nil
 		// IR 路径：体一律从 IR 取（含泛型实例与实例方法），不再走 AST。
 		if err := c.emitIRFuncs(u); err != nil {
 			return nil, nil, err
 		}
 		if err := c.emitIRInstFuncs(u); err != nil {
+			return nil, nil, err
+		}
+		// lambda 提升体（IR 体表里带 static 标记、签名表里没有的函数）。
+		if err := c.emitIRLambdaFuncs(); err != nil {
 			return nil, nil, err
 		}
 	} else {
@@ -402,6 +453,10 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if err := c.emitDelegatedBodies(); err != nil {
 		return nil, nil, err
 	}
+	if ir != nil {
+		// spawn thunk 的定义（取上下文块字段直调；原型已在原型段发过）。
+		c.emitIRSpawnBodies()
+	}
 	c.emitEntry()
 	if ir == nil {
 		c.emitSpawnThunks() // spawn 薄 thunk 在 TU 末尾（调用点只发原型）
@@ -420,7 +475,8 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	return &Result{C: c.buf.String(), Warnings: c.warnings, Needed: c.Needed(), Guards: c.guards},
 		&seed{insts: c.insts, printers: c.printers, witnesses: c.witnesses,
 			ifacePrint: c.sortedIfacePrint(), needed: c.Needed(), spawn: c.spawnThunks,
-			irRets: c.irRetOrder, irRetT: c.irRetTypes}, nil
+			irRets: c.irRetOrder, irRetT: c.irRetTypes,
+			irSpawns: c.irSpawns}, nil
 }
 
 // sortedIfacePrint 把需要打印槽的接口键排序（确定性；map 序随机会破坏 H2）。

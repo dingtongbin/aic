@@ -74,7 +74,11 @@ func printTypeDecl(b *strings.Builder, t *TypeDecl) {
 func printFunc(b *strings.Builder, f *Func) {
 	params := make([]string, 0, len(f.Params))
 	for _, p := range f.Params {
-		params = append(params, p.Name+":"+p.Ty)
+		ref := ""
+		if p.Ref {
+			ref = "ref " // 按引用形参：.air 文本里必须可辨（H8 快照钉住形态）
+		}
+		params = append(params, ref+p.Name+":"+p.Ty)
 	}
 	head := fmt.Sprintf("func %s(%s)", f.Sym, strings.Join(params, ", "))
 	switch len(f.Rets) {
@@ -162,8 +166,14 @@ func printInst(in Inst) string {
 		}
 		return fmt.Sprintf("store%s %s, %s", g, printPlace(v.Place), v.Val)
 	case *RegionEnter:
+		if v.Scope {
+			return "scope.enter " + v.TypeID
+		}
 		return "region.enter " + v.TypeID
 	case *RegionExit:
+		if v.Scope {
+			return "scope.exit"
+		}
 		return "region.exit"
 	case *DeferReg:
 		if v.OnErr {
@@ -175,12 +185,26 @@ func printInst(in Inst) string {
 		if len(v.TypeArgs) > 0 {
 			callee += "[" + strings.Join(v.TypeArgs, ", ") + "]"
 		}
-		return fmt.Sprintf("defer.init %d, %s(%s)", v.ID, callee, strings.Join(v.Vals, ", "))
+		vals := make([]string, 0, len(v.Vals))
+		for i, val := range v.Vals {
+			g := ""
+			if i < len(v.Limits) && v.Limits[i] != "" {
+				g = ".guard(" + v.Limits[i] + ")"
+			}
+			vals = append(vals, g+val)
+		}
+		return fmt.Sprintf("defer.init %d, %s(%s)", v.ID, callee, strings.Join(vals, ", "))
 	case *DeferRun:
 		if v.Err == "" {
 			return "defer.run"
 		}
 		return "defer.run " + v.Err
+	case *Spawn:
+		callee := v.Callee
+		if len(v.TypeArgs) > 0 {
+			callee += "[" + strings.Join(v.TypeArgs, ", ") + "]"
+		}
+		return fmt.Sprintf("spawn %s(%s)", callee, strings.Join(v.Vals, ", "))
 	case *TrapIfErr:
 		return fmt.Sprintf("trap.if.err %s, line %d", v.Err, v.Line)
 	case *Trap:
@@ -240,6 +264,8 @@ func printRHS(r RHS) string {
 		return fmt.Sprintf("len %s", printPlace(v.Place))
 	case *StrViewRHS:
 		return fmt.Sprintf("str.view %s, %s, %s", v.Base, v.Lo, v.Hi)
+	case *AddrRHS:
+		return "addr " + v.Val
 	case *MultiExtract:
 		return fmt.Sprintf("multi.extract %s, %d", v.Val, v.Idx)
 	case *EnumTag:
@@ -287,7 +313,7 @@ func printPlace(p Place) string {
 	case *ElemPlace:
 		return fmt.Sprintf("elem %s, %s", printPlace(v.Base), v.Idx)
 	case *StrViewPlace:
-		return fmt.Sprintf("strview %s", printPlace(v.Base))
+		return fmt.Sprintf("strview %s, %s, %s", printPlace(v.Base), v.Lo, v.Hi)
 	}
 	return fmt.Sprintf("<unknown place %T>", p)
 }
@@ -317,6 +343,8 @@ func inLoc(in Inst) Loc {
 	case *Trap:
 		return v.Loc
 	case *SelWait:
+		return v.Loc
+	case *Spawn:
 		return v.Loc
 	}
 	return Loc{}

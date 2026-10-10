@@ -41,10 +41,30 @@ func RuntimeSuffix(t Type) (string, bool) {
 	if _, ok := t.(*Interface); ok {
 		return "iface", true
 	}
+	// R21 audit ③：**嵌套容器元素走 Box 句柄槽** —— `i64[][]` = list of `void*`
+	// （内层 list 本身就是句柄），map/set 值同理。语义类型与槽位之间的强转在
+	// emit 侧（irBoxElem/irUnboxElem）。
+	if isContainerTy(t) {
+		return "Box", true
+	}
 	return "", false
 }
 
-// RuntimeMapKeySuffix：map[K]V 的键后缀（runtime 只有 POD 键与 str 键两种哈希表）。
+// isContainerTy 报告类型是否为"能被 Box 句柄槽容纳"的容器（slice/map/set/chan/bytes）。
+// 定长数组 [T;N] 是值类型（C 内联布局）不走句柄槽。
+func isContainerTy(t Type) bool {
+	switch t.(type) {
+	case *Slice, *MapT, *SetT, *ChanT:
+		return true
+	}
+	return IsBytes(t)
+}
+
+// RuntimeMapKeySuffix：map[K]V 的键后缀 = runtime/aic_l1_map.h 实例表的**精确互射**
+// （POD 键 i32/i64/u32/u64/usize/bool + str 键按内容哈希）。
+// enum / @packed / i8/u8 等窄整型键暂无运行期实例（per-type 哈希属单态化面，P3）
+// ⇒ 检查器必须按本表提前拒（审计 ③：旧行为是检查器放行、emit 才炸
+// "malformed map symbol" —— 不可操作的晚期错误）。
 func RuntimeMapKeySuffix(t Type) (string, bool) {
 	b, ok := t.(*Basic)
 	if !ok {
@@ -57,11 +77,14 @@ func RuntimeMapKeySuffix(t Type) (string, bool) {
 	return "", false
 }
 
-// RuntimeMapValueSuffix：map 的值槽位表 = i32/i64/f64/str/Box/iface。
+// RuntimeMapValueSuffix：map 的值槽位表 = aic_l1_map.h 实例表的**精确互射**：
+// i32/i64/f64/bool/str + 引用槽 Box + 两字接口 iface。
+// u8/u16/u32/u64/usize/f32 与容器值暂无实例 ⇒ 检查器提前拒并给可操作替代
+// （审计 ③；bool 是 2026-10 补的最高频缺口）。
 func RuntimeMapValueSuffix(t Type) (string, bool) {
 	if b, ok := t.(*Basic); ok {
 		switch b.Name {
-		case "i32", "i64", "f64", "str":
+		case "i32", "i64", "f64", "bool", "str":
 			return b.Name, true
 		}
 		return "", false
@@ -72,6 +95,11 @@ func RuntimeMapValueSuffix(t Type) (string, bool) {
 	// 接口值槽：两机器字结构，专用实例（与列表的 iface 实例同款）。
 	if _, ok := t.(*Interface); ok {
 		return "iface", true
+	}
+	// R21 audit ③：嵌套容器作 map 值同样走 Box 句柄槽（`map[str]i64[]` =
+	// list 句柄塞 void* 值槽）；强转在 emit 侧。
+	if isContainerTy(t) {
+		return "Box", true
 	}
 	return "", false
 }

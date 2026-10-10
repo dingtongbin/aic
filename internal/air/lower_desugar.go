@@ -184,9 +184,16 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	n := l.tmp("t")
 	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: n, Ty: "usize",
 		Rhs: &LenRHS{Place: &VarPlace{Name: xs}}, Loc: LocOf(v.Pos)})
+	// **map 迭代的名字位不是下标**（§2.5：单名 = 键，两名 = (键, 值)），故内部
+	// 下标变量一律用 i__；其他容器 Names[0] 才是使用者写的下标名。
+	// 索引名只在**两名形态**才对用户可见（`for i, x in xs` 的 i）⇒ 只有那时要
+	// 别名；单名形态下源名指的是元素，索引是隐形的（D1 的重命名不该把体内的
+	// 元素引用改到索引上）。
+	isMap := types.IsMap(xt)
+	idxVisible := !isMap && len(v.Names) >= 2
 	idxName := "i__"
-	if len(v.Names) >= 1 && v.Names[0].Name != "_" {
-		idxName = v.Names[0].Name
+	if !isMap && len(v.Names) >= 1 && v.Names[0].Name != "_" {
+		idxName = l.loopVarName(v.Names[0].Name, idxVisible)
 	}
 	l.cur.Insts = append(l.cur.Insts, &Var{Name: idxName, Ty: "usize", Init: "const 0", Loc: LocOf(v.Pos)})
 
@@ -210,18 +217,50 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	} else if len(v.Names) >= 2 {
 		elemIdx = 1
 	}
+	elemName := ""
 	if len(v.Names) > 0 && v.Names[elemIdx].Name != "_" {
-		el := l.tmp("t")
-		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: el, Ty: l.elemTypeText(xt),
-			Rhs: &ElemRHS{Place: &VarPlace{Name: xs}, Idx: idxName}, Loc: LocOf(v.Pos)})
-		l.cur.Insts = append(l.cur.Insts, &Var{Name: v.Names[elemIdx].Name,
-			Ty: l.elemTypeText(xt), Init: el, Loc: LocOf(v.Names[elemIdx].Pos)})
+		elemName = v.Names[elemIdx].Name
+		// **map 迭代：单名 = 键，两名 = (键, 值)**（§2.5）。键/值按插入序下标取
+		// （runtime 的 key_at/val_at）。曾经走通用的 elem 读 ⇒ "element read on
+		// the host type map[str]i32 is not covered"（031/700 实测）。
+		if isMap {
+			if err := l.bindMapIter(xt, xs, idxName, v); err != nil {
+				return err
+			}
+		} else if types.IsStrType(xt) && len(v.Names) == 1 {
+			// **str 单名迭代 = 单字节视图（str）**（§2.5：`for ch in s` 打印该字符）；
+			// 只有 `for i, b in s` 的两名形态才出 u8 字节。曾经两种都发 u8，
+			// `println(ch)` 打出 104/101/121（693 实测）。
+			elemName = l.loopVarName(elemName, true)
+			hi := l.tmp("t")
+			l.cur.Insts = append(l.cur.Insts, &Let{Tmp: hi, Ty: "usize",
+				Rhs: &Binop{Op: "+", A: idxName, B: "const 1"}, Loc: LocOf(v.Pos)})
+			el := l.tmp("t")
+			l.cur.Insts = append(l.cur.Insts, &Let{Tmp: el, Ty: "str",
+				Rhs: &StrViewRHS{Base: xs, Lo: idxName, Hi: hi}, Loc: LocOf(v.Pos)})
+			l.cur.Insts = append(l.cur.Insts, &Var{Name: elemName,
+				Ty: "str", Init: el, Loc: LocOf(v.Names[0].Pos)})
+		} else {
+			el := l.tmp("t")
+			l.cur.Insts = append(l.cur.Insts, &Let{Tmp: el, Ty: l.elemTypeText(xt),
+				Rhs: &ElemRHS{Place: &VarPlace{Name: xs}, Idx: idxName}, Loc: LocOf(v.Pos)})
+			elemName = l.loopVarName(elemName, true)
+			l.cur.Insts = append(l.cur.Insts, &Var{Name: elemName,
+				Ty: l.elemTypeText(xt), Init: el, Loc: LocOf(v.Names[elemIdx].Pos)})
+		}
 	}
 	l.loops = append(l.loops, loopCtx{post: post.Label, done: done.Label})
 	if err := l.block(v.Body); err != nil {
 		return err
 	}
 	l.loops = l.loops[:len(l.loops)-1]
+	// 循环体降级结束：撤掉本层循环的别名（源名指回外层变量）。
+	if idxVisible {
+		l.unaliasLoopVar(v.Names[0].Name, idxName)
+	}
+	if elemName != "" {
+		l.unaliasLoopVar(v.Names[elemIdx].Name, elemName)
+	}
 	if l.cur.Term == nil {
 		l.cur.Term = &Br{Label: post.Label, Loc: LocOf(v.Pos)}
 	}
@@ -232,6 +271,33 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	post.Insts = append(post.Insts, &Store{Place: &VarPlace{Name: idxName}, Val: nx, Loc: LocOf(v.Pos)})
 	post.Term = &Br{Label: head.Label, Loc: LocOf(v.Pos)}
 	l.cur = done
+	return nil
+}
+
+// bindMapIter 绑定 map 迭代的名字位：单名 = 键；两名 = (键, 值)。
+// 取用走 runtime 的 key_at/val_at（按插入序），符号拼写与容器方法调用同源
+// （`recvTypeSym + "_" + 方法名`，emit 侧 irMapCall 只认这一张表）。
+func (l *lowerer) bindMapIter(xt types.Type, xs, idxName string, v *parse.ForStmt) error {
+	k, val, _ := types.MapParts(xt)
+	sym := recvTypeSym(xt)
+	key := ""
+	if v.Names[0].Name != "_" {
+		t := l.tmp("t")
+		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: l.ty(k),
+			Rhs: &Call{Sym: sym + "_keyAt", Args: []string{xs, idxName}}, Loc: LocOf(v.Names[0].Pos)})
+		key = l.loopVarName(v.Names[0].Name, true)
+		l.cur.Insts = append(l.cur.Insts, &Var{Name: key, Ty: l.ty(k), Init: t,
+			Loc: LocOf(v.Names[0].Pos)})
+	}
+	if len(v.Names) >= 2 && v.Names[1].Name != "_" {
+		t := l.tmp("t")
+		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: l.ty(val),
+			Rhs: &Call{Sym: sym + "_valAt", Args: []string{xs, idxName}}, Loc: LocOf(v.Names[1].Pos)})
+		valName := l.loopVarName(v.Names[1].Name, true)
+		l.cur.Insts = append(l.cur.Insts, &Var{Name: valName, Ty: l.ty(val), Init: t,
+			Loc: LocOf(v.Names[1].Pos)})
+	}
+	_ = key
 	return nil
 }
 
@@ -254,26 +320,50 @@ func (l *lowerer) elemTypeText(t types.Type) string {
 	return "i32"
 }
 
-// scopeStmt：region.enter/exit + 逐 spawn 一条 call（T1 串行 L2：直接调用）。
+// scopeStmt：`scope { }` = 任务域（不是内存 region）：RegionEnter/Exit 带 Scope 标记，
+// 退出时 join 全部 spawn 的任务（L3）。块内 spawn 各发一条 Spawn 指令。
 func (l *lowerer) scopeStmt(v *parse.ScopeStmt) error {
 	l.depth++
-	l.cur.Insts = append(l.cur.Insts, &RegionEnter{TypeID: l.tmp("sc"), Loc: LocOf(v.Pos)})
+	l.cur.Insts = append(l.cur.Insts, &RegionEnter{TypeID: l.tmp("sc"), Scope: true, Loc: LocOf(v.Pos)})
 	if err := l.block(v.Body); err != nil {
 		return err
 	}
 	l.depth--
-	l.cur.Insts = append(l.cur.Insts, &RegionExit{Loc: LocOf(v.Pos)})
+	l.cur.Insts = append(l.cur.Insts, &RegionExit{Scope: true, Loc: LocOf(v.Pos)})
 	return nil
 }
 
-// spawnStmt：任务体 = 被调函数（实参在 spawn 点求值，§七）；T1 串行 L2 下就是一条 call。
+// spawnStmt：任务体 = 被调函数（实参在 spawn 点求值，§七）。
+// L3 真并发：**不内联执行**，发 Spawn 指令（后端 = 上下文块 + thunk + 调度入口）。
+// T1 串行期这里直接发 call —— 那个形态会让两个互相等待的任务"看起来"跑完，
+// 死锁永不触发（773 实测）。
 func (l *lowerer) spawnStmt(v *parse.SpawnStmt) error {
 	call, ok := v.Call.(*parse.Call)
 	if !ok {
 		return fmt.Errorf("air: spawn needs a call (line %d)", v.Pos.Line)
 	}
-	_, err := l.value(call)
-	return err
+	sym, ta := l.callee(call)
+	if sym == "" || sym == "unknown" {
+		return fmt.Errorf("air: cannot resolve the spawned call target (line %d)", v.Pos.Line)
+	}
+	vals := []string{}
+	// 方法形态：接收者是首实参（与直调 / defer 同一条规则）。
+	if f, isField := call.Fn.(*parse.Field); isField && l.methodRecv(f.X) {
+		rv, err := l.value(f.X)
+		if err != nil {
+			return err
+		}
+		vals = append(vals, rv)
+	}
+	for _, a := range call.Args {
+		val, err := l.deferVal(a)
+		if err != nil {
+			return err
+		}
+		vals = append(vals, val)
+	}
+	l.cur.Insts = append(l.cur.Insts, &Spawn{Callee: sym, TypeArgs: ta, Vals: vals, Loc: LocOf(v.Pos)})
+	return nil
 }
 
 // multiBind：`var a, err = f()` → call + 逐位 multi.extract + var 绑定。
@@ -295,6 +385,7 @@ func (l *lowerer) multiBind(v *parse.VarDecl) error {
 			continue
 		}
 		l.cur.Insts = append(l.cur.Insts, &Var{Name: tgt.Name, Ty: ty, Init: t, Loc: LocOf(tgt.Pos)})
+		l.noteBlockVar(tgt.Name)
 	}
 	return nil
 }

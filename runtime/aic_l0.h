@@ -80,45 +80,82 @@ typedef struct { aic_u32 reg; aic_u32 line; } aic_hdr;
 #define AIC_NO_TLS 0
 #endif
 
-/* --- 区域实例：**全局** id → 深度/进入行（弹出记 AIC_REGION_DEAD）------------
- * id 单调递增、永不复用（R0c-② F7：复用会让陈旧引用误判为活）；
- * 表按需分块扩容（含 region 的循环每轮消耗一个 id，静态表必溢出）。
- * file 记录区域进入点文件：trap 消息的「创建处」按「创建文件经区域进入点解析」取用。
+/* --- 区域实例：**（槽位, 代龄）**身份（R19）-----------------------------------
+ * 旧形态：全局单调 id、永不复用（F7：复用会让陈旧引用误判为活）⇒ 含 region 的循环
+ * 每轮消耗一个表项，**记账 32B × 总实例数**（B5 实测 2M 轮 = 65MB vs C 的 4MB）。
  *
- * **L3：id 与页链都是全局的**（不再线程局部）—— 容器/通道跨任务共享，子任务往里写
- * 会"在父任务的区域里增长"，页链按线程局部登记会把共享缓冲分配进子任务区域并在其
- * 结束时回收（实测：两个通道的值互相串）。深度仍语义上属于"任务的区域栈"，但存在
- * 全局槽里，守卫因此可以无锁查（§五 R3）。 */
+ * 新形态：实例身份 = (slot, gen)。对象头 aic_hdr **不变**（仍是 8B）：
+ *     reg = (slot << 20) | gen          slot ∈ [0, 4096)   gen ∈ [0, 2^20)
+ * push 从空闲链取 (slot, gen)，**一次 u32 存储**换发整槽状态（守卫热路径因此
+ * 相干：一次加载同时看到 gen/depth/dead，无锁读无交错）；pop 把槽标 DEAD 后归还
+ * 空闲链，gen 随下一次 push 自增。陈旧引用 = 头里的 gen 与槽内 gen 不符，或
+ * 深度为 DEAD —— 与旧形态 depth=∞ 同义 trap（F7 不变量保持）。
+ * gen 到顶（该槽第 2^20 次复用）⇒ 槽**永久退役**（状态永记 DEAD、不再回流），
+ * 换一个槽；空闲链耗尽 = 实例空间耗尽（4096 × 2^20 ≈ 4.3G 个实例，旧上限 16M）。
+ *
+ * 记账因此从 32B × 总实例数 降为 32B ×（存活 + 已退役）：B5 的 2M 轮只退役
+ * 2 个槽 ≈ 64B。表是定长 128KB BSS（按需换页），**只碰存活槽** ⇒ 守卫工作集
+ * ≤ 257 槽 × 32B = 8KB，cache 常驻。
+ *
+ * **L3 保持**：表与页链都全局（跨任务共享的容器要在其自身区域增长），守卫因此
+ * 可以无锁内联读（§五 R3）；自旋锁只保护**页链操作**（共享容器可能被别的任务
+ * 增长进本区域，列表完整性靠它），空闲链是 **Treiber 无锁栈**（tag 防 ABA，
+ * 见 aic_l0.c；tcc 退回互斥量）。
+ * ------------------------------------------------------------------------- */
 #define AIC_REGION_DEAD      0xFFFFFFFFu
 #define AIC_REGION_MAX_DEPTH 256u
 
-/* 全局区域槽（分块存放：块一旦分配就**永不搬移**，故守卫可无锁读）。
- * lock = 每区域一把自旋锁（自己区域无竞争；共享容器跨任务增长时才真竞争）。 */
+/* reg 打包：slot 占高 12 位、gen 占低 20 位。 */
+#define AIC_REGION_GEN_BITS  20u
+#define AIC_REGION_GEN_MAX   ((1u << AIC_REGION_GEN_BITS) - 1u) /* 0xFFFFF */
+#define AIC_REGION_SLOTS     (1u << (32u - AIC_REGION_GEN_BITS)) /* 4096 */
+#define AIC_REGION_SLOT_OF(reg) ((reg) >> AIC_REGION_GEN_BITS)
+#define AIC_REGION_GEN_OF(reg)  ((reg) & AIC_REGION_GEN_MAX)
+#define AIC_REGION_PACK(slot, gen) \
+    ((((aic_u32)(slot)) << AIC_REGION_GEN_BITS) | ((aic_u32)(gen) & AIC_REGION_GEN_MAX))
+
+/* 槽状态字：state = (gen << 9) | depth。**一次 u32 存储换发**（对齐 u32 存储在
+ * 全部目标平台上是单指令，故守卫的无锁读要么全旧要么全新，不会出现
+ * "gen 新 + depth 旧"的交错 —— 那会让已弹出的实例被误判为活）。
+ * depth ∈ [0, 508] 为活；511 = AIC_REGION_DEAD（已弹出 / 永久退役）。 */
+#define AIC_REGION_DEPTH_BITS 9u
+#define AIC_REGION_DEPTH_DEAD ((1u << AIC_REGION_DEPTH_BITS) - 1u) /* 511 */
+#define AIC_REGION_STATE(gen, depth) \
+    ((((aic_u32)(gen)) << AIC_REGION_DEPTH_BITS) | ((aic_u32)(depth) & AIC_REGION_DEPTH_DEAD))
+#define AIC_REGION_STATE_GEN(st)   ((st) >> AIC_REGION_DEPTH_BITS)
+#define AIC_REGION_STATE_DEPTH(st) ((st) & AIC_REGION_DEPTH_DEAD)
+
+/* 全局区域槽表（定长：块一旦存在就**永不搬移** —— 守卫无锁读的前提）。
+ * lock = 每区域一把自旋锁（只护页链操作，自己不竞争；共享容器跨任务增长才真竞争）。
+ * state = (gen, depth) 合体字（见上）；line/file = 区域进入点（trap 消息的
+ * "创建处"解析来源，每次 push 覆写）。 */
 typedef struct {
     aic_u32 lock;
-    aic_u32 depth; /* AIC_REGION_DEAD = 已弹出 */
+    aic_u32 state;
     aic_u32 line;
     const char *file;
     void *pages;   /* aic_page *（内部类型，头里不需要） */
 } aic_gslot;
 
-#define AIC_GCHUNK_SHIFT 16
-#define AIC_GCHUNK_SIZE  (1u << AIC_GCHUNK_SHIFT) /* 65536 个区域实例/块 */
-#define AIC_GCHUNK_MAX   256u                     /* 上限 16M 个区域实例 */
-
-/* 分块指针数组（全局 id >> 16 → 块）。块不存在 = 该 id 从未分配。 */
-extern aic_gslot **aic_gtab;
+extern aic_gslot aic_gslots[AIC_REGION_SLOTS];
 
 /* 线程局部：当前动态深度（任务根 = 0）；生成代码的守卫用 `aic_depth` 作 limit。 */
 extern AIC_TLS aic_u32 aic_depth;
 
-/* 守卫热路径内联读：区域实例当前深度（AIC_REGION_DEAD = 已弹出/不存在）。 */
-static inline aic_u32 aic_region_depth_of(aic_u32 gid) {
-    aic_gslot *c = aic_gtab[gid >> AIC_GCHUNK_SHIFT];
-    if (c == NULL) {
-        return AIC_REGION_DEAD;
+/* 守卫热路径内联读：区域实例当前深度（AIC_REGION_DEAD = 已弹出/身份不符/不存在）。
+ * 一次加载 + 最多三次比较，仍可被 gcc -O2 内联（H10①）。
+ * 死值统一翻成 AIC_REGION_DEAD(0xFFFFFFFF)：消费者（守卫/诊断）只认这一个哨兵。 */
+static inline aic_u32 aic_region_depth_of(aic_u32 reg) {
+    aic_gslot *s = &aic_gslots[AIC_REGION_SLOT_OF(reg)];
+    aic_u32 st = s->state;
+    if (AIC_REGION_STATE_GEN(st) != AIC_REGION_GEN_OF(reg)) {
+        return AIC_REGION_DEAD; /* 换了代：这是旧实例的陈旧引用（F7） */
     }
-    return c[gid & (AIC_GCHUNK_SIZE - 1u)].depth;
+    aic_u32 d = AIC_REGION_STATE_DEPTH(st);
+    if (d >= AIC_REGION_DEPTH_DEAD) {
+        return AIC_REGION_DEAD; /* 511 = 已弹出 / 永久退役 */
+    }
+    return d;
 }
 
 /* 诊断：区域进入点（trap 消息的"创建处"）。 */
@@ -160,6 +197,8 @@ void  aic_region_release_task(void);
 /* 守卫：被存引用对象必须活且其区域深度 ≤ limit（§五 R3 存储点 ⓪–⑥）。
  * obj 指向带头的引用对象；调用方须先判空。违反 = trap（含存储点/创建行）。 */
 void aic_guard(void *obj, aic_u32 limit, const char *file, aic_u32 line);
+/* 窄化越界的 cold 报告（§一 / R23 D1）：不返回。 */
+AIC_COLD_NORETURN void aic_cold_narrow_report(const char *file, int line, long long val);
 
 /* --- trap：bug 不是错误（§九）---------------------------------------------- */
 typedef enum {
@@ -205,6 +244,24 @@ AIC_COLD_NORETURN void aic_trap_ctx(aic_trap_code code, const char *file, int li
 #define AIC_LIST_WRITABLE(handle, file, line) \
     do { if ((handle) == NULL) \
          aic_trap(AIC_TRAP_ZERO_CONTAINER_WRITE, file, line); } while (0)
+
+/* 定长数组下标（§二.3：`[T;N]` 内联值，越界 trap；004/112 锚点）。
+ * 形态 = 内联比较 + cold 不返回报告（§10.4 第 1 条），**左值可用**（读与写同一形态：
+ * 三目两端同为左值 ⇒ 整个表达式是左值，`AT(a) = v` 合法）。
+ * n == 0 时 `i < n` 恒假 ⇒ 只可能走 trap 分支，`(p)[0]` 是死代码（不执行，
+ * 只为让两支同型）；下标值在 AIR 里恒为无副作用的临时量（V 系规则），双求值安全。 */
+#define AIC_ARRAY_AT(p, n, i, file, line) \
+    (*((aic_usize)(i) < (aic_usize)(n) ? &(p)[i] \
+     : (aic_trap(AIC_TRAP_INDEX_OUT_OF_BOUNDS, file, line), &(p)[0])))
+
+/* 窄化转换（核心设计 §一：窄化带 trap；R23 D1 —— 旧行为是裸 C 强转、静默回绕：
+ * `i32(5000000000i64)` 得 705032704）。形态 = 内联条件 + cold 不返回报告
+ * （与 AIC_GUARD 同纪律）。cond 由发射器按「源/目标位宽与符号性」生成
+ * （加宽与浮点不查；val 在 AIR 里恒为无副作用临时量，双求值安全 —— 与
+ * AIC_ARRAY_AT 同一前提）。 */
+#define AIC_NARROW(ty, cond, val, file, line) \
+    ((cond) ? (ty)(val) \
+     : (aic_cold_narrow_report(file, line, (long long)(val)), (ty)(val)))
 
 /* 存储点守卫的发射形态（§五 R3 + §10.4 第 1 条）：**内联比较 + cold 不返回报告**。
  * emit 在每个被标守卫的存储点生成 AIC_GUARD(obj, limit, file, line)；

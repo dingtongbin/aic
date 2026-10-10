@@ -31,10 +31,12 @@ func ok_main() {
     loc ../../testdata/ok/742_scope_spawn.aic:23:5 var a : chan[i32] = t2
     loc ../../testdata/ok/742_scope_spawn.aic:24:36 let t3 : chan[i32] = call chan_new_i32()
     loc ../../testdata/ok/742_scope_spawn.aic:24:5 var b : chan[i32] = t3
-    loc ../../testdata/ok/742_scope_spawn.aic:25:5 region.enter sc4
-    loc ../../testdata/ok/742_scope_spawn.aic:26:20 let t5 : void = call ok_twice(const 1, a)
-    loc ../../testdata/ok/742_scope_spawn.aic:27:20 let t6 : void = call ok_twice(const 2, b)
-    loc ../../testdata/ok/742_scope_spawn.aic:25:5 region.exit
+    loc ../../testdata/ok/742_scope_spawn.aic:25:5 scope.enter sc4
+    loc ../../testdata/ok/742_scope_spawn.aic:26:21 let t5 : i32 = const 1
+    loc ../../testdata/ok/742_scope_spawn.aic:26:9 spawn ok_twice(t5, a)
+    loc ../../testdata/ok/742_scope_spawn.aic:27:21 let t6 : i32 = const 2
+    loc ../../testdata/ok/742_scope_spawn.aic:27:9 spawn ok_twice(t6, b)
+    loc ../../testdata/ok/742_scope_spawn.aic:25:5 scope.exit
     loc ../../testdata/ok/742_scope_spawn.aic:29:24 let t7 : (i32, bool) = call chan_i32_recv(a)
     loc ../../testdata/ok/742_scope_spawn.aic:29:5 let t8 : i32 = multi.extract t7, 0
     loc ../../testdata/ok/742_scope_spawn.aic:29:9 var x : i32 = t8
@@ -57,10 +59,11 @@ func ok_main() {
     loc ../../testdata/ok/742_scope_spawn.aic:38:5 var nums : chan[i32] = t20
     loc ../../testdata/ok/742_scope_spawn.aic:39:39 let t21 : chan[str] = call chan_new_str()
     loc ../../testdata/ok/742_scope_spawn.aic:39:5 var tags : chan[str] = t21
-    loc ../../testdata/ok/742_scope_spawn.aic:40:5 region.enter sc22
+    loc ../../testdata/ok/742_scope_spawn.aic:40:5 scope.enter sc22
     loc ../../testdata/ok/742_scope_spawn.aic:41:24 let t23 : i32 = elem elem xs, const 0, const 0
-    loc ../../testdata/ok/742_scope_spawn.aic:41:21 let t24 : void = call ok_tagged(t23, const "from-slice", nums, tags)
-    loc ../../testdata/ok/742_scope_spawn.aic:40:5 region.exit
+    loc ../../testdata/ok/742_scope_spawn.aic:41:29 let t24 : str = const "from-slice"
+    loc ../../testdata/ok/742_scope_spawn.aic:41:9 spawn ok_tagged(t23, t24, nums, tags)
+    loc ../../testdata/ok/742_scope_spawn.aic:40:5 scope.exit
     loc ../../testdata/ok/742_scope_spawn.aic:43:27 let t25 : (i32, bool) = call chan_i32_recv(nums)
     loc ../../testdata/ok/742_scope_spawn.aic:43:5 let t26 : i32 = multi.extract t25, 0
     loc ../../testdata/ok/742_scope_spawn.aic:43:9 var n : i32 = t26

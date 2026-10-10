@@ -4,15 +4,15 @@ class Buf {
     var n i32
 }
 
-// @live：对象在外一层区域创建 → 活过 region 块的弹出（§五 R4）。
-// 不写 @live 而把它带出 region 块 = 存储点守卫 trap（trap/003 一类）。
+// live = 在外一层区域创建（§五 R4）。region 块内 `var live b` 让 b 活过块的
+// 弹出；去掉 live 直接 `var b = Buf{...}` 就是存储点守卫 trap（trap/003 同构）。
 func main() -> Err {
     var kept Buf = nil
     region {
-        var @live b = Buf{n: 7}
+        var live b = Buf{n: 7}
         kept = b
     }
-    // region 已弹出：@live 的 b 仍存活（它在更外层区域）
+    // region 已弹出，但 live 提升的 b 还活着（创建在任务区域）
     print.println(kept.n)
     return nil
 }

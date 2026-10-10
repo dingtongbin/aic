@@ -1,0 +1,20 @@
+import print
+
+// B5 区域回收（内存测试的泄漏探针）：N 轮「region 块内建对象 → 块退出整块回收」。
+// 语义判据 = 工作集**不随轮数增长**（区域只复位 bump 指针，不向系统要新页）。
+// 与 benches/c/b5_region.c 逐行同构（同一轮数、同一对象、同一校验和）。
+class Buf {
+    var n i32
+}
+
+func main() {
+    var rounds i32 = 2000000
+    var acc i64 = 0
+    for round in 0..rounds {
+        region {
+            var b = Buf{n: i32(round)}
+            acc = acc + i64(b.n)
+        }
+    }
+    print.println(acc)
+}
