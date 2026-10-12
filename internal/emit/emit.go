@@ -39,6 +39,19 @@ type Result struct {
 	Needed []string
 	// Guards 是守卫点计数（--report-guards）。
 	Guards GuardCounts
+	// Syms 是本次发射的「AIC 限定名 → C 符号」对照表（`aic dump syms` 的数据源；
+	// 内部符号是哈希，不可逆，这张表是回查的唯一途径）。
+	Syms []SymEntry
+}
+
+// SymEntry 是一条「IR/AIC 限定名 → C 符号」的对照（aic dump syms 的数据源）。
+type SymEntry struct {
+	// AIR 是 AIC 侧的限定名（IR 文本形态，如 `app_core_util_parse`）。
+	AIR string
+	// C 是发射出的 C 符号（内部 = `aic_<16 hex>`；export/extern = 原名直出）。
+	C string
+	// Kind 是 func / method / type / enum / iface。
+	Kind string
 }
 
 // Ctx 是一次发射的全部状态 (无包级全局状态)。
@@ -53,6 +66,8 @@ type Ctx struct {
 	cur *FileUnit
 	// deps 是包名 → 检查产物 (跨包调用/类型发射; 含本包)。
 	deps map[string]*types.Info
+	// unit 是本次发射的分配单元（`aic dump syms` 要枚举全部文件单元的类型）。
+	unit *Unit
 	// retSeen 是已发射的合成返回结构名 (跨文件去重, 同一形状只发一次)。
 	retSeen map[string]bool
 	// entryPath 是入口包名 (main 所在包)。
@@ -225,6 +240,7 @@ type seed struct {
 // 函数体一律从 IR 取（见 irbody.go）—— 不存在 AST 直译路径。
 func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	c := &Ctx{
+		unit:      u,
 		cur:       u.Files[0],
 		Path:      u.Files[0].Path,
 		File:      u.Files[0].File,
@@ -403,13 +419,74 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if err := ir.verifyAllUsed(); err != nil {
 		return nil, nil, err
 	}
-	return &Result{C: c.buf.String(), Warnings: c.warnings, Needed: c.Needed(), Guards: c.guards},
+	return &Result{C: c.buf.String(), Warnings: c.warnings, Needed: c.Needed(), Guards: c.guards,
+			Syms: c.symTable()},
 		&seed{insts: c.insts, printers: c.printers, witnesses: c.witnesses,
 			ifacePrint: c.sortedIfacePrint(), needed: c.Needed(),
 			irRets: c.irRetOrder, irRetT: c.irRetTypes,
 			irSpawns:      c.irSpawns,
 			irReprEnums:   sortedKeys(c.irReprEnums),
 			irReprStructs: sortedKeys(c.irReprStructs)}, nil
+}
+
+// symTable 汇总本次发射用到的全部符号对照，按 AIR 名排序（确定性，H2）。
+//
+// 为什么必须有这张表：内部符号是 sha256 前 8 字节，**不可逆** —— 崩溃现场的
+// `aic_9f3a...` 回不到源码，没有对照表就没法调试。哈希的对价就是这张表。
+func (c *Ctx) symTable() []SymEntry {
+	var out []SymEntry
+	for air, cname := range c.irCall {
+		kind := "func"
+		if strings.Contains(air, "__") {
+			kind = "method"
+		}
+		out = append(out, SymEntry{AIR: air, C: cname, Kind: kind})
+	}
+	for _, fu := range c.allFiles() {
+		if fu.Info == nil {
+			continue
+		}
+		pkg := fu.Info.Pkg
+		if pkg == "" {
+			pkg = c.pkg()
+		}
+		airPkg := fu.Info.PkgPath
+		if airPkg == "" {
+			airPkg = pkg
+		}
+		names := make([]string, 0, len(fu.Info.Classes)+len(fu.Info.Enums)+len(fu.Info.Interfaces))
+		for n := range fu.Info.Classes {
+			names = append(names, "c:"+n)
+		}
+		for n := range fu.Info.Enums {
+			names = append(names, "e:"+n)
+		}
+		for n := range fu.Info.Interfaces {
+			names = append(names, "i:"+n)
+		}
+		sort.Strings(names)
+		for _, key := range names {
+			kind, name := key[:1], key[2:]
+			out = append(out, SymEntry{
+				AIR:  air.TypeSym(airPkg, name),
+				C:    c.typedefName(c.ownerPkg(pkg), name),
+				Kind: map[string]string{"c": "type", "e": "enum", "i": "iface"}[kind],
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].AIR < out[j].AIR })
+	return out
+}
+
+// allFiles 是本次发射涉及的全部文件单元（当前 + 依赖）。
+func (c *Ctx) allFiles() []*FileUnit {
+	if c.unit == nil {
+		if c.cur != nil {
+			return []*FileUnit{c.cur}
+		}
+		return nil
+	}
+	return c.unit.Files
 }
 
 // sortedIfacePrint 把需要打印槽的接口键排序（确定性；map 序随机会破坏 H2）。

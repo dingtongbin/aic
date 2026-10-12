@@ -42,6 +42,14 @@ func main() {
 		code = cmdDumpAST(args)
 	case "dump-ir":
 		code = cmdDumpIR(args)
+	case "dump":
+		// `aic dump syms`：内部符号 ↔ AIC 限定名对照（哈希不可逆，必须能回查）。
+		if len(args) > 0 && args[0] == "syms" {
+			code = cmdDumpSyms(args[1:])
+			break
+		}
+		fmt.Fprintf(os.Stderr, "aic dump: unknown subcommand %q (want: syms)\n", firstOr(args, ""))
+		code = 2
 	case "fmt":
 		code = cmdFmt(args)
 	case "test":
@@ -72,6 +80,8 @@ usage:
   aic dump-c <file.aic>            print the emitted C text to stdout
   aic dump-ast <file.aic>          AST summary (for external generators; core design §10)
   aic dump-ir <file.aic> [--stage] print the typed core IR (air checkpoint; verifier-gated)
+  aic dump syms <file.aic> [-o aic_syms.h]  internal symbol -> AIC qualified name table
+                                              (internal symbols are hashed: this is the only way back)
   aic fmt <file.aic>...            print the canonicalised source (currently: echo as-is)
   aic test [dir]                   discover and run *_test.aic
   aic version                      version information
