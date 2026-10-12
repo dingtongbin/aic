@@ -14,6 +14,7 @@
 #define AIC_L2_CHAN_H
 
 #include "aic_l0.h"
+#include "aic_l1.h" /* drain 的返回值是 list（同一份运行时，禁第二套容器） */
 #include <string.h>
 
 #define AIC_CHAN_OP(short, ctype) \
@@ -81,6 +82,36 @@
     /* 容量（0 = 无界）：cap() 查询用，也是"背压是否生效"的可观察事实。 */ \
     static inline aic_usize aic_chan_cap_##short(const aic_chan_##short *ch) { \
         return ch ? ch->bound : 0; \
+    } \
+    /* tryRecv：非阻塞取一个（§2.4）。拿不到 = (零值, false) —— 调用方据此构 \
+     * Option.None；有值 = (值, true) → Option.Some。 \
+     * 与 recv 的分界就在"等不等"：recv 空且无发送方时返回 false 表示**不会再有**， \
+     * tryRecv 的 false 只表示**此刻没有**（下一秒可能就有）。同一个 bool 两种 \
+     * 含义，靠调用点上的 Option / Err 区分。 */ \
+    static inline aic_chan_##short##_recv_t aic_chan_try_recv_##short(aic_chan_##short *ch) { \
+        aic_chan_##short##_recv_t out; \
+        memset(&out, 0, sizeof(out)); \
+        if (ch == NULL || ch->len == 0) return out; \
+        out._0 = ch->slots[ch->head]; \
+        out._1 = true; \
+        ch->head++; \
+        ch->len--; \
+        return out; \
+    } \
+    /* drain(n)：非阻塞取至多 n 个（§2.4）。取不尽就給已有的 —— 返回值长度即 \
+     * 实际取到的个数，调用方不需要先查 len() 再猜。 */ \
+    static inline aic_list_##short *aic_chan_drain_##short(aic_chan_##short *ch, \
+                                                           aic_usize n, \
+                                                           const char *file, int line) { \
+        aic_list_##short *out = aic_list_new_##short((aic_u32)line); \
+        aic_usize i; \
+        if (ch == NULL) return out; \
+        for (i = 0; i < n && ch->len != 0; i++) { \
+            aic_list_append_##short(out, ch->slots[ch->head], file, line); \
+            ch->head++; \
+            ch->len--; \
+        } \
+        return out; \
     }
 
 /* N6 select 的就绪判定：无阻塞查询，绝不改状态（真等待见 aic_select_wait）。 */

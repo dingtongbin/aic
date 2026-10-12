@@ -97,6 +97,21 @@
         aic_usize i = aic_map_find_##KS##_##VS(m, k); \
         return i == (aic_usize)-1 ? zero : m->slots[i].v; \
     } \
+    /* get 的 Option 形态（§2.3：不存在 = Option，不是零值也不是 Err）。 \
+     * 为什么单独一个函数：Option 的 tag 与载荷必须**同源**。写成一个 C 表达式 \
+     * 就得把 find 求值两次（第二次 hash 到同一个槽，结果虽对但白算一半）； \
+     * 交给调用方拆两条语句又是把运行时布局泄漏出去。这里一次查找两样都给出。 */ \
+    typedef struct { bool _0; VT _1; } aic_map_##KS##_##VS##_get_t; \
+    static inline aic_map_##KS##_##VS##_get_t aic_map_try_get_##KS##_##VS( \
+        const aic_map_##KS##_##VS *m, KT k) { \
+        aic_map_##KS##_##VS##_get_t out; \
+        memset(&out, 0, sizeof(out)); \
+        if (m != NULL) { \
+            aic_usize i = aic_map_find_##KS##_##VS(m, k); \
+            if (i != (aic_usize)-1) { out._0 = true; out._1 = m->slots[i].v; } \
+        } \
+        return out; \
+    } \
     static inline void aic_map_remove_##KS##_##VS(aic_map_##KS##_##VS *m, KT k, \
                                                   const char *file, int line) { \
         if (m == NULL || m->cap == 0) return; \
@@ -136,6 +151,18 @@
                                                 const char *file, int line) { \
         if (m == NULL || i >= m->len) aic_trap(AIC_TRAP_INDEX_OUT_OF_BOUNDS, file, line); \
         return AIC_MAP_SLOT_VAL(m, m->order[i]); \
+    } \
+    /* keys() = 插入序全量（§2.3）。order[i] 就是第 i 个插入的槽位，故按 order \
+     * 顺序读槽键即得插入序；删除已在 remove 里把 order 原地压缩过，无空洞。 */ \
+    static inline aic_list_##KS *aic_map_keys_##KS##_##VS(const aic_map_##KS##_##VS *m, \
+                                                          const char *file, int line) { \
+        aic_list_##KS *out = aic_list_new_##KS((aic_u32)line); \
+        aic_usize i, n = (m == NULL) ? 0 : m->len; \
+        for (i = 0; i < n; i++) { \
+            aic_list_append_##KS(out, AIC_MAP_SLOT_KEY(m, m->order[i]), file, line); \
+        } \
+        (void)file; \
+        return out; \
     }
 
 /* POD 键（整数/bool）：按字节哈希。 */

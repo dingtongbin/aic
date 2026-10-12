@@ -349,6 +349,11 @@ aic_str aic_fmt_bool(bool v);
 /* --- print 原语（std/print 的落点；polymorphic 分派由 emit 生成）------------- */
 void aic_print_str(aic_str s);
 void aic_println_str(aic_str s);
+/* fmt 的 e 家族：同一套字节走 stderr（§3.1）。stdout 可能被管道消费，
+ * 程序数据与运维信息必须分流。 */
+void aic_eprint_str(aic_str s);
+void aic_eprintln_str(aic_str s);
+void aic_println_str(aic_str s);
 void aic_print_i64(aic_i64 v);
 void aic_println_i64(aic_i64 v);
 void aic_print_i32(aic_i32 v);

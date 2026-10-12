@@ -224,6 +224,8 @@ func (l *lowerer) emitInstanceTypes() {
 			ft := types.Subst(cl.Fields[i].Type, cl.TypeParams, inst.Args)
 			td.Fields = append(td.Fields, Field{Idx: i, Name: cl.Fields[i].Name, Ty: tyText(ft)})
 		}
+		// 实例的 derive 名单与基类同源（实例化不改能力）。
+		td.Derives = sortedDerives(cl)
 		l.mod.Types = append(l.mod.Types, td)
 	}
 	// ① 检查器登记的实例实参
@@ -245,6 +247,18 @@ func (l *lowerer) emitInstanceTypes() {
 	sort.Slice(l.mod.Types, func(i, j int) bool { return l.mod.Types[i].Sym < l.mod.Types[j].Sym })
 }
 
+// sortedDerives 取一个类的 derive 名单（字典序，确定性 —— IR 文本要逐字节可复现）。
+func sortedDerives(cl *types.Class) []string {
+	out := make([]string, 0, len(cl.Derived))
+	for d := range cl.Derived {
+		if cl.Derived[d] {
+			out = append(out, d)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // --- 类型表 -------------------------------------------------------------------
 
 func (l *lowerer) types() error {
@@ -263,6 +277,7 @@ func (l *lowerer) types() error {
 		for i := range cl.Fields {
 			td.Fields = append(td.Fields, Field{Idx: i, Name: cl.Fields[i].Name, Ty: l.ty(cl.Fields[i].Type)})
 		}
+		td.Derives = sortedDerives(cl)
 		l.mod.Types = append(l.mod.Types, td)
 	}
 	if l.in.Mono {

@@ -168,6 +168,11 @@ type Ctx struct {
 	// 序号按发现序 = 确定性，H2）。
 	irSpawns   []irSpawnSite
 	irSpawnSeq int
+	// irReprEnums / irReprStructs 是本遍发现的需要「值 → str」助手的类型文本
+	// （插值一个无载荷 enum 或 derive ToString 的 struct）。集合而不是全量：
+	// 没人引用的助手发出去就是死代码（门禁的覆盖率报告会直接盯上）。
+	irReprEnums   map[string]bool
+	irReprStructs map[string]bool
 	// FuncCache 是增量翻译的函数级缓存（nil = 不用；--emit-c 与门禁路径必须
 	// 保持 nil —— H2/H3 判的就是发射文本的确定性与可编译性，走缓存会把门禁判据
 	// 变成缓存命中）。见 func_cache.go。
@@ -211,6 +216,9 @@ type seed struct {
 	irRetT map[string][]types.Type
 	// irSpawns 是 IR 路径的 spawn 站点表（第一遍发现，第二遍据此发原型/定义）。
 	irSpawns []irSpawnSite
+	// irReprEnums / irReprStructs 是 IR 路径的插值助手表（同 spawn：两遍机制）。
+	irReprEnums   []string
+	irReprStructs []string
 }
 
 // runEmit 跑一遍完整发射，返回产物与本次发现的实例/打印函数表。
@@ -227,6 +235,9 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		retSeen:   map[string]bool{},
 		entryPath: u.Entry,
 	}
+	// 插值助手表每遍自建（原型段在函数体之前，只能吃第一遍的发现）。
+	c.irReprEnums = map[string]bool{}
+	c.irReprStructs = map[string]bool{}
 	for _, fu := range u.Files {
 		if fu.Info != nil && fu.Info.Pkg != "" {
 			c.deps[fu.Info.Pkg] = fu.Info
@@ -283,6 +294,15 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		}
 		// spawn 站点表同理（原型段跑在函数体之前，只能吃第一遍的发现）。
 		c.irSpawns = append([]irSpawnSite{}, pre.irSpawns...)
+		// 插值助手表同理（无载荷 enum 的变体名、ToString struct 的逐字段拼装）。
+		c.irReprEnums = map[string]bool{}
+		for _, t := range pre.irReprEnums {
+			c.irReprEnums[t] = true
+		}
+		c.irReprStructs = map[string]bool{}
+		for _, t := range pre.irReprStructs {
+			c.irReprStructs[t] = true
+		}
 	}
 	// pass 1 + 2：逐文件建名字表与收集泛型实例（实例定义必须在任何使用点之前）。
 	// 泛型实例由 IR 侧的 cTypeName 调用按需登记（两遍照旧：第一遍发现、第二遍带表）。
@@ -329,6 +349,7 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	}
 	c.emitIRSpawnProtos()
 	c.emitStructCmpProtos()
+	c.emitReprProtos()
 	if _, err := c.emitInstMethodProtos(u); err != nil {
 		return nil, nil, err
 	}
@@ -372,6 +393,10 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if err := c.emitStructCmpBodies(); err != nil { // struct 比较助手（同上：末尾定义）
 		return nil, nil, err
 	}
+	// 插值助手的定义（同上：末尾定义，体内读被打印类型的字段）。
+	if err := c.emitReprBodies(); err != nil {
+		return nil, nil, err
+	}
 	c.epilogue()
 	// 收口校验：IR 里不该有没人要的函数体（有 = 签名侧与 IR 侧的符号对不上，
 	// 是本类改动最容易犯的错，必须在编译期炸出来而不是静静丢掉一个函数）。
@@ -382,7 +407,9 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		&seed{insts: c.insts, printers: c.printers, witnesses: c.witnesses,
 			ifacePrint: c.sortedIfacePrint(), needed: c.Needed(),
 			irRets: c.irRetOrder, irRetT: c.irRetTypes,
-			irSpawns: c.irSpawns}, nil
+			irSpawns: c.irSpawns,
+			irReprEnums:   sortedKeys(c.irReprEnums),
+			irReprStructs: sortedKeys(c.irReprStructs)}, nil
 }
 
 // sortedIfacePrint 把需要打印槽的接口键排序（确定性；map 序随机会破坏 H2）。

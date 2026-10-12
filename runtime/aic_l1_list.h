@@ -93,6 +93,26 @@
         AIC_LIST_WRITABLE(l, file, line); \
         l->len = 0; \
         (void)file; \
+    } \
+    /* slice(a, n) = **共享底层**的视图（标准库规范 §2.2）。 \
+     * 形态 = 新头 + data 指向父缓冲的第 a 个元素：读与**元素写**都落在父缓冲上， \
+     * 这就是"共享"的字面含义。 \
+     * cap 置 0 是关键：第一次 append 会 grow 到 4 并整体拷出（copy-on-append）。 \
+     * 不这么做的话视图 append 会写进父对象的空闲容量 —— 两个 list 从此互为 \
+     * 对方的隐写通道，改一个悄悄改掉另一个。 */ \
+    static inline aic_list_##short *aic_list_slice_##short(const aic_list_##short *l, \
+                                                           aic_usize a, aic_usize n, \
+                                                           const char *file, int line) { \
+        aic_usize len = (l == NULL) ? 0 : l->len; \
+        if (a > len || n > len - a) { \
+            aic_trap(AIC_TRAP_INDEX_OUT_OF_BOUNDS, file, line); \
+        } \
+        aic_list_##short *v = (aic_list_##short *)aic_alloc_hdr(sizeof(aic_list_##short), (aic_u32)line); \
+        v->hdr.reg = (l == NULL) ? 0 : l->hdr.reg; \
+        v->data = (l == NULL || l->data == NULL) ? NULL : l->data + a; \
+        v->len = n; \
+        v->cap = 0; \
+        return v; \
     }
 
 

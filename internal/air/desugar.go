@@ -35,8 +35,12 @@ import "fmt"
 // 返回的模块**不含任何 IR-1 原语**（调用方可用 HasPrim 断言）。
 func Desugar(m *Module) (*Module, error) {
 	out := &Module{Pkg: m.Pkg, Imports: append([]string{}, m.Imports...), Types: m.Types}
+	byTy := map[string]*TypeDecl{}
+	for _, td := range m.Types {
+		byTy[td.Sym] = td
+	}
 	for _, f := range m.Funcs {
-		nf, err := desugarFunc(f)
+		nf, err := desugarFunc(f, byTy)
 		if err != nil {
 			return nil, err
 		}
@@ -45,8 +49,11 @@ func Desugar(m *Module) (*Module, error) {
 	return out, nil
 }
 
-func desugarFunc(f *Func) (*Func, error) {
-	d := &desugarer{labels: map[string]bool{}}
+// desugarFunc 去糖一个函数体。byTy = 模块的具名类型表（键 = IR 类型文本，
+// 如 `ok_Level`）—— 插值降级要按它判"这个值怎么变成 str"（无载荷 enum 走变体名，
+// derive ToString 的 struct 走逐字段 ToString；判据只能是类型声明本身）。
+func desugarFunc(f *Func, byTy map[string]*TypeDecl) (*Func, error) {
+	d := &desugarer{labels: map[string]bool{}, byTy: byTy}
 	// 预登记 IR-1 已有的全部块标签：desugar 新建块不得与它们撞名
 	//（撞名会让跳转落到错误的块上 —— 这是 IR pass 的静默错误源）。
 	for _, b := range f.Blocks {
@@ -69,10 +76,14 @@ func desugarFunc(f *Func) (*Func, error) {
 // desugarer 持有去糖期的命名器。
 //
 // 与 lowerer 的分界：lowerer 面向 AST（typeOf / value 求值），desugarer 只
-// 面向已定型 IR（有类型文本）。它不能也不需要推断类型。
+// 面向已定型 IR（有类型文本）。它**不推断类型**，但按类型文本查类型表是允许的 ——
+// 插值降级就需要它（无载荷 enum → 变体名、derive ToString 的 struct → 逐字段
+// ToString，判据只能是类型声明本身）。
 type desugarer struct {
 	tmpN int
 	blkN int
+	// byTy 是本模块的具名类型表（键 = IR 类型文本，如 `ok_Level`）。
+	byTy map[string]*TypeDecl
 	// pending 是本条原语展开过程中新建、但**尚未编入输出序列**的块。
 	// 为什么需要它：原语展开会建多个块（match 的每臂 prologue、check 的
 	// fail/ok…），而 desugarBlock 只拿到原语所在的 pre 块。若 newBlock 不
@@ -115,8 +126,13 @@ func (d *desugarer) tmp(prefix string) string {
 func (d *desugarer) emit(c *Block, in Inst) { c.Insts = append(c.Insts, in) }
 
 // let 发一条 let 并返回临时量名。
+//
+// 前缀是 `d` 而不是 `t`：lowering 的 tmp 也用 `t<N>` 且**每函数从 1 起**，
+// desugarer 若同样发 `t1`，两个序列必然撞名 —— 同一函数里两个不同类型同名的
+// let 在 C 层就是 "conflicting types for 't1'"。这是 012/028 实测出来的：
+// 撞名的直接后果是 C 编译失败，而 IR 层看不出任何异常。
 func (d *desugarer) let(c *Block, ty string, rhs RHS, at Loc) string {
-	t := d.tmp("t")
+	t := d.tmp("d")
 	d.emit(c, &Let{Tmp: t, Ty: ty, Rhs: rhs, Loc: at})
 	return t
 }
@@ -248,9 +264,14 @@ func (d *desugarer) desugarBlock(b *Block) ([]*Block, error) {
 	}
 	for _, in := range b.Insts {
 		if l, ok := in.(*Let); ok && IsPrimRHS(l.Rhs) {
+			// 原语 let **自身也要发**：desugar 只把它的 Rhs 换成低层形态（TmpRef /
+			// VarRef / Const），槽位声明（`let t1 : str = …`）仍由这一条承担。
+			// 少发它 = 结果临时量从未声明，C 层报 "'t1' undeclared"（interp/check/
+			// catch/assert/match 五族全中，002/028 实测）。
 			if err := d.letPrim(cur, l, setTerm); err != nil {
 				return nil, err
 			}
+			d.emit(cur, l)
 			out = append(out, d.takePending()...)
 			continue
 		}
@@ -479,9 +500,47 @@ func (d *desugarer) interpFormatOne(cur *Block, val, ty string, at Loc) (string,
 		return d.let(cur, "str", &Call{Sym: "str_fromU64", Args: []string{w}}, at), nil
 	case "u64", "usize":
 		return d.let(cur, "str", &Call{Sym: "str_fromU64", Args: []string{val}}, at), nil
+	case "rune":
+		// rune 是独立基本类型（Unicode 标量值）：先按数值定宽，再走 str 的编码
+		// 构造（越界在运行期 trap，见 aic_std_str_from_rune）。不能当 u32 插值 ——
+		// 那会把中文字符打成一串十进制数字。
+		return d.let(cur, "str", &Call{Sym: "str_fromRune", Args: []string{val}}, at), nil
+	}
+	// 非基本类型（规范 §1.4 的可插值集合后两类）：
+	//   - **无载荷 enum**：值就是 tag，文本 = 变体名（`Level.High` → "High"）；
+	//   - **derive ToString 的 struct**：文本 = 逐字段拼出的 ToString。
+	// 两者的判据都是 IR 类型表的声明（Derives / Variants），不猜。
+	if td, ok := d.byTy[ty]; ok {
+		if td.Kind == "enum" && payloadFreeEnum(td) {
+			return d.let(cur, "str", &Call{Sym: "str_enumName", Args: []string{val}}, at), nil
+		}
+		if td.Kind == "struct" && deriveHas(td.Derives, "ToString") {
+			return d.let(cur, "str", &Call{Sym: "str_ofStruct", Args: []string{val}}, at), nil
+		}
 	}
 	return "", fmt.Errorf("air: interpolation of %s is not mechanisable (line %d): "+
-		"a placeholder value must reach IR-1 narrowed to a basic type (AIC standard library spec §2.1)", ty, at.Line)
+		"a placeholder value must reach IR-1 narrowed to a basic type, a payload-free enum "+
+		"or a derive ToString struct (AIC language spec §1.4 / standard library spec §2.1)", ty, at.Line)
+}
+
+// payloadFreeEnum 报告一个枚举声明是否无载荷（每个变体的 Payload 都是空）。
+func payloadFreeEnum(td *TypeDecl) bool {
+	for _, v := range td.Variants {
+		if v.Payload != "" {
+			return false
+		}
+	}
+	return true
+}
+
+// deriveHas 报告 derive 名单里有没有某一项（封闭能力集，判据唯一）。
+func deriveHas(list []string, what string) bool {
+	for _, d := range list {
+		if d == what {
+			return true
+		}
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------

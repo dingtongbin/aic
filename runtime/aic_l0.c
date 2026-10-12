@@ -19,6 +19,7 @@
 /* --- stdout 二进制模式：平台相关代码统一收敛在 aic_plat.h（唯一平台层） --- */
 #include "aic_plat.h"
 static void aic_binary_stdout(void) { aic_plat_binary_stdout(); }
+static void aic_binary_stderr(void) { aic_plat_binary_stderr(); }
 
 
 /* ============================================================================
@@ -842,6 +843,22 @@ void aic_print_str(aic_str s) {
 void aic_println_str(aic_str s) {
     aic_print_str(s);
     fputc('\n', stdout);
+}
+
+/* e* 家族：同一套字节走 **stderr**（规范 §3.1：fmt 的 e 前缀一律表 stderr）。
+ * stdout 可能被管道消费，不能带时间戳、也不能与程序数据混流 —— 故必须
+ * 另一个文件句柄，而不是把 print 的目标做成可切换的全局量（那会让并发任务
+ * 的输出互相污染）。 */
+void aic_eprint_str(aic_str s) {
+    aic_binary_stderr();
+    if (s.len != 0) {
+        fwrite(s.p, 1, s.len, stderr);
+    }
+}
+
+void aic_eprintln_str(aic_str s) {
+    aic_eprint_str(s);
+    fputc('\n', stderr);
 }
 
 /* 整数打印：与 aic_fmt_* 同一套自实现十进制（无 libc printf、无裸 long）。 */

@@ -1924,7 +1924,7 @@ func (c *Ctx) irLet(v *air.Let, ind string) error {
 	// 但 C 不允许结构体间强转 —— tcc 当扩展收下、gcc/clang 直接拒
 	// （742 实测：五配置的 H3 在 gcc 配置下是潜伏的坑）。故拆两条语句：
 	// 先接原生值，再按字段逐一搬进目标结构（无 double-eval：原生值先落临时量）。
-	if nativeTy, ok := c.irChanRecvNativeTy(v.Rhs); ok {
+	if nativeTy, ok := c.irNativeResultTy(v.Rhs); ok {
 		if elems, isMulti := splitMultiText(v.Ty); isMulti {
 			expr, err := c.irRHS(v.Rhs)
 			c.irPendingTy, c.irPendingLoc = "", air.Loc{}
@@ -1952,6 +1952,12 @@ func (c *Ctx) irLet(v *air.Let, ind string) error {
 			c.irTemps[v.Tmp] = v.Ty
 			return nil
 		}
+	}
+	// **let/var 位上的 Option 构造**：tryRecv / map.get / str.indexOf 三者的
+	// tag 与载荷来自同一次调用，写成一个 C 表达式就得把它求值两次（tryRecv 第二次
+	// 读到的是下一个元素 = 静默丢消息；try_get 第二次是白算一次 hash）。
+	if done, err := c.irOptAssign(v.Rhs, v.Ty, v.Tmp, ind, v.Loc); err != nil || done {
+		return err
 	}
 	rhs, err := c.irRHS(v.Rhs)
 	c.irPendingTy, c.irPendingLoc = "", air.Loc{}
@@ -2031,6 +2037,158 @@ func (c *Ctx) irChanRecvNativeTy(r air.RHS) (string, bool) {
 		return "", false
 	}
 	return "aic_chan_" + suf + "_recv_t", true
+}
+
+// irNativeResultTy 报告 let 的右值是不是一个**返回运行时原生多值结构**的内建调用，
+// 是则给出该结构的 C 名（布局与 AIR 的多值结构逐位相同，但类型不同 —— 强转非法，
+// 必须拆两条语句按字段搬）。判据只认符号形态（与各 ir*Call 同一张解析）。
+//
+// 覆盖：chan.recv / str.utf8At / str.toI64 / str.toF64 / os.readFile / os.readStdin。
+// 少一个 = 对应的 `var a, b = f()` 在 C 层报 "invalid initializer"（028 实测）。
+func (c *Ctx) irNativeResultTy(r air.RHS) (string, bool) {
+	call, ok := r.(*air.Call)
+	if !ok {
+		return "", false
+	}
+	if ty, ok := c.irChanRecvNativeTy(r); ok {
+		return ty, true
+	}
+	switch call.Sym {
+	case "str_utf8At":
+		return "aic_r_u32_usize", true
+	case "str_toI64":
+		return "aic_r_i64_err", true
+	case "str_toF64":
+		return "aic_r_f64_err", true
+	case "os_readFile", "os_readStdin":
+		return "aic_r_str_err", true
+	}
+	return "", false
+}
+
+// irChanTryRecvNativeTy 报告 let 的右值是不是 chan tryRecv 调用，是则给出运行时
+// 原生结果结构的 C 名。tryRecv 与 recv 复用同一个 `_recv_t` 形状（_0 = 值、
+// _1 = 有吗），只是不等 —— 判据只认符号形态，与 irChanCall 同一张解析。
+// irOptAssign 在 let/var 位上把「一次调用 ⇒ Option[T]」拆成两条语句：原生结果
+// 先落临时量，再按"有值吗"构 Option。返回 done=true 表示已处理完。
+//
+// 覆盖三个调用点（规范里"不存在 = Option"的那几位）：
+//
+//	chan_<S>_tryRecv(ch)            非阻塞取一个        → {_0, _1} 结构
+//	map_<K>_<V>_get(m, k)（Option 槽） map 取值           → {_0, _1} 结构
+//	str_indexOf(hay, needle)        首个下标            → i64（-1 = 没有）
+//
+// 为什么必须是两条语句：Option 的 tag 与载荷来自同一次调用，写成一个 C 表达式就得
+// 把它求值两次 —— tryRecv 第二次读到的是**下一个**元素（静默丢消息，023 实测），
+// try_get 第二次是白算一次 hash。let 与 var 是同一个槽位语义（023 的
+// `var o Option[i64] = ch.tryRecv()` 走 var），故这个辅助由两边共用。
+func (c *Ctx) irOptAssign(rhs air.RHS, ty, tmpName, ind string, loc air.Loc) (bool, error) {
+	kind, nativeTy, ok := c.irOptSource(rhs)
+	if !ok {
+		return false, nil
+	}
+	isOpt := false
+	if t, has := c.irTab[ty]; has {
+		_, isOpt = types.IsOptionInstance(t)
+	}
+	if !isOpt {
+		return true, fmt.Errorf("emit(IR): %s must land in an Option slot, got %q (line %d)",
+			strings.TrimPrefix(nativeTy, "aic_"), ty, loc.Line)
+	}
+	c.irPendingTy, c.irPendingLoc = ty, loc
+	expr, err := c.irRHS(rhs)
+	c.irPendingTy, c.irPendingLoc = "", air.Loc{}
+	if err != nil {
+		return true, err
+	}
+	tmp := c.tmp("op")
+	c.srcLine(loc.Pos(c.Path))
+	c.line("%s%s %s = %s;", ind, nativeTy, tmp, expr)
+	// Option 的 C 类型名要从**槽位类型**取（实例名带类型实参），而构造 Some/None
+	// 发生在右值求值之后 —— 故先把 irPendingTy 设回去再构，构完再清。
+	c.irPendingTy = ty
+	some, err := c.irOptionCtor("Some", []string{tmp + c.optValField(kind)})
+	if err != nil {
+		c.irPendingTy = ""
+		return true, err
+	}
+	none, err := c.irOptionCtor("None", nil)
+	c.irPendingTy = ""
+	if err != nil {
+		return true, err
+	}
+	ct, err := c.irDeclText(ty, tmpName)
+	if err != nil {
+		return true, err
+	}
+	c.line("%s%s = (%s ? (%s) : (%s));", ind, ct, c.optTest(kind, tmp), some, none)
+	c.irTemps[tmpName] = ty
+	return true, nil
+}
+
+// optSourceKind 是"一次调用 ⇒ Option"的三种原生结果形态。
+type optSourceKind int
+
+const (
+	optStruct optSourceKind = iota // {_0 = 有吗, _1 = 值}
+	optScalar                      // 标量，-1 = 没有
+)
+
+// optValField / optTest 给一种形态取出载荷字段与"有值吗"的判据（一处一形式，
+// 不散布在调用点）。
+func (c *Ctx) optValField(k optSourceKind) string {
+	if k == optStruct {
+		return "._1"
+	}
+	return ""
+}
+
+func (c *Ctx) optTest(k optSourceKind, tmp string) string {
+	if k == optStruct {
+		return tmp + "._0"
+	}
+	return "(" + tmp + " >= 0)"
+}
+
+// irOptSource 判定一个右值是不是"一次调用 ⇒ Option"那三位之一，给出原生结果
+// 的 C 类型与形态。判据只认符号形态（与 irChanCall / irMapCall / irStrCall
+// 同一张解析）。
+func (c *Ctx) irOptSource(r air.RHS) (optSourceKind, string, bool) {
+	call, ok := r.(*air.Call)
+	if !ok {
+		return optStruct, "", false
+	}
+	rest := strings.TrimPrefix(strings.TrimPrefix(call.Sym, "chan."), "chan_")
+	parts := strings.Split(rest, "_")
+	if len(parts) == 2 && (parts[0] == "tryRecv" || parts[1] == "tryRecv") {
+		suf := parts[0]
+		if parts[0] == "tryRecv" {
+			suf = parts[1]
+		}
+		return optStruct, "aic_chan_" + suf + "_recv_t", true
+	}
+	if strings.HasPrefix(call.Sym, "map_") && strings.HasSuffix(call.Sym, "_get") {
+		return optStruct, "aic_map" + call.Sym[len("map"):len(call.Sym)-len("_get")] + "_get_t", true
+	}
+	if call.Sym == "str_indexOf" {
+		return optScalar, "aic_i64", true
+	}
+	return optStruct, "", false
+}
+
+// pendingOption 报告当前 let/var 槽位是不是 Option 实例（map.get 的形态分派用）。
+func (c *Ctx) pendingOption() (types.Type, bool) {
+	if c.irPendingTy == "" {
+		return nil, false
+	}
+	t, ok := c.irTab[c.irPendingTy]
+	if !ok {
+		return nil, false
+	}
+	if _, isOpt := types.IsOptionInstance(t); isOpt {
+		return t, true
+	}
+	return nil, false
 }
 
 // irZero 是某类型的 C 零值。
@@ -3452,6 +3610,38 @@ func (c *Ctx) irBuiltinCall(sym string, args []string, vals []string, loc air.Lo
 	case strings.HasPrefix(sym, "fmt_"):
 		s, err := c.irFmtCall(sym, args)
 		return s, true, err
+	case sym == "str_enumName":
+		// 无载荷 enum 插值：tag → 变体名（规范 §1.4）。目标类型在去糖期已按
+		// IR 类型表判过（payloadFreeEnum），这里只按接收者类型取助手名。
+		if len(args) != 1 {
+			return "", true, fmt.Errorf("emit(IR): the enum name helper takes one value")
+		}
+		ty := c.irValTy(args[0])
+		if _, ok := c.irTab[ty]; !ok {
+			return "", true, fmt.Errorf("emit(IR): no C mapping for the interpolated enum type %q", ty)
+		}
+		if en, isEn := types.IsEnum(c.irTab[ty]); !isEn || en.HasData {
+			return "", true, fmt.Errorf("emit(IR): %q is not a payload-free enum", ty)
+		}
+		c.needReprEnum(ty)
+		return fmt.Sprintf("%s((aic_i32)(%s))", c.reprEnumName(ty), args[0]), true, nil
+	case sym == "str_ofStruct":
+		// derive ToString 的 struct/class 插值（规范 §1.4）。接收者是值还是指针
+		// 由类型文本自带（irDeclText 会写对），助手按同一张表展开字段。
+		if len(args) != 1 {
+			return "", true, fmt.Errorf("emit(IR): the struct ToString helper takes one value")
+		}
+		ty := c.irValTy(args[0])
+		t, ok := c.irTab[ty]
+		if !ok {
+			return "", true, fmt.Errorf("emit(IR): no C mapping for the interpolated struct type %q", ty)
+		}
+		cl, isCl := types.IsClass(t)
+		if !isCl || !cl.Derived["ToString"] {
+			return "", true, fmt.Errorf("emit(IR): %q has no derive ToString", ty)
+		}
+		c.needReprStruct(ty)
+		return fmt.Sprintf("%s(%s, %du)", c.reprStructName(ty), args[0], uint32(ln)), true, nil
 	case strings.HasPrefix(sym, "str_"):
 		s, err := c.irStrCall(sym, args, file, ln)
 		return s, true, err
@@ -3511,12 +3701,14 @@ func (c *Ctx) irFmtCall(sym string, args []string) (string, error) {
 	switch fn {
 	case "print":
 		print = "aic_print_str"
-	case "println":
-		return fmt.Sprintf("(aic_print_str(%s), aic_print_nl())", args[0]), nil
 	case "eprint":
 		print = "aic_eprint_str"
+	case "println":
+		return fmt.Sprintf("(aic_print_str(%s), aic_print_nl())", args[0]), nil
 	case "eprintln":
-		return fmt.Sprintf("(aic_eprint_str(%s), aic_print_nl())", args[0]), nil
+		// eprintln 的两半都走 stderr：先写文本再写换行。混流会让 err 输出在
+		// 重定向到两个不同文件时丢掉半边（§3.1：stdout 与 stderr 是两条流）。
+		return fmt.Sprintf("(aic_eprint_str(%s), aic_eprint_nl())", args[0]), nil
 	default:
 		return "", fmt.Errorf("emit(IR): unsupported fmt.%s", fn)
 	}
@@ -3612,6 +3804,14 @@ func (c *Ctx) irListCall(sym string, args []string, vals []string, file string, 
 		return fmt.Sprintf("aic_list_remove_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
 	case "clear":
 		return fmt.Sprintf("aic_list_clear_%s(%s, %s, %d)", suf, recv, file, ln), nil
+	case "slice":
+		// 视图切片（§2.2）：运行时收 (a, n) 半开区间，越界 trap。
+		// cap 置 0 + copy-on-append 在运行期保证"读共享、追加不串写"。
+		if len(args) != 3 {
+			return "", fmt.Errorf("emit(IR): list.slice takes (a, n)")
+		}
+		return fmt.Sprintf("aic_list_slice_%s(%s, %s, %s, %s, %d)",
+			suf, recv, argAt(args, 1), argAt(args, 2), file, ln), nil
 	}
 	return "", fmt.Errorf("emit(IR): list.%s is not covered by the IR backend", op)
 }
@@ -3628,6 +3828,16 @@ func (c *Ctx) irSetCall(sym string, args []string, vals []string, file string, l
 	}
 	c.need("l1")
 	recv := argAt(args, 0)
+	// 方法别名先归一到运行时名：`put`/`del`/`contains` 是 types 层与 §2.3 表
+	// 里的正名，运行时只认 add/remove/has（一套实现，禁第二份）。
+	switch op {
+	case "put":
+		op = "add"
+	case "del":
+		op = "remove"
+	case "contains":
+		op = "has"
+	}
 	switch op {
 	case "new":
 		return fmt.Sprintf("aic_set_new_%s(%du)", suf, uint32(ln)), nil
@@ -3638,11 +3848,20 @@ func (c *Ctx) irSetCall(sym string, args []string, vals []string, file string, l
 	case "add":
 		return fmt.Sprintf("aic_set_add_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
 	case "has":
+		if len(args) != 2 {
+			return "", fmt.Errorf("emit(IR): set.has takes one value")
+		}
 		return fmt.Sprintf("aic_set_has_%s(%s, %s)", suf, recv, argAt(args, 1)), nil
 	case "remove":
 		return fmt.Sprintf("aic_set_remove_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
 	case "at":
 		return fmt.Sprintf("aic_set_at_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
+	case "items":
+		// 插入序全量（§2.3）
+		if len(args) != 1 {
+			return "", fmt.Errorf("emit(IR): set.items takes no argument")
+		}
+		return fmt.Sprintf("aic_set_items_%s(%s, %s, %d)", suf, recv, file, ln), nil
 	case "clear":
 		return fmt.Sprintf("aic_set_clear_%s(%s, %s, %d)", suf, recv, file, ln), nil
 	}
@@ -3673,6 +3892,12 @@ func (c *Ctx) irMapCall(sym string, args []string, file string, ln int) (string,
 	case "put":
 		return fmt.Sprintf("aic_map_put_%s(%s, %s, %s, %s, %d)", kvs, recv, argAt(args, 1), argAt(args, 2), file, ln), nil
 	case "get":
+		// 槽位是 Option ⇒ 发 try_get（_0 = 有吗, _1 = 值），由 let/var 位的
+		// 两条语句拼成 Option。槽位不是 Option 时（检查器不会放行，这里是兜底）
+		// 才发裸值形态。§2.3：不存在 = Option，不是零值也不是 Err。
+		if _, isOpt := c.pendingOption(); isOpt {
+			return fmt.Sprintf("aic_map_try_get_%s(%s, %s)", kvs, recv, argAt(args, 1)), nil
+		}
 		return fmt.Sprintf("aic_map_get_%s(%s, %s)", kvs, recv, argAt(args, 1)), nil
 	case "has":
 		return fmt.Sprintf("aic_map_has_%s(%s, %s)", kvs, recv, argAt(args, 1)), nil
@@ -3682,6 +3907,12 @@ func (c *Ctx) irMapCall(sym string, args []string, file string, ln int) (string,
 		return fmt.Sprintf("aic_map_key_at_%s(%s, %s, %s, %d)", kvs, recv, argAt(args, 1), file, ln), nil
 	case "valAt":
 		return fmt.Sprintf("aic_map_val_at_%s(%s, %s, %s, %d)", kvs, recv, argAt(args, 1), file, ln), nil
+	case "keys":
+		// 插入序全量。order[i] 已由 remove 压缩过，运行时按 order 顺序读槽键。
+		if len(args) != 1 {
+			return "", fmt.Errorf("emit(IR): map.keys takes no argument")
+		}
+		return fmt.Sprintf("aic_map_keys_%s(%s, %s, %d)", kvs, recv, file, ln), nil
 	case "clear":
 		return fmt.Sprintf("aic_map_clear_%s(%s, %s, %d)", kvs, recv, file, ln), nil
 	}
@@ -3696,7 +3927,8 @@ func (c *Ctx) irChanCall(sym string, args []string, file string, ln int) (string
 		return "", fmt.Errorf("emit(IR): malformed chan symbol %q", sym)
 	}
 	c.need("l2")
-	ops := map[string]bool{"send": true, "recv": true, "len": true, "cap": true, "ready": true, "canSend": true}
+	ops := map[string]bool{"send": true, "recv": true, "len": true, "cap": true,
+		"ready": true, "canSend": true, "tryRecv": true, "drain": true}
 	op, suf := "", ""
 	switch {
 	case parts[0] == "new":
@@ -3730,6 +3962,17 @@ func (c *Ctx) irChanCall(sym string, args []string, file string, ln int) (string
 		return fmt.Sprintf("aic_chan_ready_%s(%s)", suf, recv), nil
 	case "canSend":
 		return fmt.Sprintf("aic_chan_can_send_%s(%s)", suf, recv), nil
+	case "tryRecv":
+		// 发**原生调用**（`aic_chan_<S>_recv_t`：_0 = 值、_1 = 有吗）。
+		// Option 的组装不在这里做 —— 那需要 tag 与载荷同源，写成单个表达式就得把
+		// try_recv 求值两次（第二次读到下一个元素 = 静默丢消息）。由 let/var 位的
+		// irTryRecvAssign 拆成两条语句完成（023 实测）。
+		return fmt.Sprintf("aic_chan_try_recv_%s(%s)", suf, recv), nil
+	case "drain":
+		if len(args) != 2 {
+			return "", fmt.Errorf("emit(IR): chan.drain takes one argument (n)")
+		}
+		return fmt.Sprintf("aic_chan_drain_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
 	}
 	return "", fmt.Errorf("emit(IR): chan.%s is not covered by the IR backend", op)
 }
@@ -3840,6 +4083,11 @@ func (c *Ctx) irStrCall(sym string, args []string, file string, ln int) (string,
 		}
 		return fmt.Sprintf("aic_std_str_from_rune(%s, %s, %d)", argAt(args, 0), file, ln), nil
 	case "str_indexOf":
+		if len(args) != 2 {
+			return "", fmt.Errorf("emit(IR): str.indexOf takes one argument")
+		}
+		// -1 = 未命中（§2.1：不用 -1 表达"没有"给用户看，但运行期就是这个哨兵；
+		// 用户拿到的是 Option，见 irOptAssign 的 optScalar 形态）。
 		return fmt.Sprintf("aic_str_index_of_i64(%s, %s)", recv, argAt(args, 1)), nil
 	case "str_fromI64":
 		return fmt.Sprintf("aic_std_str_from_i64(%s, %du)", recv, uint32(ln)), nil

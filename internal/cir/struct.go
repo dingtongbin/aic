@@ -742,16 +742,16 @@ func (fl *folder) foldSwitch(t *air.Switch) (string, []Stmt, error) {
 			cases = append(cases, Case{Label: fmt.Sprintf("%d", i)})
 			continue
 		}
-		fl.done[label] = true
-		stmts, next, err := fl.foldBlock(b)
+		// **整条臂（臂头 + 臂体）折进同一个 casebody**：臂头块里声明的是
+		// payload 绑定（`Option.Some(v) =>` 的 v），而 C 的 case 体是一个块
+		// 作用域。只折臂头、把臂体留给后面的标签块 = 绑定出作用域，
+		// 臂体里读不到 v（030/023 实测：C 报 "'v' undeclared"）。
+		// 只折一块的老写法还多付一个 goto —— 两条边都不丢，只是落点不同。
+		stmts, next, from, err := fl.fold(label)
 		if err != nil {
 			return "", nil, err
 		}
-		fr := ""
-		if br, ok := b.Term.(*air.Br); ok && br.Label == next {
-			fr = label
-		}
-		if stmts, err = fl.close(stmts, next, fr, join, t.Loc); err != nil {
+		if stmts, err = fl.close(stmts, next, from, join, t.Loc); err != nil {
 			return "", nil, err
 		}
 		cases = append(cases, Case{Label: fmt.Sprintf("%d", i), Body: stmts})

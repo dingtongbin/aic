@@ -111,6 +111,18 @@
                                            const char *file, int line) { \
         if (s == NULL || i >= s->len) aic_trap(AIC_TRAP_INDEX_OUT_OF_BOUNDS, file, line); \
         return s->slots[s->order[i]]; \
+    } \
+    /* items() = 插入序全量（§2.3）。与 map.keys 同一机制：order[i] 即第 i 个 \
+     * 插入的槽位，remove 已在原地把 order 压缩过，故顺序无空洞。 */ \
+    static inline aic_list_##short *aic_set_items_##short(const aic_set_##short *s, \
+                                                          const char *file, int line) { \
+        aic_list_##short *out = aic_list_new_##short((aic_u32)line); \
+        aic_usize i, n = (s == NULL) ? 0 : s->len; \
+        for (i = 0; i < n; i++) { \
+            aic_list_append_##short(out, s->slots[s->order[i]], file, line); \
+        } \
+        (void)file; \
+        return out; \
     }
 
 AIC_SET_OP(i8, aic_i8, aic_pod_hash, aic_pod_eq)

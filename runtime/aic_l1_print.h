@@ -19,6 +19,7 @@
 #define AIC_PRINT_DEPTH_MAX 4
 
 static inline void aic_print_nl(void) { aic_print_str((aic_str){"\n", 1}); }
+static inline void aic_eprint_nl(void) { aic_eprint_str((aic_str){"\n", 1}); }
 static inline void aic_pr_ellipsis(void) { aic_print_str((aic_str){"\xe2\x80\xa6", 3}); }
 static inline void aic_pr_nil(void) { aic_print_str((aic_str){"nil", 3}); }
 static inline void aic_pr_sep(void) { aic_print_str((aic_str){", ", 2}); }

@@ -45,7 +45,12 @@ type TypeDecl struct {
 	Fields   []Field   // struct：字段按声明序（ABI 冻结）
 	Variants []Variant // enum：tag = 声明序
 	Slots    []Slot    // iface：槽位号 = 方法声明序
-	Loc      Loc
+	// Derives 是 class/struct 上的 derive 名单（封闭能力集，与泛型约束同一套）。
+	// 去糖期靠它判「插值一个 struct 值怎么变成 str」—— ToString 是**能力**不是
+	// 方法（规范 §6.2：ToString ⇒ 插值与打印），故 IR 必须能看见这份名单，
+	// 否则插值降级无从知道该类型可打印。
+	Derives []string
+	Loc     Loc
 }
 
 // Field 是 struct 字段（Idx = 声明序下标）。
