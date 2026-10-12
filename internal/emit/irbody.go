@@ -2050,7 +2050,10 @@ func (c *Ctx) irChanRecvNativeTy(r air.RHS) (string, bool) {
 	default:
 		return "", false
 	}
-	return "aic_chan_" + suf + "_recv_t", true
+	// **Err 形态**：recv 的失败位是 Err（AIC 语义），运行期为它单独生成
+	// `_recverr_t`（`_1` = aic_Err）。字段名与 `_recv_t` 相同，故下游多返回
+	// 解构（._0 / ._1）一行都不用改 —— 只有这一处类型名要跟着换。
+	return "aic_chan_" + suf + "_recverr_t", true
 }
 
 // irNativeResultTy 报告 let 的右值是不是一个**返回运行时原生多值结构**的内建调用，
@@ -2144,22 +2147,32 @@ func (c *Ctx) irOptAssign(rhs air.RHS, ty, tmpName, ind string, loc air.Loc) (bo
 type optSourceKind int
 
 const (
-	optStruct optSourceKind = iota // {_0 = 有吗, _1 = 值}
-	optScalar                      // 标量，-1 = 没有
+	optStruct   optSourceKind = iota // {_0 = 有吗, _1 = 值}
+	optChanRecv                      // {_0 = 值, _1 = 有吗}　　与 optStruct 极性相反
+	optScalar                        // 标量，-1 = 没有
 )
 
 // optValField / optTest 给一种形态取出载荷字段与"有值吗"的判据（一处一形式，
 // 不散布在调用点）。
 func (c *Ctx) optValField(k optSourceKind) string {
-	if k == optStruct {
+	switch k {
+	case optStruct:
 		return "._1"
+	case optChanRecv:
+		// chan 的 `_recv_t` 是**运行时自己的**结构（`aic_l2_chan.h`）：`_0 = 值、
+		// _1 = 有吗`。与合成返回结构的极性相反 —— 混用会把 `true`(=1) 当成载荷
+		// 发出去（023 实测：tryRecv 恒 Some(1)）。
+		return "._0"
 	}
 	return ""
 }
 
 func (c *Ctx) optTest(k optSourceKind, tmp string) string {
-	if k == optStruct {
+	switch k {
+	case optStruct:
 		return tmp + "._0"
+	case optChanRecv:
+		return tmp + "._1"
 	}
 	return "(" + tmp + " >= 0)"
 }
@@ -2179,7 +2192,7 @@ func (c *Ctx) irOptSource(r air.RHS) (optSourceKind, string, bool) {
 		if parts[0] == "tryRecv" {
 			suf = parts[1]
 		}
-		return optStruct, "aic_chan_" + suf + "_recv_t", true
+		return optChanRecv, "aic_chan_" + suf + "_recv_t", true
 	}
 	if strings.HasPrefix(call.Sym, "map_") && strings.HasSuffix(call.Sym, "_get") {
 		return optStruct, "aic_map" + call.Sym[len("map"):len(call.Sym)-len("_get")] + "_get_t", true
@@ -3976,10 +3989,13 @@ func (c *Ctx) irChanCall(sym string, args []string, file string, ln int) (string
 	case "send":
 		return fmt.Sprintf("aic_chan_send_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
 	case "recv":
-		// **直接发原生调用**：结果结构（aic_chan_<S>_recv_t）与 AIR 多值结构的
-		// 转换在 irLet 处按字段做（两条语句）。这里若发结构体强转，tcc 收、
-		// gcc/clang 拒（742 的 H3 潜伏坑）。
-		return fmt.Sprintf("aic_chan_recv_%s(%s, %s, %d)", suf, recv, file, ln), nil
+		// **Err 形态的原生调用**：`aic_chan_<S>_recv_err` 返回
+		// `{_0=值, _1=Err}`，字段名与旧的 `recv_t` 相同，所以 AIR 多返回解构
+		//（._0 / ._1）一行都不用动。旧实现直接走 `aic_chan_recv_<S>`（`_1` 是
+		// **bool**），而 AIC 的返回位是 `Err`： bool 的 true(=1) 被当成
+		// Err.code=1 → 023 实跑“收到一个就提前返回失败”，错误码错认成失败。
+		// 类型层早就写的是 (T, Err)，漏的只是这一跳。
+		return fmt.Sprintf("aic_chan_recv_err_%s(%s, %s, %d)", suf, recv, file, ln), nil
 	case "len":
 		return fmt.Sprintf("aic_chan_len_%s(%s)", suf, recv), nil
 	case "cap":

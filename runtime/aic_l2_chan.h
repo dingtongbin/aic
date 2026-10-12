@@ -17,6 +17,11 @@
 #include "aic_l1.h" /* drain 的返回值是 list（同一份运行时，禁第二套容器） */
 #include <string.h>
 
+/* chan 的错误码与消息。码表在阶段 7（std.Code）做统一登记前，chan 只占用
+ * 自己这一档：**位置固定、只用一次** —— 换值等于换所有已编译产物的语义。 */
+#define AIC_CODE_CHAN_EXHAUSTED 9001
+#define AIC_MSG_CHAN_EXHAUSTED ((aic_str){ "channel exhausted", 17 })
+
 #define AIC_CHAN_OP(short, ctype) \
     typedef struct aic_chan_##short { \
         aic_hdr hdr; ctype *slots; aic_usize head; aic_usize len; aic_usize cap; \
@@ -24,6 +29,7 @@
     } aic_chan_##short; \
     /* 字段名 _0/_1 与 emit 的合成返回结构约定一致（多返回解构按位取字段）。 */ \
     typedef struct { ctype _0; bool _1; } aic_chan_##short##_recv_t; \
+    typedef struct { ctype _0; aic_Err _1; } aic_chan_##short##_recverr_t; \
     static inline aic_chan_##short *aic_chan_new_##short(aic_usize cap, aic_u32 line) { \
         aic_chan_##short *ch = (aic_chan_##short *)aic_alloc_hdr(sizeof(aic_chan_##short), line); \
         /* cap = **已分配**容量（由 grow 管理）；bound = 语义上界（0 = 无界）。 \
@@ -96,6 +102,22 @@
         out._1 = true; \
         ch->head++; \
         ch->len--; \
+        return out; \
+    } \
+    /* recv 的 **Err 形态**：AIC 的失败位是 Err 不是 bool（错误必须进统一错误
+     * 处理，std 规范）。字段名与 recv_t 相同，故 emit 的多返回解构（._0/._1）
+     * 一行都不用改 —— 换掉的是「槽位里的东西」，不是「怎么取」。 */ \
+    static inline aic_chan_##short##_recverr_t aic_chan_recv_err_##short( \
+            aic_chan_##short *ch, const char *file, int line) { \
+        aic_chan_##short##_recverr_t out; \
+        memset(&out, 0, sizeof(out)); \
+        out._1 = AIC_ERR_NONE; \
+        aic_chan_##short##_recv_t r = aic_chan_recv_##short(ch, file, line); \
+        if (!r._1) { \
+            out._1 = aic_err_wrap(AIC_CODE_CHAN_EXHAUSTED, AIC_MSG_CHAN_EXHAUSTED, \
+                                 AIC_ERR_NONE); \
+        } \
+        out._0 = r._0; \
         return out; \
     } \
     /* drain(n)：非阻塞取至多 n 个（§2.4）。取不尽就給已有的 —— 返回值长度即 \
