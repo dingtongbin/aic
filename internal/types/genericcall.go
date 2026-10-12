@@ -39,7 +39,6 @@ func (c *Checker) checkGenericCallExplicit(v *parse.Call, ix *parse.Index, sig *
 	return c.checkInvoke(v, inst, nil, bound{off: 0}, expect)
 }
 
-
 // checkGenericStaticCall 处理 `Box[i64].init(42)`：泛型类的实例化 + 静态方法调用。
 // 实例化点 = 约束校验点（《AIC 语言规范》§6.1：约束不满足报在调用点/实例化点）。
 func (c *Checker) checkGenericStaticCall(v *parse.Call, ix *parse.Index, cl *Class, method string, expect Type) (Type, bound, untyped) {
@@ -214,7 +213,7 @@ func (c *Checker) noteFuncInst(sig *FuncSig, m map[string]Type) {
 
 // noteClassInst 登记泛型类的实例（供单态化与 C 发端决定发哪个实例符号）。
 // 与 noteFuncInst 同族：键 = 类名 + 类型实参，去重后进 funcInsts 同一条队列
-//（实例化的是类的成员函数，最终都由函数级实例承载）。
+// （实例化的是类的成员函数，最终都由函数级实例承载）。
 func (c *Checker) noteClassInst(cl *Class, m map[string]Type) {
 	// Methods 是 map[string]*FuncSig；逐个登记录（泛型类的每个成员函数都要实例化）。
 	for _, mm := range cl.Methods {

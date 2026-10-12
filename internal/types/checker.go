@@ -47,10 +47,14 @@ type CheckResult struct {
 }
 
 type Checker struct {
-	file   string
-	pkg    string
-	files  []*parse.File
-	errors []CheckerError
+	file string
+	pkg  string
+	// pkgPath 是包的**符号身份路径**（import 路径 / 入口模块名）。类型对象的
+	// 符号与类型文本键读它：同名类型在跨模块的同名包里必须区分开。
+	// 空 = 退回包名（单文件语料 / 未带路径的调用点）。
+	pkgPath string
+	files   []*parse.File
+	errors  []CheckerError
 	// deps 是已检查完的 import 包（包名 → 该包的 Info）。
 	// 跨包名解析的唯一入口：类型/函数/常量/变体都从这里查（可见性）。
 	deps   map[string]*Info
@@ -158,7 +162,14 @@ func CheckFile(f *parse.File) *CheckResult {
 // deps 是 import 闭包里已检查完的包（包名 → Info），按拓扑序由调用方提供
 // （internal/pkg 收集，整程序收集后方可发射）。deps 里的符号按
 // 可见性规则：顶层名首字母大写 = 跨包可见（小写与 `_` 前缀 = 包私有）。
+// CheckPackage 是 CheckPackagePath 的便捷形式（符号身份路径 = 包名）。
 func CheckPackage(files []*parse.File, deps map[string]*Info) *CheckResult {
+	return CheckPackagePath(files, deps, "")
+}
+
+// CheckPackagePath 检查一个包，并带上它的**符号身份路径**（import 路径 /
+// 入口模块名）。路径进类型对象：同名类型在跨模块的同名包里必须区分。
+func CheckPackagePath(files []*parse.File, deps map[string]*Info, pkgPath string) *CheckResult {
 	c := &Checker{
 		files:   files,
 		deps:    deps,
@@ -185,6 +196,10 @@ func CheckPackage(files []*parse.File, deps map[string]*Info) *CheckResult {
 	}
 	c.file = files[0].Path
 	c.pkg = pkgNameFromPath(files[0].Path) // 包名唯一所有者（目录即包）
+	c.pkgPath = pkgPath
+	if c.pkgPath == "" {
+		c.pkgPath = c.pkg
+	}
 	// std 根类型枚举进入名字表：根类型无需 import 即可用（变体构造/match）
 	c.stdEnums()
 	c.collectDecls(files)
@@ -373,6 +388,7 @@ func (c *Checker) collectClass(v *parse.ClassDecl) {
 	cl := &Class{
 		Name:        v.Name,
 		Pkg:         c.pkg, // 包名唯一所有者：mangling 只读它
+		PkgPath:     c.pkgPath,
 		Fields:      []Field{},
 		fieldIdx:    map[string]int{},
 		Methods:     map[string]*FuncSig{},
@@ -867,7 +883,7 @@ func (c *Checker) collectInterface(v *parse.InterfaceDecl) {
 			"only one type may carry this name")
 		return
 	}
-	ifc := &Interface{Name: v.Name, Pkg: c.pkg, Methods: map[string]*FuncSig{}}
+	ifc := &Interface{Name: v.Name, Pkg: c.pkg, PkgPath: c.pkgPath, Methods: map[string]*FuncSig{}}
 	c.ifaces[v.Name] = ifc
 	for _, m := range v.Methods {
 		sig := c.buildSig(m, v.Name)
@@ -977,7 +993,7 @@ func (c *Checker) collectEnum(v *parse.EnumDecl) {
 			"only one type may carry this name")
 		return
 	}
-	en := &Enum{Name: v.Name, Pkg: c.pkg, variantI: map[string]int{}, DeclPos: v.Pos, ErrCode: v.ErrCode}
+	en := &Enum{Name: v.Name, Pkg: c.pkg, PkgPath: c.pkgPath, variantI: map[string]int{}, DeclPos: v.Pos, ErrCode: v.ErrCode}
 	c.enums[v.Name] = en
 	for _, va := range v.Variants {
 		if _, dup := en.variantI[va.Name]; dup {

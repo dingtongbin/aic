@@ -32,7 +32,7 @@ func loadProgram(entry string) (*Program, string) {
 	prog := &Program{Unit: u, Emit: &emit.Unit{Entry: u.Entry.Name}}
 	var diags []string
 	for _, p := range u.Order {
-		res := types.CheckPackage(fileASTs(p.Files), deps)
+		res := types.CheckPackagePath(fileASTs(p.Files), deps, p.PkgPath)
 		if len(res.Errors) > 0 {
 			diags = append(diags, strings.TrimRight(types.FormatAll(p.Name, res.Errors), "\n"))
 			continue // 该包检查失败：不发它的 C，也不给下游当依赖（避免级联噪音）

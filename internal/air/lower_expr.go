@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"aic/internal/parse"
+	"aic/internal/pkg"
 	"aic/internal/types"
 )
 
@@ -818,11 +819,11 @@ func tyText(t types.Type) string {
 	case *types.Basic:
 		return v.Name
 	case *types.Class:
-		return mangleType(v.Pkg, v.Name) + refSuffix(v)
+		return mangleType(ownerSym(v.PkgPath, v.Pkg), v.Name) + refSuffix(v)
 	case *types.Enum:
-		return mangleType(v.Pkg, v.Name)
+		return mangleType(ownerSym(v.PkgPath, v.Pkg), v.Name)
 	case *types.Interface:
-		return mangleType(v.Pkg, v.Name)
+		return mangleType(ownerSym(v.PkgPath, v.Pkg), v.Name)
 	case *types.Slice:
 		return tyText(v.Elem) + "[]"
 	case *types.SetT:
@@ -892,14 +893,18 @@ func refSuffix(cl *types.Class) string {
 	return "*"
 }
 
-// sanitizePkg 把包身份路径折成符号可用片段：`/` `.` `-` 一律变 `_`。
-// 符号是 C 标识符与 IR 文本的一部分，不能含路径分隔符。
-func sanitizePkg(p string) string {
-	if p == "" {
-		return p
+// ownerSym 是类型对象的**符号归属包**：优先进 PkgPath（import 路径 /
+// 入口模块名，全局唯一），退回包名。类型文本是 IR 的类型键 —— 用包名会让
+// 跨模块的同名类型（两个模块各有 util.Buf）撞同一个键、互相覆盖。
+func ownerSym(pkgPath, pkg string) string {
+	if pkgPath != "" {
+		return pkgPath
 	}
-	return strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(p)
+	return pkg
 }
+
+// sanitizePkg 把包身份路径折成符号可用片段（唯一实现 = pkg.SymbolPath）。
+func sanitizePkg(p string) string { return pkg.SymbolPath(p) }
 
 func mangleType(pkg, name string) string {
 	if pkg == "" {

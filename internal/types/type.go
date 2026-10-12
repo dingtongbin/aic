@@ -27,6 +27,7 @@ type Basic struct{ Name string }
 type Class struct {
 	Name       string
 	Pkg        string
+	PkgPath    string
 	Fields     []Field
 	fieldIdx   map[string]int
 	Methods    map[string]*FuncSig
@@ -57,6 +58,7 @@ type Field struct {
 type Interface struct {
 	Name    string
 	Pkg     string
+	PkgPath string
 	Methods map[string]*FuncSig
 	// Slots 是方法名的声明序（接口分发槽位号 = 接口声明里方法的声明序）。
 	// 见证表按这个序排函数指针，调用点按同一序取槽位。
@@ -93,6 +95,7 @@ func (ifc *Interface) SlotOf(name string) int {
 type Enum struct {
 	Name       string
 	Pkg        string
+	PkgPath    string
 	Variants   []Variant
 	variantI   map[string]int
 	HasData    bool

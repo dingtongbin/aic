@@ -737,23 +737,32 @@ func (c *Ctx) irInstCName(sym string) (string, bool) {
 }
 
 // splitSymPkg 把 IR 符号拆成 (包名, 名字)：包名 = 已知依赖包里最长的那个前缀。
+// splitSymPkg 把 IR 符号拆成 (包名, 名字)。IR 类型文本里的包前缀是**符号身份
+// 路径**（`app_core`），而调用方要的是**包名**（查 depInfo 用），故两张表都试：
+// 包名与符号路径，取最长匹配。
 func (c *Ctx) splitSymPkg(base string) (string, string) {
-	best := ""
-	for p := range c.deps {
-		if p == "" || !strings.HasPrefix(base, p+"_") {
-			continue
+	bestPrefix, bestName := "", ""
+	consider := func(prefix, name string) {
+		if prefix == "" || !strings.HasPrefix(base, prefix+"_") {
+			return
 		}
-		if len(p) > len(best) {
-			best = p
+		if len(prefix) > len(bestPrefix) {
+			bestPrefix, bestName = prefix, name
 		}
 	}
-	if best == "" {
-		if strings.HasPrefix(base, c.pkg()+"_") {
-			return c.pkg(), base[len(c.pkg())+1:]
+	for p := range c.deps {
+		consider(p, p)
+		consider(pkg.SymbolPath(p), p)
+		if info := c.depInfo(p); info != nil {
+			consider(pkg.SymbolPath(info.PkgPath), p)
 		}
+	}
+	consider(c.pkg(), c.pkg())
+	consider(pkg.SymbolPath(c.pkgPath()), c.pkg())
+	if bestName == "" {
 		return "", base
 	}
-	return best, base[len(best)+1:]
+	return bestName, base[len(bestPrefix)+1:]
 }
 
 // splitArgTexts 拆 `<a>, <b>`（类型实参文本表，嵌套括号内的逗号不算）。

@@ -351,16 +351,18 @@ func (c *Checker) buildInfo() *Info {
 	info := &Info{
 		// 包名 = 源文件所在目录名（目录即包）。唯一所有者在这里，
 		// emit 只读它：两处各算一次包名 = 同款病（mangling 会分叉）。
-		Pkg:           c.pkg,
-		Locals:        c.locals,
-		Types:         c.types,
-		Guards:        c.guards,
-		Consts:        c.consts,
-		Funcs:         c.funcs,
-		Classes:       c.classes,
-		Interfaces:    c.ifaces,
-		Enums:         c.enums,
-		Imported:      c.imports,
+		Pkg:        c.pkg,
+		Locals:     c.locals,
+		Types:      c.types,
+		Guards:     c.guards,
+		Consts:     c.consts,
+		Funcs:      c.funcs,
+		Classes:    c.classes,
+		Interfaces: c.ifaces,
+		Enums:      c.enums,
+		Imported:   c.imports,
+		// 符号身份路径随 Info 出去：CLI 与 emit 的符号命名读它（不再靠包名）。
+		PkgPath:       c.pkgPath,
 		FuncInsts:     c.funcInsts,
 		Closures:      c.closures,
 		CapRefs:       c.capRefs,

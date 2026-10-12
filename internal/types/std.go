@@ -151,6 +151,7 @@ func valueEnum() *Enum {
 	valueOnce = en
 	return en
 }
+
 // logLevelEnum 构造 std 的 LogLevel 枚举（标准库规范 §3.2）。
 var logLevelOnce *Enum
 
@@ -456,8 +457,8 @@ func stdFuncSig(pkg, name string) (stdSig, bool) {
 		case "new":
 			return stdSig{nil, nil, []Type{ctxClass()}}, true
 		}
-	// math 包已取消（《AIC 标准库规范》）：标量数值函数进基本类型方法集。
-	// 留这个分支会让人以为 `import math` 还有意义。
+		// math 包已取消（《AIC 标准库规范》）：标量数值函数进基本类型方法集。
+		// 留这个分支会让人以为 `import math` 还有意义。
 	}
 	return stdSig{}, false
 }

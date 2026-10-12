@@ -279,7 +279,7 @@ func (c *Checker) funcLitType(v *parse.LambdaExpr) (*FuncT, bool) {
 		t := c.resolveType(pt)
 		if t == nil {
 			c.errorAt(parse.TypeExprPos(pt), "the parameter type of the func literal cannot be resolved",
-				"parameter " + itoa(i+1) + " (" + paramNameAt(v, i) + ")",
+				"parameter "+itoa(i+1)+" ("+paramNameAt(v, i)+")",
 
 				"write a basic type or a type declared in this package")
 			return nil, false
