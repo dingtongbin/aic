@@ -407,7 +407,7 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		&seed{insts: c.insts, printers: c.printers, witnesses: c.witnesses,
 			ifacePrint: c.sortedIfacePrint(), needed: c.Needed(),
 			irRets: c.irRetOrder, irRetT: c.irRetTypes,
-			irSpawns: c.irSpawns,
+			irSpawns:      c.irSpawns,
 			irReprEnums:   sortedKeys(c.irReprEnums),
 			irReprStructs: sortedKeys(c.irReprStructs)}, nil
 }

@@ -306,3 +306,90 @@ func sanitize(s string) string {
 	}
 	return strings.Trim(b.String(), "_")
 }
+
+// ---------------------------------------------------------------------------
+// 变体构造值与 init 构造方法（原 call.go：AST 路径已删，这里只剩 IR 助手）。
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// 调用发射 (容器方法 / str / 构造 / Err / std)。
+//
+// 约定: 一切调用都在编译期定型 (泛型单态化 + 静态派发, CPU 条款),
+// 运行时函数名来自各自的单表 (容器后缀表 / std 名表 / mangling 表)。
+// ---------------------------------------------------------------------------
+
+// lookupVariant 在本包 enum 中找变体构造名 (单态化: Option 的 Some 亦在此二义,
+// 由检查器已定型的负载类型区分)。
+func (c *Ctx) lookupVariant(name string) (*types.Enum, types.Type, bool) {
+	if c.Info == nil {
+		return nil, nil, false
+	}
+	for _, en := range c.Info.Enums {
+		if p, ok := en.VariantPayload(name); ok {
+			return en, p, true
+		}
+	}
+	return nil, nil, false
+}
+
+// variantNoData 发射无数据变体的**值**：无数据 enum 就是该 C 枚举常量本身；
+// 带数据 enum 的值类型是 {tag, union} 结构，必须补成结构字面量——直接把
+// tag 常量当值用会让 C 报「参数类型不符」（枚举常量是 tag 枚举类型，不是结构）。
+func (c *Ctx) variantNoData(en *types.Enum, ty, variant string) string {
+	if en.HasData {
+		return fmt.Sprintf("((%s){ .tag = %s_%s })", ty, ty, variant)
+	}
+	return fmt.Sprintf("%s_%s", ty, variant)
+}
+
+// initMethod 取类的 init 构造函数 (至多一个、无重载、可 -> Err)。
+func (c *Ctx) initMethod(cl *types.Class) (*types.FuncSig, bool) {
+	for name := range cl.Methods {
+		if sig, ok := cl.Method(name); ok && sig.IsInit {
+			return sig, true
+		}
+	}
+	return nil, false
+}
+
+// ---------------------------------------------------------------------------
+// 跨包查询助手（原 depcall.go：AST 路径已删）。
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// 跨包调用（可见性、 包管理器）。
+//
+// 调用点所在的包 ≠ 被调函数所在的包，故符号名必须用**被调包**的包名拼
+// （c.pkg() 是调用者的包名，直接用会拼错）——mangling 单表照旧，只是喂对包名。
+// ---------------------------------------------------------------------------
+
+// depFuncResults 取跨包函数的结果类型（emit 定宽/选打印原语用）。
+func (c *Ctx) depFuncResults(pkg, fn string) ([]types.Type, bool) {
+	dep := c.depInfo(pkg)
+	if dep == nil {
+		return nil, false
+	}
+	sig, ok := dep.Funcs[fn]
+	if !ok || sig == nil {
+		return nil, false
+	}
+	return sig.Results, true
+}
+
+// depNamedType 取跨包具名类型（类型位 util.Reader / util.Box[i32] 用）。
+func (c *Ctx) depNamedType(pkg, name string) types.Type {
+	dep := c.depInfo(pkg)
+	if dep == nil {
+		return nil
+	}
+	if cl, ok := dep.Classes[name]; ok {
+		return cl
+	}
+	if en, ok := dep.Enums[name]; ok {
+		return en
+	}
+	if ifc, ok := dep.Interfaces[name]; ok {
+		return ifc
+	}
+	return nil
+}
