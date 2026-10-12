@@ -7,7 +7,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 控制流语句：if / for / return / defer / match 语句（核心设计 §三/§五/§六）。
+// 控制流语句：if / for / return / defer / match 语句。
 // ---------------------------------------------------------------------------
 
 func (c *Checker) requireCond(e parse.Expr, what string) {
@@ -59,7 +59,7 @@ func (c *Checker) checkIf(v *parse.IfStmt) {
 	}
 
 	if isNilTest && thenTerminates(v.Then) {
-		// if p == nil { return … } 早退：出口后沿用 else 侧状态（§九）
+		// if p == nil { return … } 早退：出口后沿用 else 侧状态
 		c.nilState = elseNil
 		return
 	}
@@ -153,7 +153,7 @@ func (c *Checker) checkFor(v *parse.ForStmt) {
 		} else {
 			xt, _, xu := c.checkExprFull(v.RangeX, nil)
 			if xt == nil {
-				// 未定型字面量（`for v in "hello"`）：§一 把定型推迟到使用点，
+				// 未定型字面量（`for v in "hello"`）： 把定型推迟到使用点，
 				// **可迭代判定就是那个使用点**（与 checkInterp 同源走 literalDefault）。
 				// 只看 xt 会让 str 掉进 `case nil:` 而整条静默放行（008 实测）。
 				xt = c.literalDefault(xu, parse.ExprPos(v.RangeX))
@@ -233,7 +233,7 @@ func (c *Checker) checkFor(v *parse.ForStmt) {
 	c.scope, c.nilState = saved, savedNil
 }
 
-// checkReturn: 返回摘要必须 = 0（§五 R3）——精确 > 0 = 编译错；非精确 > 0 =
+// checkReturn: 返回摘要必须 = 0——精确 > 0 = 编译错；非精确 > 0 =
 // 返回点守卫。结果类型逐位校验。
 func (c *Checker) checkReturn(v *parse.ReturnStmt) {
 	want := c.fn.Results
@@ -258,7 +258,7 @@ func (c *Checker) checkReturn(v *parse.ReturnStmt) {
 	}
 }
 
-// checkReturnBound: 返回点规则（R0c-② F2）。
+// checkReturnBound: 返回点规则（R0c-②）。
 func (c *Checker) checkReturnBound(e parse.Expr, rb bound) {
 	if rb.off <= 0 {
 		return
@@ -285,9 +285,9 @@ func (c *Checker) checkDefer(v *parse.DeferStmt) {
 	}
 	ty, _, _ := c.checkExprFull(v.Call, nil)
 	_ = ty
-	// §15.7 规则③：defer 的调用结果没人接 ⇒ 有 Err 位的调用不能被 defer。
+	// 规则③：defer 的调用结果没人接 ⇒ 有 Err 位的调用不能被 defer。
 	c.rejectUnconsumedErr(v.Call, "defer", v.Pos)
-	// defer 实参：界 ≤ 入口（精确 > 0 = 编译错；非精确 > 0 = 注册点守卫，R5）
+	// defer 实参：界 ≤ 入口（精确 > 0 = 编译错；非精确 > 0 = 注册点守卫）
 	for _, a := range call.Args {
 		at, ab, _ := c.checkExprFull(a, nil)
 		if at == nil {
@@ -305,14 +305,14 @@ func (c *Checker) checkDefer(v *parse.DeferStmt) {
 				"create the object outside the block, or pass a value type (core design §5 R5)")
 			continue
 		}
-		// 守卫的 limit = **函数入口深度**（§五 R5：defer/errdefer 实参的界 ≤ 入口）
+		// 守卫的 limit = **函数入口深度**（defer/errdefer 实参的界 ≤ 入口）
 		// ⇒ Delta = 当前偏移（发射侧 limit = aic_depth − Delta）。
 		c.guards[a] = GuardSpec{Kind: GuardDefer, Delta: c.regionOff}
 	}
 }
 
 // ---------------------------------------------------------------------------
-// N8 `errdefer`（核心设计 §16 N8）：**仅在函数因 Err 返回时**执行的清理。
+// `errdefer`：**仅在函数因 Err 返回时**执行的清理。
 // 语法/语义与 defer 同源（LIFO、实参在注册点求值），差别只有"何时跑"。
 // ---------------------------------------------------------------------------
 
@@ -352,7 +352,7 @@ func (c *Checker) checkErrDefer(v *parse.ErrDeferStmt) {
 				"create the object outside the block, or pass a value type (core design §5 R5)")
 			continue
 		}
-		// 守卫的 limit = **函数入口深度**（§五 R5：defer/errdefer 实参的界 ≤ 入口）
+		// 守卫的 limit = **函数入口深度**（defer/errdefer 实参的界 ≤ 入口）
 		// ⇒ Delta = 当前偏移（发射侧 limit = aic_depth − Delta）。
 		c.guards[a] = GuardSpec{Kind: GuardDefer, Delta: c.regionOff}
 	}

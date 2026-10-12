@@ -8,11 +8,11 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 类型模型（核心设计 §二）。
+// 类型模型。
 //
-// 值类型：Basic（数值/bool/str/Err）、Enum、@packed Class、ArrayT、FuncT。
+// 值类型：Basic（数值/bool/str/Err）、Enum、struct、ArrayT、FuncT。
 // 引用类型：普通 Class、Interface、Slice/MapT/SetT（容器句柄）。
-// 零值：数值 0 / bool false / str "" / 其余引用与 Err = nil（§二.3）。
+// 零值：数值 0 / bool false / str "" / 其余引用与 Err = nil。
 // ---------------------------------------------------------------------------
 
 type Type interface {
@@ -23,23 +23,23 @@ type Type interface {
 // Basic is a primitive or the builtin Err.
 type Basic struct{ Name string }
 
-// Class is a user class; Packed flips it to value semantics (@packed).
+// Class is a user class; Struct flips it to value semantics (struct).
 type Class struct {
 	Name       string
 	Pkg        string
 	Fields     []Field
 	fieldIdx   map[string]int
 	Methods    map[string]*FuncSig
-	Packed     bool
+	Struct     bool
 	TypeParams []string
-	// Constraints 是泛型形参的约束（N3）：实例化点校验，报错落在使用点。
+	// Constraints 是泛型形参的约束：实例化点校验，报错落在使用点。
 	Constraints []parse.TypeParamConstraint
-	// Derived 是 @derive(...) 的派生能力集（键 = ToString/Compare/Hash）。
-	// 打印无 ToString 的 class = 编译错（§十四）；Compare/Hash 生成同名方法。
+	// Derived 是 derive ... 的派生能力集（键 = ToString/Compare/Hash）。
+	// 打印无 ToString 的 class = 编译错；Compare/Hash 生成同名方法。
 	Derived map[string]bool
 }
 
-// HasDerive 报告类是否带某个 @derive 能力（nil 安全）。
+// HasDerive 报告类是否带某个 derive 能力（nil 安全）。
 func (cl *Class) HasDerive(what string) bool {
 	if cl == nil || cl.Derived == nil {
 		return false
@@ -58,7 +58,7 @@ type Interface struct {
 	Name    string
 	Pkg     string
 	Methods map[string]*FuncSig
-	// Slots 是方法名的声明序（§十：接口分发槽位号 = 接口声明里方法的声明序）。
+	// Slots 是方法名的声明序（接口分发槽位号 = 接口声明里方法的声明序）。
 	// 见证表按这个序排函数指针，调用点按同一序取槽位。
 	Slots []string
 }
@@ -124,7 +124,7 @@ type ArrayT struct {
 
 // FuncT is the lambda type (P1, P2) -> R.
 //
-// N1 闭包：Captures 非空 = 该函数**值**是闭包（环境结构体里按值保存了捕获项）；
+// 闭包：Captures 非空 = 该函数**值**是闭包（环境结构体里按值保存了捕获项）；
 // 类型同一性**不看** Captures（捕获与否是值的事实，不是类型的事实），
 // 但区域安全判定要看 —— containsReference 因此对闭包返回 true。
 // 多返回：Results 非空 = 多个返回位（此时 Result 为 nil）；Result 是单返回的简写。
@@ -288,7 +288,7 @@ func isErr(t Type) bool {
 	return ok && b.Name == "Err"
 }
 
-// ErrFieldIndex 是 `Err` 字段的**冻结下标**（§16 N5 ④：`{code i32, msg str, cause}`）。
+// ErrFieldIndex 是 `Err` 字段的**冻结下标**（§16 ④：`{code i32, msg str, cause}`）。
 // **唯一实现**：AIR 降级的 `field` 下标与 L5 的 C 发端都走这里 —— AIR 侧对 Err
 // 一律给下标 0 会让 `e.msg` 被降成 `field e, 0`（读的是 code），IR 路径**静默读错字段**。
 func ErrFieldIndex(name string) (int, bool) {
@@ -304,11 +304,11 @@ func ErrFieldIndex(name string) (int, bool) {
 }
 
 // isReference reports whether t's values are region-managed references
-// (核心设计 §五: 唯一引用形态 = class/interface 值与容器句柄).
+// (唯一引用形态 = class/interface 值与容器句柄).
 func isReference(t Type) bool {
 	switch v := t.(type) {
 	case *Class:
-		return !v.Packed
+		return !v.Struct
 	case *Interface:
 		return true
 	case *Slice, *MapT, *SetT:
@@ -323,7 +323,7 @@ func isValueType(t Type) bool {
 	case *Basic:
 		return true
 	case *Class:
-		return v.Packed
+		return v.Struct
 	case *Enum, *ArrayT, *FuncT:
 		return true
 	}
@@ -331,8 +331,8 @@ func isValueType(t Type) bool {
 }
 
 // containsReference reports whether a value type embeds references that need
-// per-reference guards when copied into shallower storage (核心设计 §五 R3 ⑥):
-// 带数据 enum、[T;N] of class、**捕获引用的闭包**（N1）。
+// per-reference guards when copied into shallower storage (⑥):
+// 带数据 enum、[T;N] of class、**捕获引用的闭包**。
 func containsReference(t Type) bool {
 	switch v := t.(type) {
 	case *Enum:
@@ -350,7 +350,7 @@ func containsReference(t Type) bool {
 	case *FuncT:
 		return v.HasRefCapture()
 	case *Class:
-		if !v.Packed {
+		if !v.Struct {
 			return true
 		}
 		for _, f := range v.Fields {
@@ -384,7 +384,7 @@ func captureSafe(t Type, depth int) bool {
 	case *ArrayT:
 		return captureSafe(v.Elem, depth+1) // [T;N]：元素必须也是白名单类型
 	case *Class:
-		if !v.Packed {
+		if !v.Struct {
 			return false // 引用 class：环境会含区域头
 		}
 		for i := range v.Fields {
@@ -409,7 +409,7 @@ func captureInstanceSafe(v *Instance, depth int) bool {
 	}
 	switch b := v.Base.(type) {
 	case *Class:
-		if !b.Packed {
+		if !b.Struct {
 			return false
 		}
 		for i := range b.Fields {

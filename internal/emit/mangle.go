@@ -1,7 +1,7 @@
 package emit
 
 // ---------------------------------------------------------------------------
-// mangling 单表 (核心设计 §八, 红线 10: 生成与查找共用, 禁两处各写一份)。
+// mangling 单表 (生成与查找共用, 禁两处各写一份)。
 //
 //  函数    aic_<pkg>_<name>
 //  方法    aic_<pkg>_<Type>_<m>          this 为第一参数
@@ -25,7 +25,7 @@ func mangleType(pkg, name string) string {
 }
 
 // MangleGeneric 是泛型实例的符号名: aic_<pkg>_<T>__<arg1>_<arg2>。
-// 实例缓存表把同一组实参映射到同一个名字 (红线 11: 单态化必须实例缓存;
+// 实例缓存表把同一组实参映射到同一个名字 (单态化必须实例缓存;
 // 表本身在 types 侧, 此处只负责把已定案的名字拼出来)。
 func MangleGeneric(pkg, name string, argSuffixes []string) string {
 	out := "aic_" + pkg + "_" + name + "__"

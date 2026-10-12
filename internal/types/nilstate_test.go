@@ -29,7 +29,7 @@ func assertClean(t *testing.T, name, src string) {
 }
 
 // TestMultiBindResultIsUnproven: 多返回绑定的接收位来自调用 = 「未证」，
-// 不是「必然 nil」（核心设计 §九）。把它当成必 nil 会让合法程序在解引用位
+// 不是「必然 nil」。把它当成必 nil 会让合法程序在解引用位
 // 被判编译错——nil 教条只允许「可证必然为 nil」时报错，误报即教条失效。
 func TestMultiBindResultIsUnproven(t *testing.T) {
 	assertClean(t, "多返回绑定后解引用", `class Box {
@@ -53,7 +53,7 @@ func main() {
 }
 
 // TestSingleTargetWithoutInitIsMustNil: 单目标无初值（var p C）必然 nil，
-// 由 declareVar 保持 mustNil（§九 的第一条），不能随多返回绑定一起放松。
+// 由 declareVar 保持 mustNil（第一条），不能随多返回绑定一起放松。
 func TestSingleTargetWithoutInitIsMustNil(t *testing.T) {
 	src := `class Box {
     var n i32
@@ -71,7 +71,7 @@ func main() {
 	}
 }
 
-// TestCallResultDerefIsNotCompileError: 调用产物 = 未证（§九），解引用位
+// TestCallResultDerefIsNotCompileError: 调用产物 = 未证，解引用位
 // 只「运行时守」，不得因未证而报编译错（宁保守插检查，禁错误消除的反面：
 // 不得把未证当必错）。
 func TestCallResultDerefIsNotCompileError(t *testing.T) {

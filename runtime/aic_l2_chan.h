@@ -1,7 +1,7 @@
 /* AIC runtime L2 —— channel（核心设计 §七 / §16 N11 / N6）。
  *
  * 语义（§七 + 【O2 决议】，见规划 §十二 R9）：
- *   - `chan[T]` 的 T ∈ 安全集（基本类型 / str / @packed / 无负载 enum 及其容器）；
+ *   - `chan[T]` 的 T ∈ 安全集（基本类型 / str / struct / 无负载 enum 及其容器）；
  *   - `new()` / `new(0)` = **无界**（send 入队即返回）；`new(cap>0)` = **有界**（满 = 背压点）；
  *   - `send(v)`：无界恒成立；有界且满 = **阻塞**（真并发下），若没有任何别的任务能收 ⇒ 死锁 trap；
  *   - `recv() -> (T, bool)`：空则**阻塞**；本 scope 已无存活任务 ⇒ `(零值, false)`（永不靠 close）；

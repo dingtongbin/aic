@@ -19,7 +19,7 @@
 //   - 函数体是 flat 的 Blocks 列表；原语节点里只存**块标签**，不嵌 *Block；
 //   - 原语节点只带 **After**（lowering 续写块的标签），不带 OnFail ——
 //     失败路径的 C 形态（CheckFail 块）是 desugar 的产物，IR-1 不含 IR-2 内容；
-//   - 原语节点自己带 Loc（红线 9：诊断回指源码位置）。
+//   - 原语节点自己带 Loc（诊断回指源码位置）。
 //
 // 已声明但 lowering 尚未发射的原语（声明 ≠ 落地，落地见 AIC_重构TODO.md）：
 //   - ForInInst：下标循环的 head/post/done 骨架与 break/continue 目标在
@@ -47,7 +47,7 @@ type MatchTerm struct {
 
 // MatchExprRHS 是表达式位 match：值是各臂的公共类型（检查器已验一致）。
 // Slot/SlotTy = 结果槽（lowering 声明 `var <Slot> : <SlotTy>`，各臂体往里
-// store；无 phi 也满足 V2.5 —— 槽只定义一次，写入多次）。
+// store；无 phi 也满足 —— 槽只定义一次，写入多次）。
 type MatchExprRHS struct {
 	Subject string
 	SubjTy  string
@@ -206,7 +206,7 @@ type ScopeInst struct {
 	Loc     Loc
 }
 
-// SelectInst 是 `select { arms }`（N6）。
+// SelectInst 是 `select { arms }`。
 //
 // 与 ir.go 的 SelWait 的区别：SelWait 是 **C 运行时 ABI 描述符**（描述怎么
 // 调 aic_select_wait），属于 IR-2；本节点是**语言语义**（有哪些臂、谁 send

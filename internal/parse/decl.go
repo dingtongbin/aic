@@ -13,7 +13,7 @@ func New(path string, toks []Token) *Parser {
 
 // ParseFile parses a whole translation unit. The returned File is always
 // non-nil; syntax problems are reported through p.Errors with one run
-// collecting every diagnostic (红线 14).
+// collecting every diagnostic .
 func (p *Parser) ParseFile() *File {
 	f := &File{Path: p.file}
 	for {
@@ -41,7 +41,7 @@ func (p *Parser) skipSemis() {
 
 // parseDecl reads one top-level declaration. The export / extern modifiers may
 // precede it. v7 起无注解（《AIC 语言规范》§1.3）。
-// 顶层只许 const 与类型/函数声明：顶层 `var` = 编译错（红线 21）。
+// 顶层只许 const 与类型/函数声明：顶层 `var` = 编译错。
 func (p *Parser) parseDecl() Decl {
 	export, extern := false, false
 	for {
@@ -230,8 +230,8 @@ func (p *Parser) parseConst() Decl {
 
 // parseVar handles local declarations and class fields (isDecl 只控制错误
 // 恢复的同步范围)。顶层 var 由 parseDecl 拒绝，不经过这里。
-// 目标形：`name` / `live name` / `_`（弃位）。R20：`live` 是关键字（不再是
-// `@live` 注解）—— 与 var/const 同属声明层修饰语。
+// 目标形：`name` / `live name` / `_`（弃位）。`live` 是关键字（不再是
+// `live` 注解）—— 与 var/const 同属声明层修饰语。
 func (p *Parser) parseVar(isDecl bool) *VarDecl {
 	at := p.pos()
 	p.next() // var
@@ -270,7 +270,7 @@ func (p *Parser) parseVar(isDecl bool) *VarDecl {
 }
 
 // validateVarTargets enforces the parse-level binding rule: a single `_`
-// target is meaningless — 单返回丢弃 = 直接语句调用 (核心设计 §六).
+// target is meaningless — 单返回丢弃 = 直接语句调用 .
 func (p *Parser) validateVarTargets(d *VarDecl, at Pos) {
 	if len(d.Targets) == 1 && d.Targets[0].Blank {
 		p.errorHere(at, "`var _ = ...` is meaningless", "a single discard _ was declared here",

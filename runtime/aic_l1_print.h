@@ -8,7 +8,7 @@
  *
  * 容器元素按各自的单值形态打印（str 元素原样，不加引号）。
  * 表与 aic_l1_list/set/map 的实例化表一一对应：头未实例化的形状无符号可调 = 编译错。
- * enum / class(@derive(ToString)) / Box 元素的打印由 emit 侧按需合成（名字不可预知）。
+ * enum / class(derive ToString) / Box 元素的打印由 emit 侧按需合成（名字不可预知）。
  */
 #ifndef AIC_L1_PRINT_H
 #define AIC_L1_PRINT_H

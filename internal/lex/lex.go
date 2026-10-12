@@ -8,7 +8,7 @@ import (
 
 // Scanner walks one source file. It never stops at the first error: every
 // failure is recorded and scanning resumes at the next token boundary
-// (核心设计 §三 解析重点：多错一次报；红线#16).
+// (解析重点：多错一次报；红线).
 type Scanner struct {
 	file   string
 	src    string
@@ -261,7 +261,7 @@ func (s *Scanner) scanIdent(at Pos, first rune) {
 			break
 		}
 		if r == '_' && strings.HasSuffix(b.String(), "_") {
-			// "__" is reserved for symbol mangling (核心设计 §2.1 高危).
+			// "__" is reserved for symbol mangling (高危).
 			badPos := s.pos()
 			b.WriteRune('_')
 			s.advance()
@@ -447,7 +447,7 @@ func (s *Scanner) run() {
 		case r == '"':
 			s.scanString(at)
 		case r > 0x7f && (unicode.IsLetter(r) || unicode.IsDigit(r)):
-			// 标识符字符集是 ASCII（核心设计 §一，2026-10 收紧）：非 ASCII 的字母/数字
+			// 标识符字符集是 ASCII（2026-10 收紧）：非 ASCII 的字母/数字
 			// 不进标识符 —— 否则「首字符大写 = 跨包可见」在 Unicode 上没有定义。
 			// 整串一次报（`变量名` 是**一个**错，不是一个字符一条）。
 			start := at

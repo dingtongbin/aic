@@ -5,14 +5,14 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// N6 `select` / `scope.timeout`（核心设计 §16 N6）的检查。
+// `select` / `scope.timeout`的检查。
 //
 // 语义：
 //   - 分支只能是**通道收发**或**超时**（别的形态 = 编译错，不给"默认分支"留口子）；
 //   - 多个分支同时就绪时**任选一个** —— 故锚点必须与选择顺序无关；
 //   - recv 分支可绑 1 个（值）或 2 个（值, 是否收到）名字；
 //   - `scope.timeout(ms)` = 到点取消该域内全部任务（结构化取消，任务树向下传播），
-//     取消点是 AIC 侧的等待原语（select / recv / send / sleep），C 调用不可取消（§15.8 I9）。
+//     取消点是 AIC 侧的等待原语（select / recv / send / sleep），C 调用不可取消（I9）。
 // ---------------------------------------------------------------------------
 
 // checkSelect 检查 select 语句：逐臂定型 + 绑定名落在**本臂作用域**里。
@@ -135,7 +135,7 @@ func (c *Checker) checkSelectRecv(arm *parse.SelectArm, ch *ChanT, isChan bool) 
 }
 
 // bindSelectRecv 把 recv 分支的绑定名登记进**本臂作用域**。
-// 第二个绑定 = "是否真的收到"（通道为空且本 scope 已无存活任务时为 false，§七【O2】）。
+// 第二个绑定 = "是否真的收到"（通道为空且本 scope 已无存活任务时为 false，【O2】）。
 func (c *Checker) bindSelectRecv(arm *parse.SelectArm, ch *ChanT) {
 	for i := range arm.Targets {
 		tgt := arm.Targets[i]

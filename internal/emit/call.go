@@ -7,9 +7,9 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 调用发射 (核心设计 §二.2 容器方法 / §二.3 str / §四 构造 / §六 Err / §十四 std)。
+// 调用发射 (容器方法 / str / 构造 / Err / std)。
 //
-// 约定: 一切调用都在编译期定型 (泛型单态化 + 静态派发, §〇 CPU 条款),
+// 约定: 一切调用都在编译期定型 (泛型单态化 + 静态派发, CPU 条款),
 // 运行时函数名来自各自的单表 (容器后缀表 / std 名表 / mangling 表)。
 // ---------------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ func (c *Ctx) variantNoData(en *types.Enum, ty, variant string) string {
 	return fmt.Sprintf("%s_%s", ty, variant)
 }
 
-// initMethod 取类的 init 构造函数 (§四: 至多一个、无重载、可 -> Err)。
+// initMethod 取类的 init 构造函数 (至多一个、无重载、可 -> Err)。
 func (c *Ctx) initMethod(cl *types.Class) (*types.FuncSig, bool) {
 	for name := range cl.Methods {
 		if sig, ok := cl.Method(name); ok && sig.IsInit {

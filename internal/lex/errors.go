@@ -3,7 +3,7 @@ package lex
 import "strings"
 
 // LexerError is one collected scanner failure. Format renders the frozen
-// three-part diagnostic required by H5 (核心设计 §六):
+// three-part diagnostic required by H5:
 //
 //	<file>:<line>:<col>: error:<描述>
 //	    <上下文：实际文本/实际值>
@@ -20,7 +20,7 @@ func (e LexerError) Error() string {
 }
 
 // Format renders the three-part shape. No diagnostic may be emitted without
-// all three parts (执行规划 §八 防坑清单 #2).
+// all three parts (执行规划防坑清单).
 func (e LexerError) Format() string {
 	var b strings.Builder
 	b.WriteString(e.Pos.String())

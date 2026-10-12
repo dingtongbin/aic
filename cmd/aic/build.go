@@ -10,9 +10,9 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 外部 C 编译器封装（核心设计 §十一：开发路径 tcc，生产路径 gcc/clang -O2）。
-// 全仓禁 cgo（红线 18）：这里只有外部进程，没有任何 C 链接进 Go 二进制。
-// 运行时源码按需链接：无 spawn 的程序根本不拉 L2（红线 16）。
+// 外部 C 编译器封装（开发路径 tcc，生产路径 gcc/clang -O2）。
+// 全仓禁 cgo：这里只有外部进程，没有任何 C 链接进 Go 二进制。
+// 运行时源码按需链接：无 spawn 的程序根本不拉 L2。
 // ---------------------------------------------------------------------------
 
 func isWindows() bool { return runtime.GOOS == "windows" }
@@ -47,7 +47,7 @@ func repoRuntimeDir() string {
 }
 
 // findCC 选取 C 编译器：AIC_CC 优先，其次 cc/gcc/clang（PATH），最后 tcc。
-// 开发路径可用 tcc（快），生产路径要 gcc/clang -O2（核心设计 §十一）。
+// 开发路径可用 tcc（快），生产路径要 gcc/clang -O2。
 func findCC() string {
 	if cc := os.Getenv("AIC_CC"); cc != "" {
 		return cc
@@ -100,7 +100,7 @@ func buildArgs(cc, cPath, rt, out string, needL2 bool) []string {
 	args = append(args, "-I", rt, cPath,
 		filepath.Join(rt, "aic_l0.c"), filepath.Join(rt, "aic_std.c"))
 	if needL2 {
-		args = append(args, filepath.Join(rt, "aic_l2.c")) // 红线 16：按需链接
+		args = append(args, filepath.Join(rt, "aic_l2.c")) // 按需链接
 	}
 	args = append(args, "-o", out)
 	if !isTCC {

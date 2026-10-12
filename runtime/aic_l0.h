@@ -183,7 +183,7 @@ void aic_region_state_restore(const aic_region_state *st);
  * aic_str_alloc   任务区域分配字节（str 字节恒任务区域）。 */
 void *aic_alloc(aic_usize n, aic_u32 line);
 void *aic_alloc_hdr(aic_usize n, aic_u32 line);
-/* @live（§五 R4）：在**外一层**区域分配，使对象活过当前 region 块的弹出。
+/* live（§五 R4）：在**外一层**区域分配，使对象活过当前 region 块的弹出。
  * 深度 0（任务区域）时就是任务区域本身（已在最外层，等价于普通分配）。 */
 void *aic_alloc_live(aic_usize n, aic_u32 line);
 void *aic_alloc_in(aic_u32 reg, aic_usize n, aic_u32 line);
@@ -213,7 +213,7 @@ typedef enum {
     AIC_TRAP_OUT_OF_MEMORY        = 8,
     AIC_TRAP_STACK_OVERFLOW       = 9,
     AIC_TRAP_REGION_ESCAPED       = 10, /* 悬垂引用：对象所在区域已弹出 */
-    AIC_TRAP_REGION_DEEPER        = 11  /* 引用区域比存储更深：需 @live */
+    AIC_TRAP_REGION_DEEPER        = 11  /* 引用区域比存储更深：需 live */
     , AIC_TRAP_CHAN_FULL           = 12  /* 有界 channel 满：真并发下阻塞，无人能收则 trap */
     , AIC_TRAP_DEADLOCK            = 13  /* 全体任务都在等待且无进展：真死锁 */
     , AIC_TRAP_SHIFT_RANGE         = 14  /* 移位计数 ≥ 位宽（或为负）：C 里是 UB */
@@ -301,6 +301,8 @@ typedef struct aic_Err { aic_i32 code; aic_str msg; const struct aic_Err *cause;
 
 /* 构造一个带上链的 Err：cause 会被**拷贝进当前区域**（调用方无需关心栈变量寿命）。 */
 aic_Err aic_err_wrap(aic_i32 code, aic_str msg, aic_Err cause);
+/* is(c) 沿 cause 链任一层命中（§7.1）；链自指/过深 = trap，不死循环。 */
+bool aic_err_is(aic_Err e, aic_i32 code);
 
 /* 报告 cause 链（**stderr**：§语言规范「main 内逃逸 = 退出码 1 + stderr」）：
  * 第一级 msg，其后逐级 "  caused by: msg"。生成的 main 走 `-> Err` 时调它。 */

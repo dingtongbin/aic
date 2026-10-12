@@ -3,11 +3,11 @@ package parse
 import "strings"
 
 // ---------------------------------------------------------------------------
-// Type syntax (核心设计 §二). Type checking proper lives at R2; the parser only
+// Type syntax . Type checking proper lives at; the parser only
 // enforces the shape and records position for diagnostics.
 //
 // `(A, B)` 不是元组类型——多返回值只存在于返回位（parseFunc 展开为多个
-// Result）；类型位的 `(A, B) -> R` 是函数类型（lambda 的类型，§三）。
+// Result）；类型位的 `(A, B) -> R` 是函数类型（lambda 的类型）。
 // ---------------------------------------------------------------------------
 
 type TypeExpr interface {
@@ -51,7 +51,7 @@ type (
 		Args []TypeExpr
 		Pos
 	}
-	// FuncType is `(P1, P2) -> R` — the pure lambda's type (核心设计 §三).
+	// FuncType is `(P1, P2) -> R` — the pure lambda's type .
 	FuncType struct {
 		Params []TypeExpr
 		Result TypeExpr // nil for `-> ()`-free form: 参数表后无箭头时不存在
@@ -71,7 +71,7 @@ func (*NamedType) typeNode() {}
 func (*FuncType) typeNode()  {}
 
 // IsErrType reports whether a result slot is the frozen Err type. Err only
-// appears in the last return position (红线 2); the caller reports the error.
+// appears in the last return position ; the caller reports the error.
 func IsErrType(t TypeExpr) bool {
 	switch v := t.(type) {
 	case *BasicType:
@@ -124,7 +124,7 @@ func (p *Parser) parseTypeIn(inResult bool) TypeExpr {
 	if p.at(PUNCT, "(") {
 		grouped := p.parseParenTypeIn(at, inResult)
 		// 分组的**后缀**必须接在这里：`(map[str]i64)[]` = map 的列表
-		//（R21 审计 ④：`map[str]i64[]` 的 `[]` 天然绑给 map 的值类型
+		//（审计 ④：`map[str]i64[]` 的 `[]` 天然绑给 map 的值类型
 		//⇒ 没有分组就写不出 ”map 的列表“，分组后缀必须在这里接）。直接 return
 		//会让 `[]` 沦为表达式，报”赋值左侧必须是变量”。
 		if _, isFunc := grouped.(*FuncType); !isFunc {
@@ -138,7 +138,7 @@ func (p *Parser) parseTypeIn(inResult bool) TypeExpr {
 	}
 
 	// set[T] and map[K]V are type constructors spelled as names, not keywords:
-	// they are absent from the 23 frozen keywords (核心设计 §一), so they arrive
+	// they are absent from the 23 frozen keywords , so they arrive
 	// here as IDENT followed by `[`.
 	if p.atKind(IDENT) && p.cur().Text == "set" && p.peekIs(PUNCT, "[") {
 		p.next()
@@ -179,7 +179,7 @@ func (p *Parser) parseTypeIn(inResult bool) TypeExpr {
 	name := p.next().Text
 	t := TypeExpr(&NamedType{Name: name, Pos: at})
 
-	// 包限定名 sync.Mutex（import 裸名；目录即包，核心设计 §四）。
+	// 包限定名 sync.Mutex（import 裸名；目录即包）。
 	if p.at(PUNCT, ".") && p.peekKind() == IDENT {
 		p.next()
 		t = &NamedType{Name: p.next().Text, Pkg: name, Pos: at}
@@ -226,7 +226,7 @@ func (p *Parser) parseTypeIn(inResult bool) TypeExpr {
 
 // parseParenType reads `(T)` (grouping) or `(P1, P2) -> R` (function type).
 // A parenthesised type list without an arrow is a tuple type — 元组非一等类型
-// (核心设计 §二.2), so it is rejected with the mechanical fix.
+// , so it is rejected with the mechanical fix.
 func (p *Parser) parseParenType(at Pos) TypeExpr {
 	return p.parseParenTypeIn(at, false)
 }

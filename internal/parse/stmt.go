@@ -27,7 +27,7 @@ func (p *Parser) parseBlock() *Block {
 }
 
 // parseStmt reads one statement. The dispatch covers every statement keyword
-// of the surface (核心设计 §三); everything else reaches the expression path
+// of the surface ; everything else reaches the expression path
 // as a plain identifier (《AIC 语言规范》§1.3).
 func (p *Parser) parseStmt() Stmt {
 	at := p.pos()
@@ -73,7 +73,7 @@ func (p *Parser) parseStmt() Stmt {
 	case p.at(KW, "defer"):
 		p.next()
 		d := &DeferStmt{Pos: at}
-		if p.at(PUNCT, "{") { // defer { … } 块形（核心设计 §三）
+		if p.at(PUNCT, "{") { // defer { … } 块形
 			d.Block = p.parseBlock()
 			return d
 		}
@@ -109,7 +109,7 @@ func (p *Parser) parseStmt() Stmt {
 		return p.parseScopeTail(at)
 
 	case p.at(KW, "live"):
-		// R20：`live` 是变量目标修饰语，不是语句。定向报错而不是
+		// `live` 是变量目标修饰语，不是语句。定向报错而不是
 		// "unexpected token"（防坑清单：错误必须可照做）。
 		p.errorHere(at, "live is a variable modifier, not a statement",
 			"got live",
@@ -166,7 +166,7 @@ func (p *Parser) endOfStmt() bool {
 }
 
 // parseIf reads if / else if / else. `else if` 是 else 块内的单个 IfStmt；
-// 递归下降天然实现「else 配对最近未配对的 if」（核心设计 §三）。
+// 递归下降天然实现「else 配对最近未配对的 if」。
 func (p *Parser) parseIf() Stmt {
 	at := p.pos()
 	p.next() // if
@@ -187,7 +187,7 @@ func (p *Parser) parseIf() Stmt {
 	return s
 }
 
-// parseFor reads the three loop forms (核心设计 §三):
+// parseFor reads the three loop forms:
 //
 //	for cond { } / for init; cond; post { } / for i, x in xs { } / for i in a..b { }
 func (p *Parser) parseFor() Stmt {
@@ -357,7 +357,7 @@ func (p *Parser) parseSpawn(at Pos) Stmt {
 	return s
 }
 
-// parseMatchStmt reads the statement-position match (核心设计 §三):
+// parseMatchStmt reads the statement-position match:
 // subject { pattern => { … } / pattern => expr(,)? } — 强制穷尽由检查器执行。
 func (p *Parser) parseMatchStmt() Stmt {
 	at := p.pos()

@@ -3,7 +3,7 @@ package types
 import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
-// 成员访问 / 下标 / str 方法（核心设计 §二.2 §二.3）。
+// 成员访问 / 下标 / str 方法。
 // ---------------------------------------------------------------------------
 
 func (c *Checker) checkField(v *parse.Field, expect Type) (Type, bound, untyped) {
@@ -79,8 +79,8 @@ func (c *Checker) checkField(v *parse.Field, expect Type) (Type, bound, untyped)
 		case "msg":
 			return TStr, bound{off: 0}, untyped{}
 		case "cause":
-			// §16 N5 ④：`Err = {code, msg, cause}`；cause 为空指针时读它 = 解引用 nil
-			//（§九 nil 教条：疑 nil = 运行时 trap，故这里只判"可证必 nil"）。
+			// §16 ④：`Err = {code, msg, cause}`；cause 为空指针时读它 = 解引用 nil
+			//（nil 教条：疑 nil = 运行时 trap，故这里只判"可证必 nil"）。
 			c.checkDeref(v.X, "field access cause")
 			return TErr, bound{off: 0}, untyped{}
 		}
@@ -94,9 +94,9 @@ func (c *Checker) checkField(v *parse.Field, expect Type) (Type, bound, untyped)
 			if !c.memberVisible(cl.Pkg, cl.Name, v.Name, v.Pos) {
 				return nil, nilBound, untyped{}
 			}
-			// 解引用位（§九）：可证必然为 nil 的字段访问 = 编译错
+			// 解引用位：可证必然为 nil 的字段访问 = 编译错
 			c.checkDeref(v.X, "field access "+v.Name)
-			// 字段读界 = 宿主界（§五 R3）；字段不做 nil 流跟踪（§九）
+			// 字段读界 = 宿主界；字段不做 nil 流跟踪
 			return cl.Fields[idx].Type, bound{off: recvBound.off}, untyped{}
 		}
 		c.errorAt(v.Pos, "the class has no such field", cl.String()+"."+v.Name,
@@ -152,7 +152,7 @@ func (c *Checker) checkIndex(v *parse.Index, expect Type) (Type, bound, untyped)
 	if xt == nil {
 		return nil, nilBound, untyped{}
 	}
-	// 下标位接受任意整型（H6 唯一例外，核心设计 §二.4）
+	// 下标位接受任意整型（H6 唯一例外）
 	c.checkIndexInt(v.Index, "index")
 	if v.End != nil {
 		c.checkIndexInt(v.End, "view end")

@@ -5,7 +5,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// N4 编译期反射的检查侧（核心设计 §16 N4）：
+// 编译期反射的检查侧：
 //
 //   - `comptime { const …  assert … }` —— 全部编译期求值，零运行期代码；
 //   - 内省原语 `fieldsOf(T)` / `variantsOf(T)` **只在编译期可用**：它们是
@@ -127,7 +127,7 @@ func (c *Checker) resolveIntroTarget(call *parse.Call, name string) (Type, strin
 	return t, ""
 }
 
-// foldIntrospect 折叠内省原语的**取值形态**（N4）：
+// foldIntrospect 折叠内省原语的**取值形态**：
 //
 //	fieldsOf(T).len                  -> i32
 //	fieldsOf(T)[i].name / .ty / .index

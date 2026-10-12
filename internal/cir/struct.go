@@ -15,7 +15,7 @@ import (
 //
 //	CFG 的每一条边都必须在产物里被**物化**成五者之一：
 //	  fallthrough（文字顺序上紧接着）｜goto｜return｜break｜continue。
-//	少一条 = **编译失败**（红线 23），不是"发个错的先跑起来"。
+//	少一条 = **编译失败**，不是"发个错的先跑起来"。
 //
 // 为什么这条要求是决定性的：旧的折叠器只做"数数自检"（cbr 数 == if 数、
 // ret 数 == Return 数），于是**边被丢掉也照样通过**。791 实测：`ok_load` 的
@@ -93,7 +93,7 @@ type folder struct {
 	exit         string
 	edges        map[[2]string]bool // 已物化的边
 	// regOpen 跨块 region 的开放栈：enter 在这块、exit 在后续块时，平铺的
-	// RegionOpen/RegionClose 靠它找回配对（air V3.1 保证栈纪律）。
+	// RegionOpen/RegionClose 靠它找回配对（air 保证栈纪律）。
 	regOpen []regSpan
 	regSeq  int // scope 域的 aic_scope 变量名序号（确定性）
 }
@@ -320,7 +320,7 @@ func (fl *folder) foldBlock(b *air.Block) ([]Stmt, string, error) {
 }
 
 // isForShape 报告一个条件分支是否是降级器生成的循环头形态
-// （then = forbody、else = fordone；六种标签形态之一，核心设计 §十）。
+// （then = forbody、else = fordone；六种标签形态之一）。
 func isForShape(t *air.Cbr) bool {
 	return strings.HasPrefix(t.Then, "forbody") && strings.HasPrefix(t.Else, "fordone")
 }
@@ -328,7 +328,7 @@ func isForShape(t *air.Cbr) bool {
 // foldInsts 折块内指令。region 有两种折法：
 //   - 同块内 enter/exit 成对（词法括号匹配）→ Region{Body} 结构化块（原形态）；
 //   - 跨块（enter 在这块、exit 在降级后的后续块）→ 平铺 RegionOpen/RegionClose，
-//     配对由 fl.regOpen 栈跨块记录。air 层 V3.1 已沿 CFG 边保证结构化配平，
+//     配对由 fl.regOpen 栈跨块记录。air 层已沿 CFG 边保证结构化配平，
 //     故按遇到顺序平铺即保持执行序（goto 改 relabel 不改动态序）。
 func (fl *folder) foldInsts(b *air.Block, insts []air.Inst) ([]Stmt, error) {
 	var out []Stmt
@@ -592,6 +592,14 @@ func (fl *folder) foldIfPlain(headBlk *air.Block, t *air.Cbr) (string, []Stmt, e
 		if ts, es := fl.dryStop(t.Then), fl.dryStop(t.Else); ts != "" && ts == es {
 			join = ts
 		}
+	}
+	// **出口块不能当汇合点**。多前驱的 exit 常驻 reserve、由 inlineExit 在**每条**
+	// 分支收口处各自物化成 return（产物 = 多 return 的干净 C）。两支都停在 exit 时
+	// 干跑会把它判成 join，于是 close 走 "stop == join" 捷径只记边、不再物化语句 ——
+	// 分支体就成了空的（010/011/036 实测：verifyStmts 报 empty then-branch），而那条
+	// 边其实是"折进 return"，不是"落空到下一句"。清空 join 让每支自己收口即可。
+	if join == fl.exit {
+		join = ""
 	}
 	if join != "" {
 		// **折分支期间 reserve 汇合点**：否则第一个到达它的分支会把它折走，

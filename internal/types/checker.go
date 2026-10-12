@@ -9,11 +9,11 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Checker（R2）：类型检查 + 区域深度标注 + 存储点守卫判定（核心设计 §二–§九）。
-// 输入 = parse.File（R1 产物）；输出 = 三段式诊断 + 守卫标记表（R3 消费）。
+// Checker：类型检查 + 区域深度标注 + 存储点守卫判定（–）。
+// 输入 = parse.File（产物）；输出 = 三段式诊断 + 守卫标记表（消费）。
 //
 // 单遍检查 + 区域偏移随语句行走维护；返回摘要恒 = 0（返回点守卫/编译错保证，
-// 见 §五 R3 传播规则——R0c ② 修订版），故无需跨函数不动点。
+// 见传播规则——R0c ② 修订版），故无需跨函数不动点。
 // ---------------------------------------------------------------------------
 
 type GuardKind int
@@ -27,7 +27,7 @@ const (
 )
 
 // GuardSpec 标记一个需要运行时检查的点位。Delta 仅变量槽存储使用：
-// 目标声明深度 = 当前深度 − Delta（R3 发射形态）。
+// 目标声明深度 = 当前深度 − Delta（发射形态）。
 type GuardSpec struct {
 	Kind  GuardKind
 	Delta int
@@ -40,7 +40,7 @@ type GuardSpec struct {
 type CheckResult struct {
 	Errors []CheckerError
 	Guards map[parse.Node]GuardSpec
-	// Types: 每个表达式节点的检查类型（R3 emit 消费）。
+	// Types: 每个表达式节点的检查类型（emit 消费）。
 	Types map[parse.Expr]Type
 	// Info: emit 需要的只读语义事实（局部名表/签名/具名类型/泛型实参）。
 	Info *Info
@@ -52,7 +52,7 @@ type Checker struct {
 	files  []*parse.File
 	errors []CheckerError
 	// deps 是已检查完的 import 包（包名 → 该包的 Info）。
-	// 跨包名解析的唯一入口：类型/函数/常量/变体都从这里查（核心设计 §四 可见性）。
+	// 跨包名解析的唯一入口：类型/函数/常量/变体都从这里查（可见性）。
 	deps   map[string]*Info
 	guards map[parse.Node]GuardSpec
 	types  map[parse.Expr]Type
@@ -62,7 +62,7 @@ type Checker struct {
 	// failed 记下"声明失败过"的名字（const 折叠失败等）：后续引用不再刷
 	// "未声明的名字" —— 一条错刷成多条会把首因埋在级联噪音里。
 	failed map[string]bool
-	// funcInsts/funcInstSeen 是泛型函数实例登记（实例缓存，红线 11）。
+	// funcInsts/funcInstSeen 是泛型函数实例登记（实例缓存）。
 	funcInsts    []FuncInst
 	funcInstSeen map[string]bool
 	// locals: 函数标识 → 局部名/参数名集合（emit 区分裸名与包级名）
@@ -84,9 +84,9 @@ type Checker struct {
 	thisClass *Class
 	scope     *Scope
 	regionOff int
-	nilState  map[string]*nilState // 局部变量非 nil 流证明（§九）
+	nilState  map[string]*nilState // 局部变量非 nil 流证明
 
-	// N1 闭包捕获收集：lambdaBase = 当前闭包**自己的**最外层作用域（走到它就停），
+	// 闭包捕获收集：lambdaBase = 当前闭包**自己的**最外层作用域（走到它就停），
 	// caps = 正在收集的捕获表（自由变量 = 在 lambdaBase 之外解析到的名字）。
 	lambdaBase *Scope
 	caps       *[]capture
@@ -95,7 +95,7 @@ type Checker struct {
 	// capRefs 记录闭包体内**每一次**捕获引用（标识符节点 → 环境槽号）。按节点记，
 	// 因为同名局部量可以遮蔽捕获项 —— 光有名字表无法区分两者。
 	capRefs map[parse.Expr]int
-	// comptime 是编译期内省原语的折叠结果（N4）：emit 按它发常量/sizeof。
+	// comptime 是编译期内省原语的折叠结果：emit 按它发常量/sizeof。
 	comptime map[parse.Expr]ComptimeVal
 	// arrayLens 是 [T;N] 的 N 折出来的长度（键 = N 表达式节点）：emit 按**同一份结果**
 	// 发 C 数组维度（禁 emit 再折一遍 —— 那条路只认字面量与 const 名）。
@@ -129,6 +129,17 @@ var implementedStd = map[string]bool{
 	"ctx": true, "testing": true, "code": true, "value": true,
 }
 
+// implementedStdNames 是 implementedStd 的名字清单（字典序），供诊断文案引用：
+// 写死一份字符串表会与 implementedStd 分叉，报出来的"可用包"就成假广告。
+func implementedStdNames() string {
+	names := make([]string, 0, len(implementedStd))
+	for n := range implementedStd {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return strings.Join(names, "/")
+}
+
 // capture 是一个按值捕获的绑定（名字 + 类型 + 声明的区域深度）。
 type capture struct {
 	Name string
@@ -137,7 +148,7 @@ type capture struct {
 }
 
 // CheckFile checks one translation unit. The File is always checked fully:
-// 单次编译报全部错误（红线 14）。
+// 单次编译报全部错误。
 func CheckFile(f *parse.File) *CheckResult {
 	return CheckPackage([]*parse.File{f}, nil)
 }
@@ -145,7 +156,7 @@ func CheckFile(f *parse.File) *CheckResult {
 // CheckPackage 检查一个包（目录即包：同目录多个 .aic 合成一个包，共用一个 Info）。
 //
 // deps 是 import 闭包里已检查完的包（包名 → Info），按拓扑序由调用方提供
-// （internal/pkg 收集，红线 23：整程序收集后方可发射）。deps 里的符号按 §四
+// （internal/pkg 收集，整程序收集后方可发射）。deps 里的符号按
 // 可见性规则：顶层名首字母大写 = 跨包可见（小写与 `_` 前缀 = 包私有）。
 func CheckPackage(files []*parse.File, deps map[string]*Info) *CheckResult {
 	c := &Checker{
@@ -173,7 +184,7 @@ func CheckPackage(files []*parse.File, deps map[string]*Info) *CheckResult {
 		return &CheckResult{Info: &Info{}}
 	}
 	c.file = files[0].Path
-	c.pkg = pkgNameFromPath(files[0].Path) // 包名唯一所有者（目录即包，§四）
+	c.pkg = pkgNameFromPath(files[0].Path) // 包名唯一所有者（目录即包）
 	// std 根类型枚举进入名字表：根类型无需 import 即可用（变体构造/match）
 	c.stdEnums()
 	c.collectDecls(files)
@@ -230,10 +241,10 @@ func (c *Checker) errorAt(pos parse.Pos, desc, context, fix string) {
 
 func (c *Checker) collectDecls(files []*parse.File) {
 	// 声明序三轮：
-	//   ⓪ import 先收全 —— 包内符号一次导入全局可用（§四），且签名解析要用到
+	//   ⓪ import 先收全 —— 包内符号一次导入全局可用，且签名解析要用到
 	//      import 集合；少这一轮就会出现「同包另一文件的 import 尚未登记」的
 	//      假错（跨文件包按文件名序处理，先后顺序不该改变可见性）；
-	//   ① 类型（类/接口/枚举自引用合法，§二.6）与常量/函数签名；
+	//   ① 类型（类/接口/枚举自引用合法）与常量/函数签名；
 	//   ② 字段类型与方法签名（类型彼此已可引用）。
 	for _, f := range files {
 		for _, d := range f.Decls {
@@ -251,7 +262,7 @@ func (c *Checker) collectDecls(files []*parse.File) {
 			// 包存在只是自己拼错了。
 			if pkg.IsStd(im.Name) && !implementedStd[im.Name] {
 				c.errorAt(im.Pos, "this standard package is not implemented yet", "import "+im.Name,
-					"the standard library lands in phase S (core design §15.3 lists the package roadmap); the packages available today are print/str/os/math/option/testing/sync/time/ctx")
+					"the standard library lands in phase S (core design §15.3 lists the package roadmap); the packages available today are "+implementedStdNames())
 				continue
 			}
 			c.imports[im.Name] = true
@@ -285,7 +296,7 @@ func (c *Checker) collectDecls(files []*parse.File) {
 	// ②b 枚举负载：类型名此刻已全部登记 ⇒ 前向引用（`enum E { X(Late) }` 里 Late 后声明）
 	//    现在可解析；递归负载检测也在这里做（要等负载类型齐了才准）。
 	c.resolveEnumPayloads()
-	// ③ comptime 块（N4）：必须排在 ② 之后 —— 内省原语要读**已解析的字段表**
+	// ③ comptime 块：必须排在 ② 之后 —— 内省原语要读**已解析的字段表**
 	//    （`sizeOf(T)`/`fieldsOf(T)` 都在 finishClass 里才定型）；而它声明的常量
 	//    又必须早于函数体检查登记，否则函数体里用 `N` 会报"未声明的名字"。
 	for _, f := range files {
@@ -357,17 +368,17 @@ func (c *Checker) collectClass(v *parse.ClassDecl) {
 	}
 	cl := &Class{
 		Name:        v.Name,
-		Pkg:         c.pkg, // 包名唯一所有者：mangling 只读它（红线 10）
+		Pkg:         c.pkg, // 包名唯一所有者：mangling 只读它
 		Fields:      []Field{},
 		fieldIdx:    map[string]int{},
 		Methods:     map[string]*FuncSig{},
-		Packed:      v.Packed,
+		Struct:      v.Struct,
 		TypeParams:  v.TypeParams,
 		Constraints: v.Constraints,
 		Derived:     c.derivesOf(v),
 	}
 	c.classes[v.Name] = cl
-	// N3：泛型类约束名在声明处校验。
+	// 泛型类约束名在声明处校验。
 	for _, tpc := range v.Constraints {
 		c.deferConstraint("class "+v.Name, tpc)
 	}
@@ -420,17 +431,17 @@ func (c *Checker) finishClass(v *parse.ClassDecl) {
 		if ft == nil {
 			continue
 		}
-		if cl.Packed && !packedFieldOK(ft) && !containsTypeParam(ft) {
+		if cl.Struct && !structFieldOK(ft) && !containsTypeParam(ft) {
 			// 含类型参数的字段推迟到**实例化时**校验（那时 A → i32 已知）；
 			// 非泛型字段仍在此处立即拒绝。
-			c.errorAt(fd.Pos, "@packed field type is not on the whitelist",
+			c.errorAt(fd.Pos, "struct field type is not on the whitelist",
 				"field "+targetList(fd.Targets)+" has type "+ft.String(),
-				"@packed fields allow basic types / str / nested @packed / [T;N] / payload-free enums only; use a plain class for references and containers (core design §4)")
+				"struct fields allow basic types / str / nested struct / [T;N] / payload-free enums only; use a plain class for references and containers (core design §4)")
 			continue
 		}
 		for _, tgt := range fd.Targets {
 			if tgt.Live {
-				// R20：live 只修饰**局部变量目标**（§五 R4 的分配位提升）。
+				// live 只修饰**局部变量目标**（分配位提升）。
 				// 字段的生命周期归宿主对象，没有"提升一层"可言。
 				c.errorAt(tgt.Pos, "live applies to local variables only",
 					"field "+cl.Name+"."+tgt.Name+" is marked live",
@@ -510,11 +521,11 @@ func (c *Checker) checkImplementsComplete(v *parse.ClassDecl, cl *Class) {
 	}
 }
 
-// delegateMethods 处理 `use 字段 类型`（N10，核心设计 §16）：
+// delegateMethods 处理 `use 字段 类型`：
 // 把被委托类型的方法**提升**到本类（调用点 a.m() → a.字段.m()）。
 //
 // 规则：
-//   - 字段必须在本类声明，且类型是 class / @packed（值类型没有方法）；
+//   - 字段必须在本类声明，且类型是 class / struct（值类型没有方法）；
 //   - 同名方法在本类已有**显式实现** ⇒ 显式实现获胜，不报错（这正是"显式实现"）；
 //   - 同名方法来自**另一条 use** ⇒ 歧义，必须在本类显式实现，报错；
 //   - 泛型实例字段暂不支持（报错而不是默默发错代码）。
@@ -593,23 +604,23 @@ func typeParamSet(names []string) map[string]bool {
 	return out
 }
 
-// deriveMethods 装配 @derive(Compare) / @derive(Hash) 的派生方法签名（§四 三件套）。
+// deriveMethods 装配 derive Compare / derive Hash 的派生方法签名（三件套）。
 // 派生方法就是普通方法：可被 `p.compare(q)` / `p.hash()` 调用，走同一套 mangling
 // 与调用检查；方法体由 emit 按字段序合成（同一条规则，禁两处各写一份）。
 func (c *Checker) deriveMethods(v *parse.ClassDecl, cl *Class) {
 	if cl.HasDerive("Compare") {
 		if _, dup := cl.Methods["compare"]; dup {
 			c.errorAt(v.Pos, "a derived method collides with an explicit one", cl.Name+".compare",
-				"@derive(Compare) generates compare(other) -> i32; drop the explicit method or the capability")
-		} else if bad, bline, hit := packedF64Field(cl); hit {
+				"derive Compare generates compare(other) -> i32; drop the explicit method or the capability")
+		} else if bad, bline, hit := structF64Field(cl); hit {
 			// C21（规范 §3.2）：含 f64 的 struct 禁 Compare。f64 有 NaN，
 			// 比较不构成全序 —— 派生出的 compare 会给出不自反的结果。
 			// comparableField 对 numeric 一律放行，所以这条必须单独判。
 			c.errorAt(deriveFieldPos(v.Pos, bline), "a struct with an f64 field cannot derive Compare", bad,
 				"f64 has NaN, so the order is not total; store the quantity as an integer (e.g. cents i64), or drop Compare (AIC language spec §3.2, C21)")
 		} else if bad, bline := firstNonComparable(cl); bad != "" {
-			c.errorAt(deriveFieldPos(v.Pos, bline), "a field of @derive(Compare) is not comparable", bad,
-				"Compare supports numeric / bool / str / payload-free enum / @packed / Compare-enabled class fields only (core design §4)")
+			c.errorAt(deriveFieldPos(v.Pos, bline), "a field of derive Compare is not comparable", bad,
+				"Compare supports numeric / bool / str / payload-free enum / struct / Compare-enabled class fields only (core design §4)")
 		} else {
 			cl.Methods["compare"] = &FuncSig{
 				Name: "compare", Recv: cl.Name, Derived: true,
@@ -620,10 +631,10 @@ func (c *Checker) deriveMethods(v *parse.ClassDecl, cl *Class) {
 	if cl.HasDerive("Hash") {
 		if _, dup := cl.Methods["hash"]; dup {
 			c.errorAt(v.Pos, "a derived method collides with an explicit one", cl.Name+".hash",
-				"@derive(Hash) generates hash() -> u64; drop the explicit method or the capability")
+				"derive Hash generates hash() -> u64; drop the explicit method or the capability")
 		} else if bad, bline := firstNonHashable(cl); bad != "" {
-			c.errorAt(deriveFieldPos(v.Pos, bline), "a field of @derive(Hash) is not hashable", bad,
-				"Hash supports numeric / bool / str / payload-free enum / @packed / Hash-enabled class fields only (core design §4)")
+			c.errorAt(deriveFieldPos(v.Pos, bline), "a field of derive Hash is not hashable", bad,
+				"Hash supports numeric / bool / str / payload-free enum / struct / Hash-enabled class fields only (core design §4)")
 		} else {
 			cl.Methods["hash"] = &FuncSig{
 				Name: "hash", Recv: cl.Name, Derived: true,
@@ -631,15 +642,15 @@ func (c *Checker) deriveMethods(v *parse.ClassDecl, cl *Class) {
 			}
 		}
 	}
-	// N4：@derive(Default) / @derive(Clone) —— 与三件套同款「签名由检查器装配、
+	// derive Default / derive Clone —— 与三件套同款「签名由检查器装配、
 	// 体由 emit 按字段序合成」。泛型类暂不支持（实例化时的字段代换另算）。
 	if cl.HasDerive("Default") {
 		if len(cl.TypeParams) > 0 {
-			c.errorAt(v.Pos, "@derive(Default) on a generic class is not supported yet", cl.Name,
+			c.errorAt(v.Pos, "derive Default on a generic class is not supported yet", cl.Name,
 				"derive on the concrete instantiation instead (core design §16 N4)")
 		} else if _, dup := cl.Methods["default"]; dup {
 			c.errorAt(v.Pos, "a derived method collides with an explicit one", cl.Name+".default",
-				"@derive(Default) generates default() -> T; drop the explicit method or the capability")
+				"derive Default generates default() -> T; drop the explicit method or the capability")
 		} else {
 			cl.Methods["default"] = &FuncSig{
 				Name: "default", Recv: cl.Name, Derived: true, NoRecv: true,
@@ -649,11 +660,11 @@ func (c *Checker) deriveMethods(v *parse.ClassDecl, cl *Class) {
 	}
 	if cl.HasDerive("Clone") {
 		if len(cl.TypeParams) > 0 {
-			c.errorAt(v.Pos, "@derive(Clone) on a generic class is not supported yet", cl.Name,
+			c.errorAt(v.Pos, "derive Clone on a generic class is not supported yet", cl.Name,
 				"derive on the concrete instantiation instead (core design §16 N4)")
 		} else if _, dup := cl.Methods["clone"]; dup {
 			c.errorAt(v.Pos, "a derived method collides with an explicit one", cl.Name+".clone",
-				"@derive(Clone) generates clone() -> T; drop the explicit method or the capability")
+				"derive Clone generates clone() -> T; drop the explicit method or the capability")
 		} else if bad := firstNonClonable(cl); bad != "" {
 			c.errorAt(v.Pos, "a field of derive(Clone) cannot be deep-copied", bad,
 				"Clone copies value fields; a reference field would alias the original — copy it explicitly in a method (core design §16 N4)")
@@ -727,7 +738,7 @@ func firstNonClonableType(t Type) string {
 func firstNonClonableFor(t Type) string {
 	switch v := t.(type) {
 	case *Class:
-		if !v.Packed && !v.Derived["Clone"] {
+		if !v.Struct && !v.Derived["Clone"] {
 			return v.Name + " has no `derive Clone`"
 		}
 		return firstNonClonable(v)
@@ -747,11 +758,11 @@ func deriveFieldPos(clsPos parse.Pos, fieldLine int) parse.Pos {
 }
 
 // firstNonComparable 返回第一个不可比较字段的说明与**它的行号**（全可比较 = ("", 0)）。
-// 行号是必须的：@derive 的字段级错误若报在**类声明行**，用户要自己找是哪个字段。
-// packedF64Field 报告值语义 struct 里首个 f64 字段（C21）：含 f64 的 struct
+// 行号是必须的：derive 的字段级错误若报在**类声明行**，用户要自己找是哪个字段。
+// structF64Field 报告值语义 struct 里首个 f64 字段（C21）：含 f64 的 struct
 // 禁 derive Compare（规范 §3.2）。非 struct（引用 class）不在此列。
-func packedF64Field(cl *Class) (string, int, bool) {
-	if cl == nil || !cl.Packed {
+func structF64Field(cl *Class) (string, int, bool) {
+	if cl == nil || !cl.Struct {
 		return "", 0, false
 	}
 	for i := range cl.Fields {
@@ -788,7 +799,7 @@ func comparableField(t Type, depth int) string {
 	}
 	if cl, ok := t.(*Class); ok {
 		if !cl.HasDerive("Compare") {
-			return "class " + cl.String() + " has no @derive(Compare)"
+			return "class " + cl.String() + " has no derive Compare"
 		}
 		return ""
 	}
@@ -821,13 +832,13 @@ func hashableField(t Type, depth int) string {
 	}
 	if b, ok := t.(*Basic); ok {
 		if isNumeric(b) || b.Name == "bool" || b.Name == "str" {
-			return "" // str 按内容哈希（§四：@derive(Hash) 支持 str 字段）
+			return "" // str 按内容哈希（derive Hash 支持 str 字段）
 		}
 		return "type " + b.Name + " is not hashable"
 	}
 	if cl, ok := t.(*Class); ok {
 		if !cl.HasDerive("Hash") {
-			return "class " + cl.String() + " has no @derive(Hash)"
+			return "class " + cl.String() + " has no derive Hash"
 		}
 		return ""
 	}
@@ -870,12 +881,12 @@ func (c *Checker) collectInterface(v *parse.InterfaceDecl) {
 			continue
 		}
 		ifc.Methods[sig.Name] = sig
-		ifc.Slots = append(ifc.Slots, sig.Name) // 声明序 = 分发槽位号（§十）
+		ifc.Slots = append(ifc.Slots, sig.Name) // 声明序 = 分发槽位号
 	}
 	c.embedInto(v, ifc)
 }
 
-// embedInto 把嵌入接口的槽位并进本接口（N9，核心设计 §16）。
+// embedInto 把嵌入接口的槽位并进本接口。
 //
 // 语义：**并集**，不是继承 ——
 //   - 槽位序 = 声明序（嵌入项插在它出现的位置，方法各自保持自己的位置）；
@@ -1055,13 +1066,13 @@ func (c *Checker) buildSig(v *parse.FuncDecl, recv string) *FuncSig {
 		TypeParams:  v.TypeParams,
 		Constraints: v.Constraints,
 	}
-	// N3：约束名在**声明处**校验（不认识的名字绝不推迟到调用点）。
+	// 约束名在**声明处**校验（不认识的名字绝不推迟到调用点）。
 	for _, tpc := range v.Constraints {
 		c.deferConstraint("func "+v.Name, tpc)
 	}
 	// 泛型函数的签名在**类型参数在作用域内**时解析：`func id[T](x T) -> T` 的
 	// 形参与返回位都指向 TypeParam（T1 泛型单态化的前提）。
-	// 方法不得新增类型参数（§四）：方法体里只继承所属类的类型参数。
+	// 方法不得新增类型参数：方法体里只继承所属类的类型参数。
 	saved := c.typeParams
 	if recv == "" {
 		c.typeParams = typeParamSet(v.TypeParams)
@@ -1105,7 +1116,7 @@ func (c *Checker) checkExportedSig(at parse.Pos, sig *FuncSig) {
 	if sig == nil {
 		return
 	}
-	// 可见性：自由函数看名字或 export 修饰符；方法随所属类型（R7 决策一：成员不单独按大小写判定）。
+	// 可见性：自由函数看名字或 export 修饰符；方法随所属类型（决策一：成员不单独按大小写判定）。
 	pub := exported(sig.Name) || sig.Export
 	if sig.Recv != "" {
 		pub = exported(sig.Recv) || sig.Export
@@ -1213,7 +1224,7 @@ func (c *Checker) rootIterator(v *parse.NamedType) Type {
 	}
 	ifc := &Interface{Name: "Iterator", Pkg: "", Methods: map[string]*FuncSig{}}
 	ifc.Methods["next"] = &FuncSig{Name: "next", Results: []Type{at, TBool}}
-	ifc.Slots = []string{"next"} // 声明序 = 分发槽位号（§十）
+	ifc.Slots = []string{"next"} // 声明序 = 分发槽位号
 	c.rootIfaces[at.String()] = ifc
 	return ifc
 }
@@ -1326,7 +1337,7 @@ func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
 				"check the spelling; a user package's public types are declared in its own files (core design §4)")
 			return nil
 		}
-		// chan[T]：parse 把 `chan[T]` 解析成泛型具名类型，这里归位（§七）。
+		// chan[T]：parse 把 `chan[T]` 解析成泛型具名类型，这里归位。
 		if v.Name == "chan" {
 			return c.resolveChanType(v)
 		}
@@ -1405,7 +1416,7 @@ func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
 		}
 		if !hashable(k) {
 			c.errorAt(v.Pos, "the map key type is not hashable", typeText(k),
-				"a key allows numeric / bool / str / payload-free enum / @packed only; class references and containers cannot be keys")
+				"a key allows numeric / bool / str / payload-free enum / struct only; class references and containers cannot be keys")
 			return nil
 		}
 		// 审计 ③：**键/值槽位表**（runtime aic_l1_map.h 的实例表，rtsuffix.go 是
@@ -1431,7 +1442,7 @@ func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
 		}
 		if !hashable(elem) {
 			c.errorAt(v.Pos, "the set element type is not hashable", typeText(elem),
-				"elements allow numeric / bool / str / payload-free enum / @packed only")
+				"elements allow numeric / bool / str / payload-free enum / struct only")
 			return nil
 		}
 		// 审计 ③：set 的元素槽位表同样在检查期验（旧行为 = emit 期才炸）。
@@ -1517,7 +1528,7 @@ func (c *Checker) instantiate(base Type, args []parse.TypeExpr, at parse.Pos) Ty
 			}
 			inst.Args = append(inst.Args, rt)
 		}
-		// N3：泛型类实例化点的约束校验（位置 = 使用点，绝不报在模板体内部）。
+		// 泛型类实例化点的约束校验（位置 = 使用点，绝不报在模板体内部）。
 		m := map[string]Type{}
 		for i, tp := range b.TypeParams {
 			if i < len(inst.Args) {
@@ -1525,14 +1536,14 @@ func (c *Checker) instantiate(base Type, args []parse.TypeExpr, at parse.Pos) Ty
 			}
 		}
 		c.checkCallConstraints(at, b.Name, b.Constraints, m)
-		// @packed 的字段白名单在实例化时校验（形参字段只有在实例化之后才能判定）。
-		if b.Packed {
+		// struct 的字段白名单在实例化时校验（形参字段只有在实例化之后才能判定）。
+		if b.Struct {
 			for i := range b.Fields {
 				ft := subst(b.Fields[i].Type, b.TypeParams, inst.Args)
-				if !packedFieldOK(ft) {
-					c.errorAt(at, "@packed field type is not on the whitelist",
+				if !structFieldOK(ft) {
+					c.errorAt(at, "struct field type is not on the whitelist",
 						"field "+b.Name+"."+b.Fields[i].Name+" becomes "+ft.String(),
-						"@packed fields allow basic types / str / nested @packed / [T;N] / payload-free enums only (core design §4)")
+						"struct fields allow basic types / str / nested struct / [T;N] / payload-free enums only (core design §4)")
 					return nil
 				}
 			}
@@ -1562,7 +1573,7 @@ func (c *Checker) instantiate(base Type, args []parse.TypeExpr, at parse.Pos) Ty
 	return nil
 }
 
-// containsTypeParam 报告类型里是否含类型参数（@packed 白名单推迟判定的依据）。
+// containsTypeParam 报告类型里是否含类型参数（struct 白名单推迟判定的依据）。
 func containsTypeParam(t Type) bool {
 	switch v := t.(type) {
 	case *TypeParam:
@@ -1597,7 +1608,7 @@ func hashable(t Type) bool {
 	case *Basic:
 		return v.Name != "Err" || true // Err 按值可哈希（code+msg 内容哈希）
 	case *Class:
-		return v.Packed
+		return v.Struct
 	case *Enum:
 		return !v.HasData
 	case *ArrayT:
@@ -1606,16 +1617,16 @@ func hashable(t Type) bool {
 	return false
 }
 
-func packedFieldOK(t Type) bool {
+func structFieldOK(t Type) bool {
 	switch v := t.(type) {
 	case *Basic:
 		return true
 	case *Class:
-		return v.Packed
+		return v.Struct
 	case *Enum:
 		return !containsReference(v)
 	case *ArrayT:
-		return packedFieldOK(v.Elem)
+		return structFieldOK(v.Elem)
 	}
 	return false
 }

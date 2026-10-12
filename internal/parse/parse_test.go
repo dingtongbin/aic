@@ -340,7 +340,7 @@ func f() {
     }
 }
 `)
-	// spawn 外于 scope = 词法级编译错（红线 5）
+	// spawn 外于 scope = 词法级编译错
 	mustFail(t, "func work() {\n}\nfunc f() {\n    spawn work()\n}\n", "scope")
 }
 
@@ -369,7 +369,7 @@ func TestStrView(t *testing.T) {
 	mustParse(t, "func f(xs i32[], i i32) -> i32 {\n    return xs[i]\n}\n")
 }
 
-// --- 用例组 9：顶层规则（红线 21 / export） ----------------------------------------
+// --- 用例组 9：顶层规则（export） ----------------------------------------
 
 func TestTopLevelRules(t *testing.T) {
 	// 顶层 var 禁
@@ -414,7 +414,7 @@ func TestNonKeywordSpellingsArePlainIdentifiers(t *testing.T) {
 	mustParse(t, "func f(elseif i32) -> i32 {\n    var await = elseif\n    return await\n}\n")
 }
 
-// --- 用例组 12：Err 末位（红线 2）与 check 位置 -------------------------------------
+// --- 用例组 12：Err 末位与 check 位置 -------------------------------------
 
 func TestErrLastAndCheckPosition(t *testing.T) {
 	mustFail(t, "func f() -> (Err, i32) {\n    return Err(0, \"\"), 1\n}\n", "last result position")
@@ -454,7 +454,7 @@ class C {
 	mustParse(t, "func f(b Box[i32]) {\n}\n")
 }
 
-// --- 用例组 14：多错一次报（红线 14）------------------------------------------------
+// --- 用例组 14：多错一次报------------------------------------------------
 
 func TestMultipleErrorsOneRun(t *testing.T) {
 	// 两个错误分别位于独立函数：恢复停在函数边界，第二次编译报出全部。

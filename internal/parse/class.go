@@ -3,7 +3,7 @@ package parse
 import "strings"
 
 // parseFunc reads a function or method. recv is empty for free functions.
-// 方法一律可读写 this，无 `var func` 之分（核心设计 §四）。
+// 方法一律可读写 this，无 `var func` 之分。
 func (p *Parser) parseFunc(recv string, inClass bool, export, extern bool, bodyOptional bool) Decl {
 	at := p.pos()
 	p.next() // func
@@ -13,7 +13,7 @@ func (p *Parser) parseFunc(recv string, inClass bool, export, extern bool, bodyO
 		Extern:      extern,
 		Pos:         at,
 	}
-	// `init` is a method name, not one of the 23 frozen keywords (核心设计 §一),
+	// `init` is a method name, not one of the 23 frozen keywords ,
 	// so it arrives as an IDENT. init：至多一个、无重载（checker 执行）。
 	if inClass && p.atKind(IDENT) && p.cur().Text == "init" {
 		d.IsInit = true
@@ -52,7 +52,7 @@ func (p *Parser) parseFunc(recv string, inClass bool, export, extern bool, bodyO
 	}
 	p.expect(PUNCT, ")", "function parameter list is missing the closing `)`")
 
-	// Return shape: none / single / `(A, B, Err)` 列表。Err must be last (红线 2).
+	// Return shape: none / single / `(A, B, Err)` 列表。Err must be last .
 	// 注意 `-> (i32) -> i32`：括号可能是**函数类型的形参表**，不是结果列表 ——
 	// 判定 = 配对 `)` 之后紧跟 `->`（此时按单个类型解析）。
 	if p.at(PUNCT, "->") {
@@ -97,7 +97,7 @@ func (p *Parser) parseFunc(recv string, inClass bool, export, extern bool, bodyO
 	return d
 }
 
-// checkErrLast enforces 红线 2 at parse time: Err only in the final slot.
+// checkErrLast enforces at parse time: Err only in the final slot.
 func (p *Parser) checkErrLast(results []Result, at Pos) {
 	for i, r := range results {
 		if !IsErrType(r.Type) {
@@ -121,7 +121,7 @@ func resultText(results []Result) string {
 }
 
 // parseClass reads `class 名字[T] { … }`. v2 无继承、无 implements——
-// 组合 + 接口（核心设计 §四）。
+// 组合 + 接口。
 func (p *Parser) parseClass(export bool) Decl {
 	at := p.pos()
 	p.next() // class
@@ -162,8 +162,8 @@ func (p *Parser) parseClass(export bool) Decl {
 }
 
 // parseStruct 读 `struct Name derive ... implements ... { fields methods }`。
-// struct 是值类型拼写（《AIC 语言规范》§2.3），语言里没有 `@packed` 注解。
-// 实现上复用 class 的解析机构，语义由类型的值/引用二分决定（Packed = 值类型）。
+// struct 是值类型拼写（《AIC 语言规范》§2.3），与 class 的引用语义相对。
+// 实现上复用 class 的解析机构，语义由类型的值/引用二分决定（Struct = 值类型）。
 func (p *Parser) parseStruct(export bool) Decl {
 	at := p.pos()
 	p.next() // struct
@@ -173,7 +173,7 @@ func (p *Parser) parseStruct(export bool) Decl {
 		p.synchronize(false)
 		return nil
 	}
-	d := &ClassDecl{Name: p.next().Text, Pos: at, Packed: true}
+	d := &ClassDecl{Name: p.next().Text, Pos: at, Struct: true}
 	d.Derives = p.parseDerives()
 	if export {
 		p.errorHere(at, "export is only for exporting functions to C", "export struct "+d.Name,
@@ -272,7 +272,7 @@ func (p *Parser) parseClassBody(d *ClassDecl) {
 				d.Methods = append(d.Methods, m)
 			}
 		case p.at(KW, "use"):
-			// N10：`use b B` —— 把 B 的方法提升到本类（上下文关键字，非 24th 关键字）。
+			// `use b B` —— 把 B 的方法提升到本类（上下文关键字，非 24th 关键字）。
 			uat := p.pos()
 			p.next()
 			u := UseDecl{Pos: uat}
@@ -435,7 +435,7 @@ func (p *Parser) parseInterface(export bool) Decl {
 }
 
 // parseEnum reads `enum` with one-level variant names and optional payloads.
-// 无方法、不得递归含自身（checker 执行，核心设计 §二.6/§四）。
+// 无方法、不得递归含自身（checker 执行）。
 func (p *Parser) parseEnum() Decl {
 	at := p.pos()
 	p.next() // enum
@@ -477,7 +477,7 @@ func (p *Parser) parseEnum() Decl {
 				v.Payload = p.parseType()
 				// **多负载不是本语言表面**（设计定案：负载是单值；元组类型不在类型构造子表里）。
 				// 在这里定向报错并给可照做的替代写法，而不是让后面的 expect 报 "missing `)`"
-				// （使用者会以为只是括号写错，见语言规范 §2.6 的反例）。
+				// （使用者会以为只是括号写错，见语言规范反例）。
 				if p.at(PUNCT, ",") {
 					at := p.pos()
 					for p.at(PUNCT, ",") {

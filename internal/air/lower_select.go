@@ -6,7 +6,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// N6 `select` 与 `scope.timeout` 的去糖（核心设计 §16 N6；L3 起为**真等待**）。
+// `select` 与 `scope.timeout` 的去糖（L3 起为**真等待**）。
 //
 // select 的去糖 = 一条 `select.wait` 指令 + 按下标分派：
 //
@@ -24,11 +24,11 @@ import (
 //   - 被取消（scope.timeout / Ctx）→ -2；
 //   - 无就绪、无截止点、无取消且**无人能推进** → trap 死锁（位置 = select 点）；
 //   - 存在 recv 臂且**已无别的存活任务** → 返回该 recv 臂（其 recv 得 (零值,false)，
-//     即 §七【O2】）。
+//     即【O2】）。
 //
 // scope.timeout：与 scope 同形（region.enter/exit + 体），额外发一次
 // `scope_timeout(ms)` 登记截止点（本任务及其后 spawn 的子任务继承；取消点只在
-// AIC 侧等待原语上，C 调用不可取消 —— §15.8 I9），体结束发 `scope_timeout_clear`。
+// AIC 侧等待原语上，C 调用不可取消 —— I9），体结束发 `scope_timeout_clear`。
 // ---------------------------------------------------------------------------
 
 // selectStmt 把 select 降级成 select.wait + 下标分派。

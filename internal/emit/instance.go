@@ -10,7 +10,7 @@ import (
 // ---------------------------------------------------------------------------
 // 泛型实例（T1）与 std option。
 //
-// 名字规则沿用 §八 实例命名：类型 typedef = aic_<pkg>_<T>[_<A1>_…]，
+// 名字规则沿用实例命名：类型 typedef = aic_<pkg>_<T>[_<A1>_…]，
 // 例如 Option[i32] → aic_option_Option_i32。实例登记是**确定性**的（按登记序）。
 //
 // T1 覆盖 enum 实例（Option[T] 是第一个，也是泛型枚举的全部形态）；
@@ -35,7 +35,7 @@ func instPkgName(inst *types.Instance) (string, string) {
 }
 
 // typeSeg 是实例实参的 mangling 段（不是 C 类型名：i32 而非 aic_i32）。
-// 与 §八 类型 typedef 规则同源，禁第二份拼法。
+// 与类型 typedef 规则同源，禁第二份拼法。
 func typeSeg(t types.Type) string {
 	if t == nil {
 		return "t"
@@ -86,7 +86,7 @@ func typeSeg(t types.Type) string {
 	return "t"
 }
 
-// instanceName 按实例命名规则拼出 C 类型名（键与名同源，红线 10）。
+// instanceName 按实例命名规则拼出 C 类型名（键与名同源）。
 func (c *Ctx) instanceName(inst *types.Instance) string {
 	pkg, typ := instPkgName(inst)
 	name := "aic_" + pkg + "_" + typ
@@ -96,7 +96,7 @@ func (c *Ctx) instanceName(inst *types.Instance) string {
 	return name
 }
 
-// registerInstance 登记实例并返回其 C 类型名（同一实例只登记一次 = 实例缓存，红线 11）。
+// registerInstance 登记实例并返回其 C 类型名（同一实例只登记一次 = 实例缓存）。
 func (c *Ctx) registerInstance(inst *types.Instance) string {
 	if inst == nil {
 		return "void"
@@ -125,7 +125,7 @@ func (c *Ctx) emitInstances() {
 		if cl, isClass := e.inst.Base.(*types.Class); isClass {
 			c.line("typedef struct %s %s;", e.name, e.name)
 			c.line("struct %s {", e.name)
-			if !cl.Packed {
+			if !cl.Struct {
 				c.line("    aic_hdr hdr;")
 			}
 			for fi := range cl.Fields {

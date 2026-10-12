@@ -4,7 +4,7 @@ import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
 // 语句检查：作用域/遮蔽、区域偏移与存储点守卫判定（⓪–⑥）、返回摘要、
-// defer、绑定规则（核心设计 §三/§五/§六）。
+// defer、绑定规则。
 // ---------------------------------------------------------------------------
 
 // checkBlock 在新子作用域内检查一个块（内层块可遮蔽外层名；变量声明偏移 =
@@ -54,7 +54,7 @@ func (c *Checker) checkStmt(s parse.Stmt) {
 		// 的 Scope 已在 checkRegionBlock 内管理，这里无需清理。
 	case *parse.SpawnStmt:
 		c.checkStmtOnly(v.Call)
-		// §15.7 规则③：spawn 出去的调用**没有人接它的 Err**（结果不进任何绑定）
+		// 规则③：spawn 出去的调用**没有人接它的 Err**（结果不进任何绑定）
 		// ⇒ 有 Err 位的调用不能被 spawn（要么先处理错误，要么把错误留在任务内处理）。
 		c.rejectUnconsumedErr(v.Call, "spawn", v.Pos)
 	case *parse.ScopeStmt:
@@ -68,7 +68,7 @@ func (c *Checker) checkStmt(s parse.Stmt) {
 // checkRegionBlock: region 块体（偏移在 checkStmt 中已处理）。
 func (c *Checker) checkRegionBlock(b *parse.Block) { c.checkBlock(b) }
 
-// --- 变量声明（含多返回绑定规则，§六） --------------------------------------
+// --- 变量声明（含多返回绑定规则） --------------------------------------
 
 func (c *Checker) checkVarDecl(v *parse.VarDecl) {
 	var declared Type
@@ -111,7 +111,7 @@ func (c *Checker) checkVarDecl(v *parse.VarDecl) {
 		}
 	}
 	if declared == nil {
-		// 推断：字面量取最窄可容纳（§一）
+		// 推断：字面量取最窄可容纳
 		declared = c.inferFromInit(vt, vinfo, tgt.Pos)
 		if declared == nil {
 			return
@@ -124,12 +124,12 @@ func (c *Checker) checkVarDecl(v *parse.VarDecl) {
 	//
 	// **只在初值自身没有类型时补记**：初值已有类型（如 `var s Shape = d` 里的 d
 	// 是具体类 Dog）时必须原样保留 —— 覆盖成声明类型会让 emit 看不出「具体类装进
-	// 接口」这件事，装箱（§四）就发不出去，C 层报 invalid initializer。
+	// 接口」这件事，装箱就发不出去，C 层报 invalid initializer。
 	if v.Init != nil && c.types[v.Init] == nil {
 		c.types[v.Init] = declared
 	}
-	// live 语义（R4）：仅对构造表达式有意义；创建发生在外一层。
-	// R20 起 live 是关键字（`var live x = ...`），诊断文案同步换拼写。
+	// live 语义：仅对构造表达式有意义；创建发生在外一层。
+	// 起 live 是关键字（`var live x = ...`），诊断文案同步换拼写。
 	if tgt.Live {
 		if isStr(declared) || (isValueType(declared) && !containsReference(declared)) {
 			c.errorAt(tgt.Pos, "live is meaningless for value types and str", "live "+tgt.Name,
@@ -146,11 +146,11 @@ func (c *Checker) checkVarDecl(v *parse.VarDecl) {
 
 // declareVar 登记变量。init == nil 表示「无初值表达式」——单目标无初值
 // （var p C）必然 nil，但多返回绑定（var a, err = f()）的接收值来自调用，
-// 属「未证」而非「必 nil」（§九），故由调用方在声明后调用 setCallResultNilState。
+// 属「未证」而非「必 nil」，故由调用方在声明后调用 setCallResultNilState。
 func (c *Checker) declareVar(tgt parse.VarTarget, ty Type, init parse.Expr) {
 	off := c.regionOff
 	if tgt.Live {
-		off-- // live = 外一层创建（R4）；块外 live 由 parse 层约束 + 这里校验
+		off-- // live = 外一层创建；块外 live 由 parse 层约束 + 这里校验
 		if off < 0 {
 			c.errorAt(tgt.Pos, "live is meaningless at the outermost function level (already the task region)", "live "+tgt.Name,
 				"drop live: an object in the task region already lives as long as the task (core design §5 R4)")
@@ -167,7 +167,7 @@ func (c *Checker) declareVar(tgt parse.VarTarget, ty Type, init parse.Expr) {
 	// C22：登记进当前函数的待结算池（读点置 Used，体走完统一结算）。
 	// 形参不入池 —— C22 管的是局部变量，参数未用是合法的。
 	c.unusedVars = append(c.unusedVars, sym)
-	// nil 流证明初始化（§九）
+	// nil 流证明初始化
 	st := &nilState{}
 	if init != nil {
 		if isNilExpr(init) {
@@ -216,7 +216,7 @@ func (c *Checker) checkMultiBind(v *parse.VarDecl, declared Type) {
 	}
 	for i, tgt := range v.Targets {
 		if tgt.Blank {
-			// §15.7 规则③：**有 Err 位的调用结果必须被消费** —— 末位（Err）弃位 = 吞错。
+			// 规则③：**有 Err 位的调用结果必须被消费** —— 末位（Err）弃位 = 吞错。
 			if i == len(v.Targets)-1 && isErr(mt.Elems[i]) {
 				c.errorAt(tgt.Pos, "the Err result must be consumed", "_ = "+exprText(call),
 					"bind it (var v, err = f()) and test it, or propagate with f()? / f()! (core design §15.7 rule 3)")
@@ -224,7 +224,7 @@ func (c *Checker) checkMultiBind(v *parse.VarDecl, declared Type) {
 			continue
 		}
 		c.declareVar(tgt, mt.Elems[i], nil)
-		// 接收位 = 调用产物 → 未证（§九：不因「无初值字面量」误判为必 nil）。
+		// 接收位 = 调用产物 → 未证（不因「无初值字面量」误判为必 nil）。
 		c.nilState[tgt.Name] = &nilState{}
 	}
 	_ = blankCount
@@ -235,7 +235,7 @@ func isNilExpr(e parse.Expr) bool {
 	return ok
 }
 
-// isProvenNonNil: 构造表达式 = 已证非 nil（§九 教条的第一条）。
+// isProvenNonNil: 构造表达式 = 已证非 nil（教条的第一条）。
 func (c *Checker) isProvenNonNil(e parse.Expr) bool {
 	switch v := e.(type) {
 	case *parse.CompositeLit:
@@ -262,7 +262,7 @@ func (c *Checker) checkExprStmt(v *parse.ExprStmt) {
 	case *parse.MultiAssign:
 		c.checkMultiAssign(x)
 	case *parse.CheckExpr:
-		// 独立 check 语句（§六）：传播即可
+		// 独立 check 语句：传播即可
 		c.checkCheckExpr(x, nil)
 	default:
 		// 裸调用语句。
@@ -332,7 +332,7 @@ func (c *Checker) checkAssign(v *parse.Assign) {
 	}
 }
 
-// markVarStore: 变量槽赋值的守卫判定（存储点 ⓪，R0c-② F1）。
+// markVarStore: 变量槽赋值的守卫判定（存储点 ⓪，R0c-②）。
 func (c *Checker) markVarStore(value parse.Expr, sym *Symbol, name string) {
 	c.markVarStoreAt(value, value, sym, name)
 }
@@ -347,12 +347,12 @@ func (c *Checker) markVarStoreAt(value parse.Expr, markNode parse.Expr, sym *Sym
 	if isValueType(vt) && !containsReference(vt) {
 		return
 	}
-	// 形参派生值写**本函数局部变量**恒安全（参数定理，§五 R3）；但目标更浅时仍要判。
+	// 形参派生值写**本函数局部变量**恒安全（参数定理）；但目标更浅时仍要判。
 	if vb.off <= sym.DeclOffset {
 		return
 	}
 	if vb.exact {
-		// N1 闭包捕获的引用更具体：报"捕获的引用活得没闭包久"，并指向捕获点。
+		// 闭包捕获的引用更具体：报"捕获的引用活得没闭包久"，并指向捕获点。
 		if ft, isFn := vt.(*FuncT); isFn && ft.HasRefCapture() {
 			c.errorAt(parse.ExprPos(value), "closure captures a reference that does not outlive the closure",
 				"the closure is created at depth "+itoa(vb.off)+", variable "+name+" lives at depth "+itoa(sym.DeclOffset),
@@ -416,7 +416,7 @@ func (c *Checker) checkFieldStore(v *parse.Assign, lhs *parse.Field, rhs Type, r
 		return
 	}
 	c.requireAssignableAt(v.Right, rhs, rinfo, ft, "field "+lhs.Name)
-	// 存储点 ①：目标深度 = 宿主对象深度；@packed 赋值即拷贝（值语义）
+	// 存储点 ①：目标深度 = 宿主对象深度；struct 赋值即拷贝（值语义）
 	ownerBound := bound{off: c.regionOff}
 	if thisExpr, isThis := lhs.X.(*parse.ThisExpr); isThis {
 		_ = thisExpr
@@ -486,7 +486,7 @@ func (c *Checker) checkStmtOnly(e parse.Expr) {
 }
 
 // checkMultiAssign: a, err = f()——名字必须全部已存在（_ 弃位除外），
-// 混搭 = 编译错，数量与被调返回一致（核心设计 §六 绑定规则）。
+// 混搭 = 编译错，数量与被调返回一致（绑定规则）。
 func (c *Checker) checkMultiAssign(v *parse.MultiAssign) {
 	ct, _, _ := c.checkExprFull(v.Right, nil)
 	mt, isMulti := ct.(*MultiType)
@@ -509,7 +509,7 @@ func (c *Checker) checkMultiAssign(v *parse.MultiAssign) {
 			continue
 		}
 		if id.Name == "_" {
-			// §15.7 规则③：末位（Err）弃位 = 吞错（赋值形态，与声明形态同一判据）。
+			// 规则③：末位（Err）弃位 = 吞错（赋值形态，与声明形态同一判据）。
 			if i == len(v.LHS)-1 && isErr(mt.Elems[i]) {
 				c.errorAt(parse.ExprPos(lhs), "the Err result must be consumed", "_ = "+exprText(v.Right),
 					"bind it (v, err = f()) and test it, or propagate with f()? / f()! (core design §15.7 rule 3)")
@@ -523,7 +523,7 @@ func (c *Checker) checkMultiAssign(v *parse.MultiAssign) {
 			continue
 		}
 		c.requireAssignableAt(v.Right, mt.Elems[i], untyped{}, sym.Type, "assigned to "+id.Name)
-		// 存储点 ⑤（§五 R3）：多返回解构接收 —— 调用结果界 = 调用点偏移 + 被调返回摘要，
+		// 存储点 ⑤：多返回解构接收 —— 调用结果界 = 调用点偏移 + 被调返回摘要，
 		// 目标变量更浅时必须插守卫。不插守卫会让 `region { a, b = mk(1) }`
 		// （a/b 声明在块外）静默把块内对象写进更浅的槽，弹出后读到别的对象。
 		// 守卫标记挂在**目标名节点**上（每个目标一个键，互不覆盖），发射侧按名取用。

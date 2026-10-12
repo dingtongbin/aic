@@ -3,7 +3,7 @@ package types
 import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
-// 可赋值性（核心设计 §二.4：无隐式转换，唯一例外 = 未类型化字面量的范围证明
+// 可赋值性（无隐式转换，唯一例外 = 未类型化字面量的范围证明
 // 与下标/for-in 计数位的任意整型）。
 // ---------------------------------------------------------------------------
 
@@ -25,7 +25,7 @@ func (c *Checker) requireAssignableAt(value parse.Expr, vt Type, vinfo untyped, 
 		return
 	}
 	if isUntypedNil(vinfo) {
-		// nil = 全类型零值（§二.3）：任何类型可赋
+		// nil = 全类型零值：任何类型可赋
 		return
 	}
 	if vt == nil {
@@ -40,9 +40,9 @@ func (c *Checker) requireAssignableAt(value parse.Expr, vt Type, vinfo untyped, 
 	if en, isEn := vt.(*Enum); isEn && en.ErrCode && isErr(target) {
 		return
 	}
-	// interface 装箱（§四 结构化满足）：类 → 接口，方法签名集完全匹配即可赋值。
-	// 无 implements 关键字：满足关系完全由方法签名决定（红线 1 的又一处例外位，
-	// 但它是**装箱**不是隐式数值转换，与 §二.4 不冲突）。
+	// interface 装箱（结构化满足）：类 → 接口，方法签名集完全匹配即可赋值。
+	// 无 implements 关键字：满足关系完全由方法签名决定（又一处例外位，
+	// 但它是**装箱**不是隐式数值转换，与不冲突）。
 	if ifc, isIfc := target.(*Interface); isIfc {
 		if cl, isCl := vt.(*Class); isCl {
 			if miss, ok := satisfies(cl, ifc); ok {
@@ -56,7 +56,7 @@ func (c *Checker) requireAssignableAt(value parse.Expr, vt Type, vinfo untyped, 
 		}
 		// 接口 → 接口：**收窄**（目标方法集 ⊆ 源）在设计上是合法的（同一 data 指针 +
 		// 目标见证表），但见证表按 (接口, 具体类) 配对、运行期不知道具体类 ⇒ 需要
-		// "类 → 各接口见证表"的运行期映射（§十二 R11，随阶段 O/S 落地）。
+		// "类 → 各接口见证表"的运行期映射（随阶段 O/S 落地）。
 		// 现在必须给出**可照做**的修复，而不是指向不存在的 `A(big)` 转换。
 		if src, isSrc := vt.(*Interface); isSrc {
 			if miss, subset := ifaceSubset(src, ifc); subset {
@@ -97,7 +97,7 @@ func conversionFix(target Type, value parse.Expr) string {
 	switch t := target.(type) {
 	case *Basic:
 		if t.Name == "str" {
-			return "convert explicitly first: str.fromI64 / str.fromF64 / str.fromBool, or give the type @derive(ToString) (red line 1)"
+			return "convert explicitly first: str.fromI64 / str.fromF64 / str.fromBool, or give the type derive ToString (red line 1)"
 		}
 		return "convert explicitly first: " + target.String() + "(" + exprText(value) + ") (red line 1)"
 	case *Slice, *MapT, *SetT, *ArrayT, *Instance, *FuncT:
@@ -105,7 +105,7 @@ func conversionFix(target Type, value parse.Expr) string {
 	return "no conversion exists for " + target.String() + ": build the value explicitly (a composite literal, a constructor, or a field-by-field copy) (red line 1)"
 }
 
-// satisfies 判定类是否满足接口（结构化满足，§四）：接口的每个方法都要在类里有
+// satisfies 判定类是否满足接口（结构化满足）：接口的每个方法都要在类里有
 // **签名完全一致**的实现。多出的方法不影响满足关系。
 // 返回 (缺失/不匹配的方法说明, 是否满足)。
 func satisfies(cl *Class, ifc *Interface) (string, bool) {
@@ -152,7 +152,7 @@ func Satisfies(cl *Class, ifc *Interface) bool {
 	return ok
 }
 
-// InterfaceSlots 返回接口方法的声明序槽位（§十：槽位号 = 声明序）。
+// InterfaceSlots 返回接口方法的声明序槽位（槽位号 = 声明序）。
 // 顺序取自 Methods 的声明序——由 collectInterface 按声明序登记，故这里按
 // 接口声明重建：调用方传 nil 时返回名字排序（确定性兜底）。
 func InterfaceSlots(ifc *Interface) []string { return ifc.slotOrder() }

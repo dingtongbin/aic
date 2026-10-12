@@ -17,17 +17,17 @@ const (
 	EOF   = "EOF"
 )
 
-// Parser is a hand-written single-pass LL parser (核心设计 §三: 单遍、无回溯).
+// Parser is a hand-written single-pass LL parser (单遍、无回溯).
 // On a syntax error it records the diagnostic, resynchronises at the next
 // statement or declaration boundary and keeps going, so one run reports all
-// errors rather than stopping at the first (红线#16).
+// errors rather than stopping at the first (红线).
 type Parser struct {
 	file   string
 	toks   []Token
 	i      int
 	Errors []ParseError
 
-	scopeDepth  int // >0 inside `scope { }` — spawn requires it (红线 5)
+	scopeDepth  int // >0 inside `scope { }` — spawn requires it 
 	noComposite int // >0 inside a condition — `{` opens a body, never C{…}
 }
 
@@ -107,7 +107,7 @@ func itoa(n int) string {
 }
 
 // ParseError is one collected syntax diagnostic in the frozen three-part shape
-// (H5 / 核心设计 §六).
+// (H5 ).
 type ParseError struct {
 	Pos     Pos
 	Desc    string
@@ -250,7 +250,7 @@ func (p *Parser) expect(kind, text, fix string) bool {
 }
 
 // synchronize skips to the next statement or declaration boundary so parsing
-// can continue after an error (核心设计 §三: 跳到下一个语句边界继续报).
+// can continue after an error (跳到下一个语句边界继续报).
 func (p *Parser) synchronize(stopAtBrace bool) {
 	start := p.i
 	p.synchronizeInner(stopAtBrace)

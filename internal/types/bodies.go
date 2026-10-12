@@ -55,10 +55,10 @@ func (c *Checker) checkOneFunc(v *parse.FuncDecl, sig *FuncSig) {
 	if sig.Recv != "" {
 		c.thisClass = c.classes[sig.Recv]
 	}
-	// **类型参数在函数/方法体内有效**（核心设计 §四 泛型）：`func dup[T](x T) -> T { var y T = x }`
+	// **类型参数在函数/方法体内有效**（泛型）：`func dup[T](x T) -> T { var y T = x }`
 	// 里的 T 必须解析成类型参数 —— 只在**签名**解析时安装（checker.go）会让
 	// 泛型函数体里任何 `T` 都报"未知类型名"，泛型基本写不出可用代码。
-	// 方法体继承接收类的类型参数（方法不得自带类型参数，§四）。
+	// 方法体继承接收类的类型参数（方法不得自带类型参数）。
 	c.typeParams = typeParamSet(v.TypeParams)
 	if c.typeParams == nil {
 		c.typeParams = map[string]bool{}
@@ -75,7 +75,7 @@ func (c *Checker) checkOneFunc(v *parse.FuncDecl, sig *FuncSig) {
 	c.nilState = map[string]*nilState{}
 	c.regionOff = 0
 
-	// 参数 = 函数体块的既有名（核心设计 §三）：声明进体块作用域。
+	// 参数 = 函数体块的既有名：声明进体块作用域。
 	for i, p := range sig.Params {
 		sym := &Symbol{Kind: SymVar, Name: p, Type: sig.ParamTypes[i], DeclOffset: 0, Param: true}
 		if !c.scope.Declare(sym) {
@@ -106,7 +106,7 @@ func (c *Checker) checkOneFunc(v *parse.FuncDecl, sig *FuncSig) {
 			"add a return (the Err slot takes nil); or drop the result type")
 	}
 
-	// main 特判：入口 func main() -> Err 或无返回（§四）
+	// main 特判：入口 func main() -> Err 或无返回
 	if sig.Name == "main" && sig.Recv == "" && len(sig.Results) > 1 {
 		c.errorAt(v.Pos, "main returns at most one Err", "func main() -> (…)",
 			"write func main() -> Err or func main() (core design §4)")
@@ -165,7 +165,7 @@ func (c *Checker) checkBlockScoped(b *parse.Block) {
 	c.scope = saved
 }
 
-// literalDefault: 未类型化字面量在无目标类型时的默认定型（§一 最窄可容纳）。
+// literalDefault: 未类型化字面量在无目标类型时的默认定型（最窄可容纳）。
 func (c *Checker) literalDefault(info untyped, at parse.Pos) Type {
 	switch info.kind {
 	case unInt:
@@ -185,7 +185,7 @@ func (c *Checker) literalDefault(info untyped, at parse.Pos) Type {
 	return nil
 }
 
-// inferFromInit: var x = e 的推断（§一 字面量取最窄；无类型可推 = 报错）。
+// inferFromInit: var x = e 的推断（字面量取最窄；无类型可推 = 报错）。
 func (c *Checker) inferFromInit(vt Type, info untyped, at parse.Pos) Type {
 	if info.kind != unNone && info.kind != unNil {
 		switch info.kind {

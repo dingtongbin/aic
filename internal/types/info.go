@@ -7,12 +7,12 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Info —— 检查结果的只读视图，供 internal/emit 消费（核心设计 §十：emit 是
+// Info —— 检查结果的只读视图，供 internal/emit 消费（emit 是
 // AST → C 的纯函数；它需要的语义事实全部来自这里，不在 emit 里重做一遍）。
 //
 // 为什么要有这一层：类型模型与作用域事实（哪个名字是局部/参数、哪个名字是
 // 用户函数、类型实参）只有在检查器内才完整可见；emit 若自带一份作用域重建，
-// 就成了「两处各写一份」（红线 10 的同款病）。本层只读、不产生新语义。
+// 就成了「两处各写一份」（同款病）。本层只读、不产生新语义。
 // ---------------------------------------------------------------------------
 
 // Info 是不可变的检查产物视图。
@@ -34,18 +34,18 @@ type Info struct {
 	Classes    map[string]*Class
 	Interfaces map[string]*Interface
 	Enums      map[string]*Enum
-	// Imported 是 import 过的包名集合（std 面见 §十四）。
+	// Imported 是 import 过的包名集合（std 面见）。
 	Imported map[string]bool
 	// mainHasErr 记录入口是否有 Err 位。
 	MainHasErr bool
 	// FuncInsts 是泛型函数实例表（单态化的工作单元；键 = 函数 + 实参类型）。
 	FuncInsts []FuncInst
-	// Closures 是闭包字面量的捕获表（N1：键 = LambdaExpr 节点，值 = 捕获项名，
+	// Closures 是闭包字面量的捕获表（键 = LambdaExpr 节点，值 = 捕获项名，
 	// 按首次出现序）。AIR 降级按它建环境结构体 —— 禁第二份自由变量分析。
 	Closures map[parse.Expr][]string
 	// CapRefs 记录闭包体内每一次捕获引用（标识符节点 → 环境槽号）。
 	CapRefs map[parse.Expr]int
-	// Comptime 是编译期内省原语的折叠结果（N4）。
+	// Comptime 是编译期内省原语的折叠结果。
 	Comptime map[parse.Expr]ComptimeVal
 	// ArrayLens 是 [T;N] 的 N 折出来的长度（键 = N 表达式节点）。emit 必须按**同一份**
 	// 结果发 C 数组维度：自己再折一遍只认字面量与 const 名，`[i32; sizeOf(i32)]` 会发成 `[0]`。
@@ -56,10 +56,10 @@ type Info struct {
 	CallTypeArgs map[parse.Expr][]Type
 }
 
-// ComptimeVal 是一次编译期内省（N4）的折叠结果。
+// ComptimeVal 是一次编译期内省的折叠结果。
 //   Kind = "typeName" | "sizeOf" | "isValueType"
 //   Ty   = 实参类型（sizeOf 在 C 侧用 sizeof(Ty) 现算真尺寸）
-//   Const= 折叠值；sizeOf 对 @packed/[T;N] 不可折（ConstNone），由 C 的 sizeof 承担
+//   Const= 折叠值；sizeOf 对 struct/[T;N] 不可折（ConstNone），由 C 的 sizeof 承担
 type ComptimeVal struct {
 	Kind  string
 	Ty    Type
@@ -93,7 +93,7 @@ func (i *Info) Captures(e parse.Expr) []string {
 }
 
 // LookupType 返回表达式节点的检查类型；未定型字面量返回 nil（调用方用上下文
-// 期望类型定夺——字面量的取值本来由上下文决定，§一 最窄可容纳）。
+// 期望类型定夺——字面量的取值本来由上下文决定， 最窄可容纳）。
 func (i *Info) LookupType(e parse.Expr) Type {
 	if i == nil || e == nil {
 		return nil
@@ -130,7 +130,7 @@ func FuncKey(recv, name string) string {
 	return recv + "." + name
 }
 
-// HasErrResult 报告末位是否为 Err（§六：Err 只允许出现在返回类型最末位）。
+// HasErrResult 报告末位是否为 Err（Err 只允许出现在返回类型最末位）。
 // emit 用它决定是否需要在每个出口构造 Err 值、以及 check 的传播形态。
 func (sig *FuncSig) HasErrResult() bool {
 	if sig == nil || len(sig.Results) == 0 {
@@ -238,10 +238,10 @@ func InstanceParts(t Type) (Type, []Type, bool) {
 	return nil, nil, false
 }
 
-// IsPacked 报告类是否 @packed（值语义 = C struct）。
-func IsPacked(t Type) bool {
+// IsStruct 报告类是否 struct（值语义 = C struct）。
+func IsStruct(t Type) bool {
 	if cl, ok := t.(*Class); ok {
-		return cl.Packed
+		return cl.Struct
 	}
 	return false
 }
@@ -345,8 +345,8 @@ func (c *Checker) NoteLocal(key, name string) {
 
 func (c *Checker) buildInfo() *Info {
 	info := &Info{
-		// 包名 = 源文件所在目录名（目录即包，§四）。唯一所有者在这里，
-		// emit 只读它：两处各算一次包名 = 红线 10 的同款病（mangling 会分叉）。
+		// 包名 = 源文件所在目录名（目录即包）。唯一所有者在这里，
+		// emit 只读它：两处各算一次包名 = 同款病（mangling 会分叉）。
 		Pkg:        c.pkg,
 		Locals:     c.locals,
 		Types:      c.types,
@@ -371,7 +371,7 @@ func (c *Checker) buildInfo() *Info {
 	return info
 }
 
-// pkgNameFromPath 取目录名作包名（目录即包，核心设计 §四 可见性）。
+// pkgNameFromPath 取目录名作包名（目录即包， 可见性）。
 func pkgNameFromPath(path string) string {
 	p := strings.ReplaceAll(path, "\\", "/")
 	i := strings.LastIndex(p, "/")

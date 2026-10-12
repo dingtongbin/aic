@@ -1,9 +1,9 @@
 package parse
 
-// match 模式与 check 位置规则（核心设计 §三/§六）。
+// match 模式与 check 位置规则。
 
 // parsePatterns reads the single pattern of a match arm. 模式一层、无通配符
-// (核心设计 §三)；或模式不存在，遇到即定向报错（更严方向）。
+// ；或模式不存在，遇到即定向报错（更严方向）。
 func (p *Parser) parsePatterns() []MatchPattern {
 	pat := p.parsePattern()
 	if p.at(PUNCT, "|") {
@@ -57,7 +57,7 @@ func (p *Parser) parsePattern() MatchPattern {
 }
 
 // hasCheckExpr reports whether e contains a check expression at any depth —
-// const 初始化禁 check (核心设计 §六).
+// const 初始化禁 check .
 func hasCheckExpr(e Expr) bool {
 	found := false
 	walkCheckCollect(e, &found)
@@ -110,7 +110,7 @@ func walkCheckCollect(e Expr, found *bool) {
 }
 
 // validateBlankValues rejects `_` outside binding-target positions: `_` 不是
-// 值 (核心设计 §六). inTarget marks the LHS targets of a multi-assign.
+// 值 . inTarget marks the LHS targets of a multi-assign.
 func (p *Parser) validateBlankValues(e Expr, inTarget bool) {
 	if e == nil {
 		return
@@ -188,7 +188,7 @@ func (p *Parser) validateBlankValues(e Expr, inTarget bool) {
 	}
 }
 
-// validateCheckPosition enforces the v2 check position rule (核心设计 §六):
+// validateCheckPosition enforces the v2 check position rule:
 // `check` legal at the outermost position of a var initializer or a standalone
 // statement, and anywhere inside a lambda body (check 在 lambda 内 = 从
 // lambda 返回). Nested inside a larger expression otherwise = 编译错误.

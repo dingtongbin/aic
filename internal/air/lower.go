@@ -1,13 +1,13 @@
-// AST → AIR（核心设计 §十 阶段 4「去糖」；检查点 = air）。
+// AST → AIR（阶段 4「去糖」；检查点 = air）。
 //
 // 本文件负责**结构**：模块 / 类型表 / 函数骨架 / 直线语句 / 控制流；
 // 表达式到值的提升（含副作用子表达式的 let 化）在 lower_expr.go。
 //
 // 去糖规则（§10.1）：
-//   - 每函数 = 入口块 + 若干块 + **唯一收尾块**（V4.4：全部 ret 先 br 到收尾块）；
+//   - 每函数 = 入口块 + 若干块 + **唯一收尾块**（全部 ret 先 br 到收尾块）；
 //   - `if` → cbr；`for`（三形态）→ 块 + br/cbr；`region` → region.enter/exit；
 //   - 赋值 → `store`（守卫由检查器 GuardSpec 决定，是 store 的**修饰符**）；
-//   - 创建表达式 → `alloc`（唯一分配来源；@live → alloc live）；
+//   - 创建表达式 → `alloc`（唯一分配来源；live → alloc live）；
 //   - 有副作用的子表达式一律提升为独立 `let`（求值顺序由语句序编码，§10.1）。
 package air
 
@@ -117,7 +117,7 @@ func (l *lowerer) ty(t types.Type) string { return tyText(l.sub(t)) }
 
 // typeOf 查一个表达式的类型（实例上下文下先代换）。
 //
-// 未定型字面量检查器不给类型（§一：定宽推迟到使用点），但**方法调用**要用接收者类型
+// 未定型字面量检查器不给类型（定宽推迟到使用点），但**方法调用**要用接收者类型
 // （`"abc".len()`）：这里补一条与 types.LiteralTy 同源的兜底，否则接收者类型为 nil，
 // 降级只能落到 `unknown` 这种不可执行的符号（685/717 语料实测）。
 func (l *lowerer) typeOf(e parse.Expr) types.Type {
@@ -139,6 +139,14 @@ func (l *lowerer) typeOf(e parse.Expr) types.Type {
 			return types.TI64
 		}
 		return types.TI32
+	case *parse.Unary:
+		// 一元修饰不改类型：`-7` 是整型、`(-3.5).abs()` 的接收者是 f64、
+		// `!ok` 是 bool。少这一条会让**带括号的负数字面量上的方法调用**
+		// 取不到接收者类型 ⇒ 符号落 "unknown"（029：`(-3.5).abs()` 实测）。
+		if v.Op == "!" {
+			return types.TBool
+		}
+		return l.typeOf(v.X)
 	}
 	return nil
 }
@@ -160,15 +168,15 @@ type lowerer struct {
 	deferErr bool
 	depth    int // 当前 region 嵌套深度（守卫 limit 的计算依据）
 	loops    []loopCtx
-	// blockVars 记录每个 AIR 块里已声明的变量名（V2.6 的判据源）。循环变量若与
+	// blockVars 记录每个 AIR 块里已声明的变量名（判据源）。循环变量若与
 	// **同一块**里的外层变量同名 ⇒ 重命名成 fresh 名并走 loopAlias 改写体内引用
-	// （审计 D1：`var v i64 = 1; for v in xs` 旧行为 = V2.6 误报"重复声明"）。
+	// （审计 D1：`var v i64 = 1; for v in xs` 旧行为 = 误报"重复声明"）。
 	// 只在真冲突时改名 ⇒ 无冲突程序的 IR 快照不动（H8）。
 	blockVars  map[*Block]map[string]bool
 	loopAlias  map[string]string
 	renameSeq  int
 	lamSeq   int // lambda 提升编号（确定性）
-	// envCur 非空 = 正在降级一个闭包体：捕获引用读 `field envCur, <槽>`（N1）。
+	// envCur 非空 = 正在降级一个闭包体：捕获引用读 `field envCur, <槽>`。
 	envCur string
 	// instParams/instArgs 非空 = 正在降级一个泛型**实例**（mair 层）：类型先代换再渲染。
 	instParams []string
@@ -211,7 +219,7 @@ func (l *lowerer) emitInstanceTypes() {
 			return
 		}
 		seen[key{sym}] = true
-		td := &TypeDecl{Sym: sym, Kind: "struct", Packed: cl.Packed}
+		td := &TypeDecl{Sym: sym, Kind: "struct", Struct: cl.Struct}
 		for i := range cl.Fields {
 			ft := types.Subst(cl.Fields[i].Type, cl.TypeParams, inst.Args)
 			td.Fields = append(td.Fields, Field{Idx: i, Name: cl.Fields[i].Name, Ty: tyText(ft)})
@@ -251,7 +259,7 @@ func (l *lowerer) types() error {
 				continue // 实例声明由 emitInstanceTypes 发（下面）
 			}
 		}
-		td := &TypeDecl{Sym: mangleType(cl.Pkg, cl.Name), Kind: "struct", Packed: cl.Packed}
+		td := &TypeDecl{Sym: mangleType(cl.Pkg, cl.Name), Kind: "struct", Struct: cl.Struct}
 		for i := range cl.Fields {
 			td.Fields = append(td.Fields, Field{Idx: i, Name: cl.Fields[i].Name, Ty: l.ty(cl.Fields[i].Type)})
 		}
@@ -322,14 +330,14 @@ func (l *lowerer) funcDecl(d *parse.FuncDecl, recv string) error {
 	entry := l.newBlock("entry", d.Pos)
 	f.Blocks = append(f.Blocks, entry)
 	saved := l.begin(f, entry, d.Pos)
-	// V2.6 判据源：形参 / this / 返回槽都住在入口块
+	// 判据源：形参 / this / 返回槽都住在入口块
 	for _, p := range f.Params {
 		l.noteBlockVar(p.Name)
 	}
 	for i := range f.Rets {
 		l.noteBlockVar(fmt.Sprintf("ret%d", i))
 	}
-	// 返回槽（§10.1 V4.4）：全部出口先 store 进槽再 br 到唯一收尾块，
+	// 返回槽（§10.1）：全部出口先 store 进槽再 br 到唯一收尾块，
 	// 收尾块统一 ret —— 无 phi 也满足「每临时量恰定义一次」。
 	for i, r := range f.Rets {
 		entry.Insts = append(entry.Insts, &Var{Name: fmt.Sprintf("ret%d", i), Ty: r, Loc: LocOf(d.Pos)})
@@ -337,7 +345,7 @@ func (l *lowerer) funcDecl(d *parse.FuncDecl, recv string) error {
 	if err := l.block(d.Body); err != nil {
 		return err
 	}
-	// 体末落空（无 return）= 隐式落到唯一收尾块（V2.1：每块恰一个终结符）。
+	// 体末落空（无 return）= 隐式落到唯一收尾块（每块恰一个终结符）。
 	if l.cur.Term == nil {
 		l.cur.Term = &Br{Label: l.exitLabel, Loc: LocOf(d.Pos)}
 	}
@@ -388,7 +396,7 @@ func (l *lowerer) airVarName(src string) string {
 	return src
 }
 
-// noteBlockVar 记录一个变量声明落在当前块（V2.6 的判据源；参数与返回槽在入口块）。
+// noteBlockVar 记录一个变量声明落在当前块（判据源；参数与返回槽在入口块）。
 func (l *lowerer) noteBlockVar(name string) {
 	if name == "" {
 		return
@@ -400,7 +408,7 @@ func (l *lowerer) noteBlockVar(name string) {
 }
 
 // loopVarName 取循环变量在 AIR 里的名字：与当前块已有变量同名时重命名
-// （源级遮蔽合法，但 AIR 的 Var 全落在同块会被 V2.6 误报），并登记 loopAlias
+// （源级遮蔽合法，但 AIR 的 Var 全落在同块会被误报），并登记 loopAlias
 // 供循环体里的引用改写。返回值 = AIR 名。
 func (l *lowerer) loopVarName(src string, wantAlias bool) string {
 	if src == "" || src == "_" {
@@ -429,8 +437,8 @@ func (l *lowerer) unaliasLoopVar(src, airName string) {
 	}
 }
 
-// finish 发射唯一收尾块：全部出口先 br 到它（V4.4），由它执行 ret；
-// 同时**剪掉不可达块**（V2.3：全路径 return 之后的延续代码是死代码，直接丢弃）。
+// finish 发射唯一收尾块：全部出口先 br 到它，由它执行 ret；
+// 同时**剪掉不可达块**（全路径 return 之后的延续代码是死代码，直接丢弃）。
 func (l *lowerer) finish(f *Func, at parse.Pos) {
 	l.pruneUnreachable(f)
 	exit := &Block{Label: l.exitLabel, Loc: LocOf(at)}
@@ -456,10 +464,10 @@ func (l *lowerer) finish(f *Func, at parse.Pos) {
 	f.Blocks = append(f.Blocks, exit)
 }
 
-// pruneUnreachable 剪掉从入口不可达的块（V2.3）。lowering 收尾时调用。
+// pruneUnreachable 剪掉从入口不可达的块。lowering 收尾时调用。
 func (l *lowerer) pruneUnreachable(f *Func) { PruneUnreachable(f) }
 
-// PruneUnreachable 剪掉从入口不可达的块（V2.3）。
+// PruneUnreachable 剪掉从入口不可达的块。
 //
 // **要跑两次**（§13.1 管线的必然要求，不是补丁）：
 //  1. lowering 收尾：此时 IR-1 原语的分发 Switch 还不存在，只能按
@@ -545,7 +553,7 @@ func (l *lowerer) stmt(s parse.Stmt) error {
 	case *parse.VarDecl:
 		return l.varDecl(v)
 	case *parse.ExprStmt:
-		// 赋值在 AIC 里是表达式（§三），但只能作语句用（赋值非表达式值）
+		// 赋值在 AIC 里是表达式，但只能作语句用（赋值非表达式值）
 		switch x := v.X.(type) {
 		case *parse.Assign:
 			return l.assign(x)
@@ -567,7 +575,7 @@ func (l *lowerer) stmt(s parse.Stmt) error {
 	case *parse.ForStmt:
 		return l.forStmt(v)
 	case *parse.Block:
-		// 嵌套源块 → 新 AIR 块：遮蔽由块结构显式化（V2.6 的本意）。
+		// 嵌套源块 → 新 AIR 块：遮蔽由块结构显式化（本意）。
 		inner := l.newBlock("scope", v.Pos)
 		l.cur.Term = &Br{Label: inner.Label, Loc: LocOf(v.Pos)}
 		l.cur = inner
@@ -661,7 +669,7 @@ func (l *lowerer) assign(v *parse.Assign) error {
 	}
 	st := &Store{Place: place, Val: val, Loc: LocOf(v.Pos)}
 	// 守卫标记挂在**值表达式**上（与 emit 的 emitGuardStore(value, target, delta) 同源），
-	// 故先看 RHS；LHS 形态只在少数位置带标记（容器方法的实参即语义宿主，§五 R3）。
+	// 故先看 RHS；LHS 形态只在少数位置带标记（容器方法的实参即语义宿主）。
 	g, ok := l.info.HasGuard(v.Right)
 	if !ok {
 		g, ok = l.info.HasGuard(v.LHS)
@@ -673,7 +681,7 @@ func (l *lowerer) assign(v *parse.Assign) error {
 	return nil
 }
 
-// ret：先算出返回值临时量，再 br 到唯一收尾块（V4.4）。
+// ret：先算出返回值临时量，再 br 到唯一收尾块。
 func (l *lowerer) ret(v *parse.ReturnStmt) error {
 	for i, r := range v.Results {
 		// **return 位自动传播**（§5.6）：`return f()` 里 f() 是 fallible 调用时
@@ -694,7 +702,7 @@ func (l *lowerer) ret(v *parse.ReturnStmt) error {
 		if l.fn != nil && i < len(l.fn.Rets) {
 			val = l.coerce(val, r, l.fn.Rets[i])
 		}
-		// 写进返回槽（入口块声明的那一个），不产生新定义（V2.5）。
+		// 写进返回槽（入口块声明的那一个），不产生新定义。
 		l.cur.Insts = append(l.cur.Insts, &Store{
 			Place: &VarPlace{Name: fmt.Sprintf("ret%d", i)}, Val: val, Loc: LocOf(v.Pos)})
 	}
@@ -830,7 +838,7 @@ func (l *lowerer) rangeFor(v *parse.ForStmt) error {
 	return nil
 }
 
-// regionStmt：region.enter / region.exit（与作用域严格配对，V3.1）。
+// regionStmt：region.enter / region.exit（与作用域严格配对）。
 func (l *lowerer) regionStmt(v *parse.RegionStmt) error {
 	l.depth++
 	l.cur.Insts = append(l.cur.Insts, &RegionEnter{TypeID: l.tmp("r"), Loc: LocOf(v.Pos)})
@@ -842,7 +850,7 @@ func (l *lowerer) regionStmt(v *parse.RegionStmt) error {
 	return nil
 }
 
-// deferStmt：defer.reg / defer.init（注册点求值）；onErr = N8 的 errdefer
+// deferStmt：defer.reg / defer.init（注册点求值）；onErr = errdefer
 // （同一个栈，只是只在因 Err 返回时执行）。
 //
 // 被调者与实参**都在这里定下来**：后端只按 `Callee(Vals…)` 发一个薄 trampoline +
@@ -891,7 +899,7 @@ func (l *lowerer) deferStmt(v *parse.DeferStmt, onErr bool) error {
 }
 
 // guardLimitOf 取一个表达式上的存储点守卫的 IR limit 文本（没有守卫 = 空串）。
-// defer/errdefer 实参的界 ≤ 函数入口（§五 R5），检查器把 GuardDefer 标在实参
+// defer/errdefer 实参的界 ≤ 函数入口，检查器把 GuardDefer 标在实参
 // 节点上；降级侧必须查它，否则守卫从未发出（781：defer 退出时读已弹出的区域）。
 func (l *lowerer) guardLimitOf(e parse.Expr) string {
 	if g, ok := l.info.HasGuard(e); ok {
@@ -913,7 +921,7 @@ func (l *lowerer) deferVal(e parse.Expr) (string, error) {
 	}
 	lit := strings.TrimPrefix(val, "const ")
 	// 类型：检查器有记录就用它（`const 3` 在 `f(x i64)` 位上是 i64 还是 i32 由语义定），
-	// 没有记录（未定型字面量）才按 §一 的最窄规则定 —— 同一条规则由 types 持有。
+	// 没有记录（未定型字面量）才按最窄规则定 —— 同一条规则由 types 持有。
 	ty := types.LiteralTy(lit)
 	if t := l.typeOf(e); t != nil {
 		ty = l.ty(t)
@@ -926,10 +934,10 @@ func (l *lowerer) deferVal(e parse.Expr) (string, error) {
 }
 
 // methodRecv 报告 `x.m(…)` 的 x 是否是"值接收者"（方法调用：接收者当首实参）。
-// 与调用降级用**同一条**判定（红线 10：两处各自判断迟早会分叉）。
+// 与调用降级用**同一条**判定（两处各自判断迟早会分叉）。
 //
 // **标量接收者也算**：语言面标量没有任何内建方法，故出现在标量上的方法调用只有
-// 一种可能 = N3 约束授权的方法（`[T: Ord]` 的 a.compare(b)）。它们同样把接收者
+// 一种可能 = 约束授权的方法（`[T: Ord]` 的 a.compare(b)）。它们同样把接收者
 // 当首实参（约束签名 compare(other) 之外隐含 this）—— 漏了这条，实例降级会把
 // `a.compare(b)` 发成 `opaque_compare(b)`（少一个实参，762 实测）。
 func (l *lowerer) methodRecv(x parse.Expr) bool {
@@ -997,7 +1005,7 @@ func (l *lowerer) placeType(e parse.Expr) string {
 	return "i32"
 }
 
-// limitOf 把检查器 GuardSpec 翻成文法里的 <limit>（V5.2：形态与目标种类匹配）。
+// limitOf 把检查器 GuardSpec 翻成文法里的 <limit>（形态与目标种类匹配）。
 // limitOf 把检查器的守卫标记渲染成 IR 的 limit 文本（**受限文法**，见 ir.go 的 Store）：
 //
 //	fnentry   返回点守卫：界 ≤ 函数入口（运行时比 0u）
@@ -1006,7 +1014,7 @@ func (l *lowerer) placeType(e parse.Expr) string {
 //	host      界 = 宿主对象所在区域的深度（形参派生：只能运行期读）
 //
 // 为什么不是"C 表达式"：limit 的最终形态取决于宿主对象与区域深度运算，只有后端
-// 知道（红线 10：表达式的唯一生成处是后端）。air 若直接发 `decl(X)` 或裸数字，
+// 知道（表达式的唯一生成处是后端）。air 若直接发 `decl(X)` 或裸数字，
 // Delta/Dynamic 两个决定性的位在降级时被丢掉 —— 后端无法复原，只能猜，于是守卫
 // 要么发错界、要么整条丢掉（实测：`func sink(h Holder, t Buf) { h.b = t }` 会静默悬垂）。
 func (l *lowerer) limitOf(g types.GuardSpec, e parse.Expr) string {
@@ -1056,7 +1064,7 @@ func (l *lowerer) lowerInstance(d *parse.FuncDecl, recv string, params []string,
 	return err
 }
 
-// sortInstances 按实参文本排序（map 序不进 IR，H8/V7.1）。
+// sortInstances 按实参文本排序（map 序不进 IR，H8）。
 func sortInstances(in []instInstance) {
 	sort.Slice(in, func(i, j int) bool { return instKey(in[i]) < instKey(in[j]) })
 }

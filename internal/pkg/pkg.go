@@ -1,13 +1,13 @@
-// Package pkg 是 AIC 包管理器的最小面（核心设计 §十一，黄金执行规划 T1）。
+// Package pkg 是 AIC 包管理器的最小面（T1）。
 //
-// 职责（核心设计 §十 阶段 1「收集」）：
+// 职责（阶段 1「收集」）：
 //   - import 闭包解析：入口包 → 逐层展开 import，直到闭包封闭；
 //   - 目录即包：一个目录里的全部 .aic 合成一个包（*_test.aic 除外，归 aic test）；
-//   - 循环检测：包图有环 = 编译错（红线 21）；
-//   - 内容哈希缓存：产物按内容哈希存 ~/.cache/aic（§十一 importc 缓存同源）。
+//   - 循环检测：包图有环 = 编译错；
+//   - 内容哈希缓存：产物按内容哈希存 ~/.cache/aic（importc 缓存同源）。
 //
 // 纪律：本包只做「文件系统 → 包图」的收集，不做类型检查（那是 internal/types），
-// 也不发射 C（那是 internal/emit）。整程序收集完成后才允许发射（红线 23）。
+// 也不发射 C（那是 internal/emit）。整程序收集完成后才允许发射。
 package pkg
 
 import (
@@ -20,7 +20,7 @@ import (
 	"aic/internal/parse"
 )
 
-// stdNames 是 std 包名（§十四）：import 这些名字不找目录，由检查器按 std 面定型。
+// stdNames 是 std 包名：import 这些名字不找目录，由检查器按 std 面定型。
 // 圆 1–4 的包名也先登记在此，避免被误当作用户目录（用到时检查器会报「包内无此函数」）。
 var stdNames = map[string]bool{
 	// 《AIC 标准库规范》§0.1 的包名封闭表。**这是唯一一份 std 名单**——
@@ -41,7 +41,7 @@ func IsStd(name string) bool { return stdNames[name] }
 
 // File 是一个已解析的源文件。
 type File struct {
-	// Path 是仓库根相对（斜杠分隔）的路径，用于诊断与 #line 回指（红线 9）。
+	// Path 是仓库根相对（斜杠分隔）的路径，用于诊断与 #line 回指。
 	Path string
 	// Src 是源文本（内容哈希缓存的输入）。
 	Src string
@@ -67,7 +67,7 @@ type Package struct {
 type Unit struct {
 	// Entry 是入口包（含 main 的包）。
 	Entry *Package
-	// Order 是拓扑序的包列表：依赖在前，依赖者在后（发射顺序，红线 23）。
+	// Order 是拓扑序的包列表：依赖在前，依赖者在后（发射顺序）。
 	Order []*Package
 }
 
@@ -88,7 +88,7 @@ func (u *Unit) ByName(name string) *Package {
 //     目录内全部 .aic 合成一个包）；
 //   - 否则 → 只有入口文件构成包（单文件程序；语料 ok/err/trap 全是这种）。
 //
-// 被 import 的包一律是**整个目录**（目录即包，§四）。这条区分是必要的：
+// 被 import 的包一律是**整个目录**（目录即包）。这条区分是必要的：
 // testdata/ok/ 下 87 个互不相干的单文件程序共处一目录，若入口也按目录成包，
 // 它们会被并成一个包（重复 import / 多个 main），语料立刻全灭。
 func Load(entry string) (*Unit, error) {
@@ -211,7 +211,7 @@ func (l *loader) walk(p *Package) error {
 	return nil
 }
 
-// cycleError 构造循环 import 的诊断（红线 21：包循环 import = 编译错）。
+// cycleError 构造循环 import 的诊断（包循环 import = 编译错）。
 // at = 闭合环的那行 import（诊断回指它）。
 func (l *loader) cycleError(back string, at parse.Pos) error {
 	i := 0
@@ -227,7 +227,7 @@ func (l *loader) cycleError(back string, at parse.Pos) error {
 }
 
 // resolveImport 把 import 名解析为目录：先从导入者目录向下找 <dir>/<name>，
-// 再逐级向上找 <ancestor>/<name>（目录即包，§四）。
+// 再逐级向上找 <ancestor>/<name>（目录即包）。
 // moduleRoot 从 startDir 向上找最近的含 aic.mod 的目录。
 // 找不到返回 ""（无模块：按"单文件程序 / 无依赖模块"处理，§10.2）。
 func moduleRoot(startDir string) string {

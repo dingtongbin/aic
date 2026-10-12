@@ -7,12 +7,12 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 按需合成的打印函数（核心设计 §十四：println(v) 任意单值）。
+// 按需合成的打印函数（println(v) 任意单值）。
 //
 // 运行时表（aic_l1_print.h）覆盖标量与"container of scalar elements"；以下三类形状的名字在
 // 编译期不可预知，必须由 emit 合成一个 static 函数：
 //   - enum（无数据：变体名；带数据：Variant(负载)）
-//   - class（须 @derive(ToString)，字段按声明序打印；§十四 无 ToString = 编译错）
+//   - class（须 derive ToString，字段按声明序打印； 无 ToString = 编译错）
 //   - 元素非标量的容器（嵌套容器 / enum / class 元素的 list/set/map）与 [T;N]
 //
 // 合成是**确定性**的：按登记序编号（aic_pr_syn_<n>），登记序由类型遍历序决定，
@@ -94,7 +94,7 @@ func (c *Ctx) printerFor(t types.Type) (string, error) {
 	if t == nil {
 		return "aic_pr_nil", nil
 	}
-	// 接口值：动态类型未知，走见证表的**打印槽**（方法槽之后的追加槽，§十四 扩展）。
+	// 接口值：动态类型未知，走见证表的**打印槽**（方法槽之后的追加槽， 扩展）。
 	if ifc, isIfc := types.IsInterface(t); isIfc {
 		return c.interfacePrinter(ifc)
 	}
@@ -163,7 +163,7 @@ func (c *Ctx) registerChildPrinters(t types.Type) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("emit: type %s cannot be printed (§14: a class needs @derive(ToString))", t.String())
+	return fmt.Errorf("emit: type %s cannot be printed (§14: a class needs derive ToString)", t.String())
 }
 
 // emitPrinters 发射合成打印函数的原型与定义（在类型定义之后、函数原型之前）。
@@ -324,11 +324,11 @@ func (c *Ctx) emitEnumPrinterBody(e printerEntry, en *types.Enum) error {
 	return nil
 }
 
-// emitClassPrinterBody 发射 class 合成打印体（@derive(ToString)：字段按声明序）。
-// @packed = 值类型（C struct，按值传参，用 `.`）；其余 = 引用对象（句柄，用 `->`）。
+// emitClassPrinterBody 发射 class 合成打印体（derive ToString：字段按声明序）。
+// struct = 值类型（C struct，按值传参，用 `.`）；其余 = 引用对象（句柄，用 `->`）。
 func (c *Ctx) emitClassPrinterBody(e printerEntry, cl *types.Class) error {
 	arrow := "->"
-	if cl.Packed {
+	if cl.Struct {
 		arrow = "."
 	} else {
 		c.line("    if (v == NULL) { aic_pr_nil(); return; }")
@@ -355,7 +355,7 @@ func (c *Ctx) printValue(e string, t types.Type) (string, error) {
 	if t == nil {
 		return fmt.Sprintf("aic_pr_nil()"), nil
 	}
-	// @packed 值类型 / 数组：按值传参；引用与容器：按句柄传参。
+	// struct 值类型 / 数组：按值传参；引用与容器：按句柄传参。
 	pn, err := c.printerFor(t)
 	if err != nil {
 		return "", err

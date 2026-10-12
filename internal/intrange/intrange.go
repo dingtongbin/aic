@@ -1,4 +1,4 @@
-// Package intrange 是 AIR 上的整数区间证明（核心设计 §九「区间分析」；§10.4 第 12 条②
+// Package intrange 是 AIR 上的整数区间证明（「区间分析」；§10.4 第 12 条②
 // 「证明安全且要向量化收益 → 发射 unchecked 访问器」的前提）。
 //
 // 只做**可解释、可复核**的保守证明：证明不出来 = unknown（宁保守插检查，禁错误消除）。
@@ -7,7 +7,7 @@
 //   - `binop add/sub/mul` → 区间算术（溢出即 unknown）
 //   - `cbr (cmp lt a, b)` 的两条出边 → then: a ≤ b−1；else: a ≥ b
 //   - 循环头块（`forhead`）的条件事实在体内每轮成立（回边重新建立）
-//   - `[T;N]` 定长数组的长度是字面量 N（V1 已保证下标等于声明序）
+//   - `[T;N]` 定长数组的长度是字面量 N（已保证下标等于声明序）
 //
 // 本包**不改 IR**：它只产事实（`Facts`）供调用方（election/emit）消费，并可由 verifier
 // 复核 —— 「先证明后使用」与 escape 的 prove/elim 分离同构。

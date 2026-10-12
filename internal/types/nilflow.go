@@ -3,7 +3,7 @@ package types
 import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
-// nil 非零流证明（核心设计 §九 教条：宁保守插检查，禁错误消除）。
+// nil 非零流证明（教条：宁保守插检查，禁错误消除）。
 //
 // 已证非 nil：构造赋值后、p != nil 分支内、if p == nil { return … } 早退后、
 // 被赋以已证非 nil 表达式之后。调用产物 / 字段 / 元素读 = 未证。字段不做流
@@ -33,11 +33,11 @@ func (c *Checker) updateNilState(name string, init parse.Expr) {
 	}
 }
 
-// checkDeref: 解引用位校验——可证必 nil = 编译错（红线 6）。
+// checkDeref: 解引用位校验——可证必 nil = 编译错。
 func (c *Checker) checkDeref(e parse.Expr, what string) {
 	id, ok := e.(*parse.Ident)
 	if !ok {
-		return // 字段/元素读不做流跟踪（§九）
+		return // 字段/元素读不做流跟踪
 	}
 	st, found := c.nilState[id.Name]
 	if !found || !st.mustNil {

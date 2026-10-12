@@ -53,16 +53,16 @@ func TestE1DeclarationDomain(t *testing.T) {
 	}
 }
 
-// TestE1KeepsLiveAndOuter：@live 变量与外层声明被内层写入的槽**必须保留**（E1 反例）。
+// TestE1KeepsLiveAndOuter：live 变量与外层声明被内层写入的槽**必须保留**（E1 反例）。
 func TestE1KeepsLiveAndOuter(t *testing.T) {
-	// @live 变量：声明偏移 = 偏移 − 1 → 不满足 E1
+	// live 变量：声明偏移 = 偏移 − 1 → 不满足 E1
 	m, b := build("1", true, true)
 	rep := Analyze(m)
 	if rep.Eliminated != 0 {
-		t.Fatalf("@live 槽被误消去：%s", rep.Summary())
+		t.Fatalf("live 槽被误消去：%s", rep.Summary())
 	}
 	if b.Blocks[0].Insts[3].(*air.Store).Limit == "" {
-		t.Fatal("@live 槽的守卫被清空")
+		t.Fatal("live 槽的守卫被清空")
 	}
 	// 外层声明、内层 region 写入：DeclIn = false → 不满足 E1
 	m2, _ := build("1", false, false)

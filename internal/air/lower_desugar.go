@@ -59,7 +59,7 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	}
 	xt := l.typeOf(v.RangeX)
 	if xt == nil {
-		// 未定型字面量主体：str 字面量按 str 定（§一 最窄可容纳）
+		// 未定型字面量主体：str 字面量按 str 定（最窄可容纳）
 		if _, isStr := v.RangeX.(*parse.StrLit); isStr {
 			xt = types.TStr
 		}
@@ -71,7 +71,7 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	n := l.tmp("t")
 	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: n, Ty: "usize",
 		Rhs: &LenRHS{Place: &VarPlace{Name: xs}}, Loc: LocOf(v.Pos)})
-	// **map 迭代的名字位不是下标**（§2.5：单名 = 键，两名 = (键, 值)），故内部
+	// **map 迭代的名字位不是下标**（单名 = 键，两名 = (键, 值)），故内部
 	// 下标变量一律用 i__；其他容器 Names[0] 才是使用者写的下标名。
 	// 索引名只在**两名形态**才对用户可见（`for i, x in xs` 的 i）⇒ 只有那时要
 	// 别名；单名形态下源名指的是元素，索引是隐形的（D1 的重命名不该把体内的
@@ -107,7 +107,7 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	elemName := ""
 	if len(v.Names) > 0 && v.Names[elemIdx].Name != "_" {
 		elemName = v.Names[elemIdx].Name
-		// **map 迭代：单名 = 键，两名 = (键, 值)**（§2.5）。键/值按插入序下标取
+		// **map 迭代：单名 = 键，两名 = (键, 值)**。键/值按插入序下标取
 		// （runtime 的 key_at/val_at）。走通用的 elem 读会报 "element read on
 		// the host type map[str]i32 is not covered"（031/700 实测）。
 		if isMap {
@@ -115,7 +115,7 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 				return err
 			}
 		} else if types.IsStrType(xt) && len(v.Names) == 1 {
-			// **str 单名迭代 = 单字节视图（str）**（§2.5：`for ch in s` 打印该字符）；
+			// **str 单名迭代 = 单字节视图（str）**（`for ch in s` 打印该字符）；
 			// 只有 `for i, b in s` 的两名形态才出 u8 字节；两种都发 u8 会让
 			// `println(ch)` 打出 104/101/121（693 实测）。
 			elemName = l.loopVarName(elemName, true)
@@ -220,7 +220,7 @@ func (l *lowerer) scopeStmt(v *parse.ScopeStmt) error {
 	return nil
 }
 
-// spawnStmt：任务体 = 被调函数（实参在 spawn 点求值，§七）。
+// spawnStmt：任务体 = 被调函数（实参在 spawn 点求值）。
 // L3 真并发：**不内联执行**，发 Spawn 指令（后端 = 上下文块 + thunk + 调度入口）。
 // T1 串行期这里直接发 call —— 那个形态会让两个互相等待的任务"看起来"跑完，
 // 死锁永不触发（773 实测）。

@@ -42,8 +42,8 @@ func diag(pos parse.Pos, desc, context, fix string) *Diag {
 	return &Diag{Pos: pos, Desc: desc, Context: context, Fix: fix}
 }
 
-// SyntaxError 是包内某个源文件的词法/语法错误（三段式诊断，红线 14：一次报全）。
-// 收集阶段遇语法错即停：整程序收集不完整时禁止发射（红线 23）。
+// SyntaxError 是包内某个源文件的词法/语法错误（三段式诊断，一次报全）。
+// 收集阶段遇语法错即停：整程序收集不完整时禁止发射。
 type SyntaxError struct {
 	Path  string
 	Lex   []lex.LexerError

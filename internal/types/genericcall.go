@@ -5,7 +5,7 @@ import "aic/internal/parse"
 // ---------------------------------------------------------------------------
 // 泛型函数的调用点检查（T1 单态化：推断 → 实例化 → 登记实例）。
 //
-// §十 终止性前提：类型形参不得只出现在返回口，故每个 T 必须能从**实参类型**
+// 终止性前提：类型形参不得只出现在返回口，故每个 T 必须能从**实参类型**
 // 解出；解不出 = 编译错，禁止发明隐式推断（否则单态化不终止）。
 // ---------------------------------------------------------------------------
 
@@ -31,7 +31,7 @@ func (c *Checker) checkGenericCallExplicit(v *parse.Call, ix *parse.Index, sig *
 		}
 		m[sig.TypeParams[i]] = at
 	}
-	// N3：约束校验的位置 = 调用点（与推断版同一判据）。
+	// 约束校验的位置 = 调用点（与推断版同一判据）。
 	c.checkCallConstraints(v.Pos, sigName(sig), sig.Constraints, m)
 	inst := SubstSig(sig, m)
 	c.noteFuncInst(sig, m)
@@ -161,7 +161,7 @@ func (c *Checker) checkGenericCall(v *parse.Call, sig *FuncSig, expect Type) (Ty
 			"a type parameter must be decidable from the argument types (core design §10); pass an explicitly typed value")
 		return nil, nilBound, untyped{}
 	}
-	// N3：约束校验的位置 = **调用点**（不是模板体内部）。
+	// 约束校验的位置 = **调用点**（不是模板体内部）。
 	c.checkCallConstraints(v.Pos, sigName(sig), sig.Constraints, m)
 	inst := SubstSig(sig, m)
 	c.noteFuncInst(sig, m)
@@ -170,7 +170,7 @@ func (c *Checker) checkGenericCall(v *parse.Call, sig *FuncSig, expect Type) (Ty
 }
 
 // noteMethodInst 登记一次**泛型类方法**的实例（args 按类形参声明序）。
-// 方法本身不声明类型形参（§四：方法继承所属类的形参），故不能走 noteFuncInst 的
+// 方法本身不声明类型形参（方法继承所属类的形参），故不能走 noteFuncInst 的
 // "按 sig.TypeParams 取实参"那条路 —— 那条会得到空实参表（实例键 = `Box.get[]`，
 // mair 就无从展开方法体）。
 func (c *Checker) noteMethodInst(sig *FuncSig, args []Type) {
@@ -195,7 +195,7 @@ func (c *Checker) noteMethodInst(sig *FuncSig, args []Type) {
 	c.funcInsts = append(c.funcInsts, FuncInst{Fn: sig, Args: append([]Type{}, args...)})
 }
 
-// noteFuncInst 登记一次泛型函数实例（实例缓存：同键只记一次，红线 11）。
+// noteFuncInst 登记一次泛型函数实例（实例缓存：同键只记一次）。
 func (c *Checker) noteFuncInst(sig *FuncSig, m map[string]Type) {
 	key := InstKey(sig, m)
 	if c.funcInstSeen == nil {

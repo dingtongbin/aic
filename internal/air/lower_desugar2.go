@@ -17,7 +17,7 @@ type loopCtx struct {
 	done string
 }
 
-// branchStmt：break / continue → br 到循环的出口 / 步进块（无循环标签，§三）。
+// branchStmt：break / continue → br 到循环的出口 / 步进块（无循环标签）。
 func (l *lowerer) branchStmt(v *parse.BranchStmt) error {
 	if len(l.loops) == 0 {
 		return fmt.Errorf("air: %s outside a loop (line %d)", v.Keyword, v.Pos.Line)

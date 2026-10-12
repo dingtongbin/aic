@@ -9,13 +9,13 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// tast：**类型检查后的树**的文本投影（核心设计 §十 的检查点之一）。
+// tast：**类型检查后的树**的文本投影（检查点之一）。
 //
 // 五个检查点 = tast → air → mair → eair → cir；每个都是"可 dump、可 diff、
 // 可过 verifier"的稳定文本。tast 的作用是**把检查器的输出面冻住**：后面任何
 // 一层（单态化、逃逸、C 发射）看到的事实都必须能从这份投影里读出来 ——
 // 一旦某层偷偷重算（例如自己再折一次常量、自己再解一次字段下标），
-// 两边的差异就会在这里现形（红线 10 的机器可查版本）。
+// 两边的差异就会在这里现形（机器可查版本）。
 //
 // 只投影**语义事实**（名字、解析后的类型、折叠值、实例键），不投影语法糖；
 // 输出必须与 map 迭代序无关（全部排序），否则 H8 的"两次 dump 逐字节一致"会随机红。
@@ -117,8 +117,8 @@ func constText(v ConstVal) string {
 func dumpClass(b *strings.Builder, v *parse.ClassDecl, info *Info) {
 	cl := info.Classes[v.Name]
 	kind := "class"
-	if v.Packed {
-		kind = "@packed class"
+	if v.Struct {
+		kind = "struct"
 	}
 	tp := ""
 	if len(v.TypeParams) > 0 {
@@ -131,7 +131,7 @@ func dumpClass(b *strings.Builder, v *parse.ClassDecl, info *Info) {
 			caps = append(caps, c)
 		}
 		sort.Strings(caps)
-		fmt.Fprintf(b, " @derive(%s)", strings.Join(caps, ", "))
+		fmt.Fprintf(b, " derive %s", strings.Join(caps, ", "))
 	}
 	fmt.Fprintf(b, " {\n")
 	if cl != nil {

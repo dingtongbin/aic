@@ -3,7 +3,7 @@ package types
 import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
-// match（核心设计 §三）：仅作用于 enum、强制穷尽、无通配符、模式一层、
+// match：仅作用于 enum、强制穷尽、无通配符、模式一层、
 // match 不消费枚举（共享语义，原值仍可用）。
 // ---------------------------------------------------------------------------
 
@@ -49,7 +49,7 @@ func (c *Checker) resolvePattern(p parse.MatchPattern, subject *Enum, targs []Ty
 // UnqualifiedVariant 去掉变体名里的 `Enum.` 限定前缀（`Shape.Circle` → `Circle`）。
 // **唯一实现**：检查器（resolvePattern）与 AIR 降级（match 臂的负载绑定）必须用同一套
 // 规则 —— AIR 侧直接用原始 `p.Name` 去查变体表，带限定的模式查不到就**静默跳过绑定**，
-// arm 里引用绑定的名字就成了"先用后定"（verifier V2.4 报编译器缺陷）。
+// arm 里引用绑定的名字就成了"先用后定"（verifier 报编译器缺陷）。
 func UnqualifiedVariant(name string) string {
 	if dot := lastIndexDot(name); dot >= 0 {
 		return name[dot+1:]
@@ -112,7 +112,7 @@ func (c *Checker) checkArms(arms []parse.MatchArm, subject *Enum, targs []Type, 
 
 		}
 	}
-	// 强制穷尽：无通配符（红线 4）
+	// 强制穷尽：无通配符
 	for i := range subject.Variants {
 		if !covered[i] {
 			c.errorAt(at, "match is not exhaustive: missing variant", subject.Name+"."+subject.Variants[i].Name,

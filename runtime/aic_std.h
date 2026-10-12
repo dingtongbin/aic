@@ -171,13 +171,48 @@ aic_r_str_err aic_std_os_read_file(aic_str path, const char *file, int line);
 aic_r_str_err aic_std_os_read_stdin(const char *file, int line);
 
 /* --- math ------------------------------------------------------------------- */
+/* f64 面按《AIC 标准库规范》§2.5 逐条落地（math 包已取消：标量数值函数即基本
+ * 类型方法）。整型面（abs/min/max/wrappingAdd/…）是 C 的整型运算，没有 libm
+ * 依赖，由发射器按整型宽度直接发内联表达式 —— 未实例化的泛型 wrapper 只会
+ * 让 `x.min(y)` 在窄整型上撞上类型提升的静默语义差。 */
 static inline aic_f64 aic_math_abs_f64(aic_f64 v) { return v < 0 ? -v : v; }
 static inline aic_f64 aic_math_min_f64(aic_f64 a, aic_f64 b) { return a < b ? a : b; }
 static inline aic_f64 aic_math_max_f64(aic_f64 a, aic_f64 b) { return a > b ? a : b; }
 static inline aic_f64 aic_math_floor_f64(aic_f64 v) { return floor(v); }
 static inline aic_f64 aic_math_ceil_f64(aic_f64 v) { return ceil(v); }
+static inline aic_f64 aic_math_round_f64(aic_f64 v) { return round(v); }
+static inline aic_f64 aic_math_trunc_f64(aic_f64 v) { return trunc(v); }
 static inline aic_f64 aic_math_sqrt_f64(aic_f64 v) { return sqrt(v); }
+static inline aic_f64 aic_math_cbrt_f64(aic_f64 v) { return cbrt(v); }
+static inline aic_f64 aic_math_exp_f64(aic_f64 v) { return exp(v); }
+static inline aic_f64 aic_math_log_f64(aic_f64 v) { return log(v); }
+static inline aic_f64 aic_math_log2_f64(aic_f64 v) { return log2(v); }
+static inline aic_f64 aic_math_log10_f64(aic_f64 v) { return log10(v); }
+static inline aic_f64 aic_math_sin_f64(aic_f64 v) { return sin(v); }
+static inline aic_f64 aic_math_cos_f64(aic_f64 v) { return cos(v); }
+static inline aic_f64 aic_math_tan_f64(aic_f64 v) { return tan(v); }
+static inline aic_f64 aic_math_asin_f64(aic_f64 v) { return asin(v); }
+static inline aic_f64 aic_math_acos_f64(aic_f64 v) { return acos(v); }
+static inline aic_f64 aic_math_atan_f64(aic_f64 v) { return atan(v); }
 static inline aic_f64 aic_math_pow_f64(aic_f64 a, aic_f64 b) { return pow(a, b); }
+static inline aic_f64 aic_math_atan2_f64(aic_f64 a, aic_f64 b) { return atan2(a, b); }
+/* 分类谓词不用 isnan/isinf/isfinite 宏：三者在 libm 的实现随 C 库而变，
+ * 而判据只有一条 —— IEEE-754 的自比较与 ±HUGE_VAL 比较，写出来反而更准。 */
+static inline bool aic_math_is_nan_f64(aic_f64 v) { return v != v; }
+static inline bool aic_math_is_inf_f64(aic_f64 v) { return v == HUGE_VAL || v == -HUGE_VAL; }
+static inline bool aic_math_is_finite_f64(aic_f64 v) {
+    return v == v && v != HUGE_VAL && v != -HUGE_VAL;
+}
+
+/* --- str：rune 构造 / 大小写（分配型）-------------------------------------- */
+/* rune 的合法域 = Unicode 标量值：≤ 0x10FFFF 且不在代理区 D800..DFFF。
+ * 那两个区间在 UTF-8 里没有编码，静默发出畸形字节串会让 len / codepoints /
+ * utf8At 全都读到错的东西 —— 越界构造必须 trap，不是"发点什么先跑"。 */
+aic_str aic_std_str_from_rune(aic_u32 c, const char *file, int line);
+/* ASCII 逐字节映射。str 是不可变字节串：Unicode 大小写折叠不是语言级承诺，
+ * 非 ASCII 字节原样透传（§2.1 的封闭方法面只有 toUpper/toLower 两个名字）。 */
+aic_str aic_std_str_to_upper(aic_str s, aic_u32 line);
+aic_str aic_std_str_to_lower(aic_str s, aic_u32 line);
 
 /* --- testing：失败即 trap 并打印两值（§十一）-------------------------------- */
 void aic_std_test_assert(bool cond, aic_str msg, const char *file, int line);

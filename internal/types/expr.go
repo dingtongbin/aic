@@ -6,17 +6,17 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 表达式检查 + 静态深度界传播（核心设计 §五 R3，R0c ② 修订版）。
+// 表达式检查 + 静态深度界传播（R0c ② 修订版）。
 //
 // bound：off = 对象深度上界（相对函数入口偏移）；exact = 创建表达式（必然是
-// off 深度的那个对象）。规则：创建 = 当前偏移/精确；变量读 = 声明偏移（@live
+// off 深度的那个对象）。规则：创建 = 当前偏移/精确；变量读 = 声明偏移（live
 // 已减一）；字段/元素读 = 宿主界；调用 = 调用点偏移；参数 = 0；nil = -∞。
 // ---------------------------------------------------------------------------
 
 type bound struct {
 	off   int
 	exact bool
-	// param = 该界来自**形参（含 this）派生链**。参数定理（§五 R3）只保证
+	// param = 该界来自**形参（含 this）派生链**。参数定理只保证
 	// "参数派生值写本函数**局部变量**恒安全"；两个参数之间的深度顺序不可证，
 	// 故 param 与 param 之间的存储必须留守卫（否则静默内存损坏，见 markStoreGuard）。
 	param bool
@@ -150,7 +150,7 @@ type untyped struct {
 
 func (c *Checker) checkIdent(v *parse.Ident, expect Type) (Type, bound, untyped) {
 	if sym, ok := c.scope.Lookup(v.Name); ok {
-		// N1 闭包捕获：命中点在当前闭包自己的作用域**之外** ⇒ 这是一次按值捕获。
+		// 闭包捕获：命中点在当前闭包自己的作用域**之外** ⇒ 这是一次按值捕获。
 		if c.caps != nil && !c.lookupInsideLambda(v.Name) {
 			c.noteCapture(v, v.Name, sym)
 		}
@@ -162,7 +162,7 @@ func (c *Checker) checkIdent(v *parse.Ident, expect Type) (Type, bound, untyped)
 			if st := c.nilState[v.Name]; st != nil && st.mustNil {
 				return sym.Type, nilBound, untyped{}
 			}
-			// 变量读界 = 声明偏移（§五 R3）；param 标记 = 形参（含 this）派生，
+			// 变量读界 = 声明偏移；param 标记 = 形参（含 this）派生，
 			// 用于存储点判定：参数定理只覆盖"写本函数局部变量"，两个参数之间没有深度顺序。
 			return sym.Type, bound{off: sym.DeclOffset, param: sym.Param}, untyped{}
 		case SymConst:
@@ -188,7 +188,7 @@ func (c *Checker) checkIdent(v *parse.Ident, expect Type) (Type, bound, untyped)
 			}
 		}
 	}
-	// 裸名撞字段（红线 3）：本类有此字段但没写 this.
+	// 裸名撞字段：本类有此字段但没写 this.
 	if c.thisClass != nil {
 		if _, isField := c.thisClass.fieldIdx[v.Name]; isField {
 			c.errorAt(v.Pos, "a bare name collides with a field: access this class's fields as this.", v.Name,
@@ -204,7 +204,7 @@ func (c *Checker) checkIdent(v *parse.Ident, expect Type) (Type, bound, untyped)
 		return nil, nilBound, untyped{}
 	}
 	if isComptimeOnlyName(v.Name) {
-		// N4：内省原语只在编译期可用 —— 报"没有运行期形态"，而不是"未声明的名字"。
+		// 内省原语只在编译期可用 —— 报"没有运行期形态"，而不是"未声明的名字"。
 		c.errorAt(v.Pos, "compile-time introspection has no runtime form", v.Name,
 			v.Name+"(T) exists in constant positions only (const / comptime block / [T;N] size): the compiler emits no type metadata (core design §16 N4)")
 		return nil, nilBound, untyped{}
@@ -254,7 +254,7 @@ func (c *Checker) lookupEnumByVariant(variant string) *Enum {
 
 func (c *Checker) checkUnary(v *parse.Unary, expect Type) (Type, bound, untyped) {
 	ty, _, info := c.checkExprFull(v.X, expect)
-	// 操作数是**未定型字面量**（`!true` / `-1` / `~0`）：类型推迟到使用点（§一），
+	// 操作数是**未定型字面量**（`!true` / `-1` / `~0`）：类型推迟到使用点，
 	// 但一元算符的**结果类型**由操作数的字面量种类定死。这里不能因为 ty == nil 就早退：
 	// 早退会让 `!true` 完全没有类型，AIR 侧只好兜底成 `i32`，于是
 	// `print.println(!true)` 打印 `0` 而不是 `false`（720 实测），
@@ -277,7 +277,7 @@ func (c *Checker) checkUnary(v *parse.Unary, expect Type) (Type, bound, untyped)
 	switch v.Op {
 	case "-":
 		if isNumeric(ty) || info.kind == unInt || info.kind == unUint || info.kind == unFloat {
-			// -9223372036854775808 与字面量作为整体参与判定（§一）
+			// -9223372036854775808 与字面量作为整体参与判定
 			if info.kind == unInt && info.ival == -9223372036854775808 {
 				c.errorAt(v.Pos, "negating the minimum i64 overflows", "-("+info.text+")",
 					"write the literal -9223372036854775808 (judged as a whole), or i64(-9223372036854775807 - 1)")

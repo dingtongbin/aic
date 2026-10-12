@@ -1,9 +1,9 @@
-// Command aic is the AIC compiler driver (核心设计 §十: cmd/aic CLI).
+// Command aic is the AIC compiler driver (cmd/aic CLI).
 //
 // 子命令: check / build / dump-c / fmt / test / version。
-// 纪律: C 编译器一律 external process (红线 18 全仓禁 cgo); build 的
+// 纪律: C 编译器一律 external process (全仓禁 cgo); build 的
 // 默认路径 = emit → 内部 C 编译器封装 → 运行产物; 门禁需要自掌四配置时
-// 用 `--emit-c` 只取 C 文本 (黄金执行规划 §四.1 H3)。
+// 用 `--emit-c` 只取 C 文本 (H3)。
 package main
 
 import (
@@ -90,7 +90,7 @@ type loaded struct {
 // loadUnit 解析 + 检查一个翻译单元（单文件粒度）。
 //
 // 包级装载（目录即包 + import 闭包 + 循环检测）在 internal/pkg，经 loadProgram
-// 走整程序发射（红线 23）。这里保留单文件粒度给 dump-ast 之类只关心一个文件的
+// 走整程序发射。这里保留单文件粒度给 dump-ast 之类只关心一个文件的
 // 子命令用。
 func loadUnit(path string) (*loaded, string) {
 	src, err := os.ReadFile(path)
@@ -368,13 +368,13 @@ func cmdFmt(args []string) int {
 			fmt.Fprintf(os.Stderr, "aic: cannot read %s: %v\n", p, err)
 			return 2
 		}
-		// R3: 规范化打印待补（需 parse 侧保留注释/空行信息）；当前原样回显。
+		// 规范化打印待补（需 parse 侧保留注释/空行信息）；当前原样回显。
 		os.Stdout.Write(src)
 	}
 	return 0
 }
 
-// cmdTest 运行 *_test.aic（核心设计 §十一：func testXxx 约定，testing 失败即 trap）。
+// cmdTest 运行 *_test.aic（func testXxx 约定，testing 失败即 trap）。
 //
 // 每个测试文件 = 一个测试程序：包内普通源文件 + 该测试文件 + 合成 main
 // （按声明序调用 testXxx）。全部通过 = 退出码 0；任一失败 = 打印 trap 消息并返回 1。
@@ -469,7 +469,7 @@ func sanitizeName(path string) string {
 	return b.String()
 }
 
-// needsL2 报告产物是否用到调度层（红线 16：按需链接 aic_l2.c）。
+// needsL2 报告产物是否用到调度层（按需链接 aic_l2.c）。
 func needsL2(needed []string) bool {
 	for _, n := range needed {
 		if n == "l2" {
@@ -482,13 +482,13 @@ func needsL2(needed []string) bool {
 // emitProgram 是**唯一**的 C 后端入口：自有 IR 下降（tast → air → mair → eair → cir → C）。
 //
 // 用户直令（2026-10）：**直译路径去掉，不能再用了** —— 不存在"模式选择"，也不存在回退。
-// 未覆盖的 IR 形态一律**编译失败**（红线 23：绝不发半截），失败清单就是施工清单。
+// 未覆盖的 IR 形态一律**编译失败**（绝不发半截），失败清单就是施工清单。
 func emitProgram(prog *Program, args []string) (*emit.Result, error) {
 	return emitProgramCached(prog, args, false)
 }
 
 // emitProgramCached 与 emitProgram 同管线，区别是可按 open 开函数级增量翻译
-// 缓存（F1：翻译段 47ms → 命中段 ~0ms；键含编译器身份与 IR 体哈希）。
+// 缓存（翻译段 47ms → 命中段 ~0ms；键含编译器身份与 IR 体哈希）。
 // open=false（门禁 --emit-c / dump-c / --no-cache）时行为与裸管线完全一致。
 func emitProgramCached(prog *Program, args []string, open bool) (*emit.Result, error) {
 	if !open {

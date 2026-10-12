@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// --- helpers (黄金执行规划 §15.2) -----------------------------------------------
+// --- helpers  -----------------------------------------------
 
 type wantTok struct {
 	Kind Kind
@@ -121,7 +121,7 @@ func TestCommentOnlyFileYieldsEOF(t *testing.T) {
 
 // --- 用例 4–6：标识符 ---------------------------------------------------------------
 
-// v2（核心设计 §一，2026-10 收紧）：标识符字符集是 **ASCII** ——
+// v2（2026-10 收紧）：标识符字符集是 **ASCII** ——
 // 首字符 ASCII 字母或 `_`，后续 ASCII 字母/数字/单个 `_`。
 // Unicode 字母**不是**标识符字符（否则「首字符大写 = 跨包可见」在 Unicode 上无定义）。
 func TestASCIIIdentifiersOnly(t *testing.T) {
@@ -153,7 +153,7 @@ func TestDoubleUnderscoreRejected(t *testing.T) {
 	assertThreePart(t, errs[0].Format())
 }
 
-// v2（核心设计 §一）：`_` 前缀 = 包私有标识符，词法合法；裸 `_` = 弃位 token。
+// v2：`_` 前缀 = 包私有标识符，词法合法；裸 `_` = 弃位 token。
 // `__` 相邻仍然拒绝（保留给 mangling），见 TestDoubleUnderscoreRejected。
 func TestLeadingUnderscorePrivateIdentifier(t *testing.T) {
 	expectSeq(t, lexAll(t, "var _x = 1"), []wantTok{

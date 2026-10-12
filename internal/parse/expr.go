@@ -8,7 +8,7 @@ var debugParen = false
 // < equality < relational < shift < additive < multiplicative < unary <
 // postfix (call / index / field / composite literal).
 //
-// `..` 只存在于 for-in 位与 str 视图位（核心设计 §一/§二.3）；复合字面量
+// `..` 只存在于 for-in 位与 str 视图位；复合字面量
 // C{f: v} 合法化，但条件位禁写（与块体 `{` 歧义，Go 同款规则）。
 
 // parseExpr parses one expression including the assignment forms.
@@ -147,7 +147,7 @@ func (p *Parser) assignOp() (string, bool) {
 }
 
 // binary levels; each level lists its operators left to right. 短路求值 for
-// &&/|| is a checker/emitter property; precedence is lexical (核心设计 §一).
+// &&/|| is a checker/emitter property; precedence is lexical .
 var binaryLevels = [][]string{
 	{"||"},
 	{"&&"},
@@ -188,7 +188,7 @@ func (p *Parser) parseBinary(level int) Expr {
 }
 
 // parseUnary reads `-x`, `!x`, `~x`, `check x`, and the primary forms.
-// 无一元 `+`（核心设计 §一）。
+// 无一元 `+`。
 func (p *Parser) parseUnary() Expr {
 	at := p.pos()
 	switch {
@@ -204,7 +204,7 @@ func (p *Parser) parseUnary() Expr {
 	return p.parsePostfix()
 }
 
-// parseMatchExpr reads the expression-position match (核心设计 §三):
+// parseMatchExpr reads the expression-position match:
 // 全分支为表达式，穷尽性保证必有值 — var x = match e { A => 1, B => 2 }.
 func (p *Parser) parseMatchExpr() Expr {
 	at := p.pos()
@@ -461,7 +461,7 @@ func (p *Parser) parseCatchTail(x Expr) Expr {
 	return c
 }
 
-// parseFuncLit reads the N1 closure literal (核心设计 §16 N1):
+// parseFuncLit reads the closure literal:
 //
 //	func(x i32) -> i32 { return x + base }
 //	func(c Ctx, req Request) -> (Response, Err) { … }

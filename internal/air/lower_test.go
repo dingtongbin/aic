@@ -113,8 +113,8 @@ func mk() -> P {
 		t.Fatalf("verifier 拒绝：%v", vs)
 	}
 	out := Print(m)
-	if !strings.Contains(out, "type main_P = struct") {
-		t.Errorf("类型表缺 struct 声明：\n%s", out)
+	if !strings.Contains(out, "type main_P = class") {
+		t.Errorf("类型表缺 class 声明：\n%s", out)
 	}
 	if !strings.Contains(out, "alloc task(main_P)") {
 		t.Errorf("创建表达式未走 alloc：\n%s", out)

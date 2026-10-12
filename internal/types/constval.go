@@ -8,8 +8,8 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 常量折叠（核心设计 §三：const = 数值/bool/str 的折叠字面量算术，无函数调用）。
-// 字面量推断（§一）：整数取最窄可容纳者 i32→i64→u64；浮点推断 f64、流向 f32
+// 常量折叠（const = 数值/bool/str 的折叠字面量算术，无函数调用）。
+// 字面量推断：整数取最窄可容纳者 i32→i64→u64；浮点推断 f64、流向 f32
 // 按可表示性判定。一元负号与字面量作为整体参与判定。
 // ---------------------------------------------------------------------------
 
@@ -77,7 +77,7 @@ func foldConst(e parse.Expr, c *Checker) (ConstVal, string) {
 		}
 		return ConstVal{}, "const allows literal arithmetic only, no name references (except existing consts)"
 	case *parse.Field:
-		// N4 内省取值形态：`fieldsOf(T).len` / `fieldsOf(T)[i].name`。
+		// 内省取值形态：`fieldsOf(T).len` / `fieldsOf(T)[i].name`。
 		if val, err, handled := foldIntrospect(v, c); handled {
 			return val, err
 		}
@@ -88,7 +88,7 @@ func foldConst(e parse.Expr, c *Checker) (ConstVal, string) {
 		}
 		return ConstVal{}, "const initialisation must be foldable literal arithmetic over numeric/bool/str"
 	case *parse.Call:
-		// N4 编译期内省原语：在常量位可用（**运行期零元数据**：全部折成常量）。
+		// 编译期内省原语：在常量位可用（**运行期零元数据**：全部折成常量）。
 		if v, err := foldComptime(v, c); err == "" {
 			return v, ""
 		} else if err != errNotComptime {
@@ -102,10 +102,10 @@ func foldConst(e parse.Expr, c *Checker) (ConstVal, string) {
 // errNotComptime 是"这不是编译期内省调用"的内部标记（调用方据此给出通用报错）。
 var errNotComptime = "not a comptime intrinsic"
 
-// foldComptime 折叠编译期内省原语（N4）：
+// foldComptime 折叠编译期内省原语：
 //
 //	typeName(T)    -> str     （类型的规范拼写）
-//	sizeOf(T)      -> i32     （运行期字节数；@packed 与 [T;N] 走 C 的 sizeof，见 emit）
+//	sizeOf(T)      -> i32     （运行期字节数；struct 与 [T;N] 走 C 的 sizeof，见 emit）
 //	isValueType(T) -> bool    （是否有区域头）
 //
 // 实参必须是**类型名**（不是值）：i32 / 本包类型 / 跨包 pkg.Type。
@@ -127,20 +127,20 @@ func foldComptime(v *parse.Call, c *Checker) (ConstVal, string) {
 	case "isValueType":
 		return ConstVal{Kind: ConstBool, Bool: isValueType(t)}, ""
 	case "sizeOf":
-		// 只有尺寸无歧义的类型能折成常量；@packed / [T;N] 的 C 布局由 emit 用
+		// 只有尺寸无歧义的类型能折成常量；struct / [T;N] 的 C 布局由 emit 用
 		// sizeof 现算（那才是真尺寸，绝不猜 padding）。
 		if n, ok := staticSize(t); ok {
 			return ConstVal{Kind: ConstInt, Int: n}, ""
 		}
 		return ConstVal{}, "sizeOf(" + typeText(t) + ") is only a compile-time constant for scalar and pointer types; " +
-			"@packed / [T;N] sizes come from the C layout — use it in a runtime expression instead"
+			"struct / [T;N] sizes come from the C layout — use it in a runtime expression instead"
 	}
 	return ConstVal{}, errNotComptime
 }
 
 // typeDisplayName 是 `typeName(T)` 的结果：**非限定名**（就是类型标识符本身）。
 //
-// 为什么不带包前缀：typeName 的用途是"按名字分派/生成代码"（@derive 风格），
+// 为什么不带包前缀：typeName 的用途是"按名字分派/生成代码"（derive 风格），
 // 包前缀对同一份源码里的分派没有信息量，却会让结果随编译方式（单文件 / 整包）
 // 变化 —— 那正好违反 H3「跨配置输出逐位一致」。跨包重名由用户自己限定。
 func typeDisplayName(c *Checker, t Type) string {
@@ -189,7 +189,7 @@ func staticSize(t Type) (int64, bool) {
 			return 16, true // {code i32, msg str} → 对齐后 16
 		}
 	case *Class:
-		if !v.Packed {
+		if !v.Struct {
 			return 8, true // 引用 = 指针
 		}
 	case *Interface:
@@ -204,7 +204,7 @@ func staticSize(t Type) (int64, bool) {
 	return 0, false
 }
 
-// foldIntLit: 无后缀整数字面量 → 最窄可容纳（i32 → i64 → u64，§一）。
+// foldIntLit: 无后缀整数字面量 → 最窄可容纳（i32 → i64 → u64）。
 func foldIntLit(text string) (ConstVal, string) {
 	n := normalizeUnderscores(text)
 	neg := false
@@ -424,7 +424,7 @@ func constAsUint(v ConstVal) (uint64, bool) {
 func foldInt(op string, a, b int64) (ConstVal, string) {
 	switch op {
 	case "+":
-		// 编译期算术**溢出 = 编译错**（§二.4/§九：可证必错 = 编译错；运行期才是 trap）。
+		// 编译期算术**溢出 = 编译错**（可证必错 = 编译错；运行期才是 trap）。
 		// 直接 `a + b` 会让 Go 的 int64 回绕被静默接受
 		// （`const Y = 9223372036854775807 + 1` 编译通过并打印负数）。
 		if (b > 0 && a > math.MaxInt64-b) || (b < 0 && a < math.MinInt64-b) {
@@ -519,7 +519,7 @@ func foldFloat(op string, a, b float64) (ConstVal, string) {
 	return ConstVal{}, "this constant operation is not supported"
 }
 
-// constFitsTy: 常量写入声明类型的范围证明（§二.4：编译期范围证明合法）。
+// constFitsTy: 常量写入声明类型的范围证明（编译期范围证明合法）。
 func constFitsTy(v ConstVal, ty Type) bool {
 	b, ok := ty.(*Basic)
 	if !ok {
@@ -557,7 +557,7 @@ func constFitsTy(v ConstVal, ty Type) bool {
 	return false
 }
 
-// inferredType: 无声明类型的 const 的推断类型（§一 字面量推断）。
+// inferredType: 无声明类型的 const 的推断类型（字面量推断）。
 func (v ConstVal) inferredType() Type {
 	switch v.Kind {
 	case ConstInt:
@@ -578,7 +578,7 @@ func (v ConstVal) inferredType() Type {
 }
 
 // constArrayLen: [T;N] 的 N = **任何编译期可折叠的整数常量**（字面量 / const 名 /
-// 编译期内省原语 —— `[i32; sizeOf(i32)]` 也必须能写，§16 N4 的 sizeOf 在标量上就是常量）。
+// 编译期内省原语 —— `[i32; sizeOf(i32)]` 也必须能写，§16 sizeOf 在标量上就是常量）。
 func (c *Checker) constArrayLen(e parse.Expr) (int64, string) {
 	switch v := e.(type) {
 	case nil:

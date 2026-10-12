@@ -7,7 +7,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// std 最小类型面（核心设计 §十四；逐条边界语义 R4 以语料冻结【O9】）。
+// std 最小类型面（逐条边界语义以语料冻结【O9】）。
 // 这里只做类型化：print 任意单值 / str 包函数 / os / math / option / testing。
 // sync/net/time 属圆 3；sort AIC 自举（圆 1）。
 // ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ func stdType(pkg, name string, c *Checker) Type {
 	return nil
 }
 
-// ctxClass 是 N12 的 `Ctx` 约定（核心设计 §16 N12）：
+// ctxClass 是 `Ctx` 约定：
 //
 //	class Ctx { var vals map[str]str  func with(k str, v str) -> Ctx  func get(k str) -> (str, bool) }
 //
@@ -244,7 +244,7 @@ func (c *Checker) checkStdCall(v *parse.Call, pkg string, expect Type) (Type, bo
 	// 旧助手面（option.ok/none/isSome/isNone/unwrap）随之删除：match 是穷尽的，
 	// 不需要那套查询函数。命中旧拼写会给"no such function"（下面统一报错）。
 	if pkg == "testing" {
-		// 面 = eq/gt/lt（§十四），签名恒为 (实得, 期望, "note")：三参、前两值同型、
+		// 面 = eq/gt/lt，签名恒为 (实得, 期望, "note")：三参、前两值同型、
 		// 说明是 str（失败消息里原样打印）。
 		if fnName != "eq" && fnName != "gt" && fnName != "lt" {
 			c.errorAt(v.Pos, "no such function in the package", "testing."+fnName,
@@ -421,7 +421,7 @@ func stdFuncSig(pkg, name string) (stdSig, bool) {
 			// sleep(d Duration)：任务让出（非线程阻塞）。单位进类型（P3）。
 			return stdSig{[]string{"d"}, []Type{durationType()}, nil}, true
 		case "after":
-			// N6：`time.after(ms)` 返回**单调毫秒截止点**（select 的时间分支就绪条件）。
+			// `time.after(ms)` 返回**单调毫秒截止点**（select 的时间分支就绪条件）。
 			return stdSig{[]string{"ms"}, []Type{TI64}, []Type{TI64}}, true
 		case "Sec", "Ms", "Us":
 			// Duration 构造（《AIC 标准库规范》§5.3）：单位进类型，禁裸毫秒参数
@@ -456,7 +456,7 @@ func stdFuncSig(pkg, name string) (stdSig, bool) {
 		case "new":
 			return stdSig{nil, nil, []Type{ctxClass()}}, true
 		}
-	// math 包已取消（《AIC 标准库规范》§2.5）：标量数值函数进基本类型方法集。
+	// math 包已取消（《AIC 标准库规范》）：标量数值函数进基本类型方法集。
 	// 留这个分支会让人以为 `import math` 还有意义。
 	}
 	return stdSig{}, false
@@ -512,7 +512,7 @@ func (c *Checker) checkErrCtor(v *parse.Call, isWrap bool) (Type, bound, untyped
 func (c *Checker) checkErrCodeArg(e parse.Expr, what string) {
 	at, _, u := c.checkExprFull(e, nil)
 	if at == nil {
-		// 未定型整数字面量（`Err(10, "bad")`）：§一 把定型推迟到使用点，
+		// 未定型整数字面量（`Err(10, "bad")`）： 把定型推迟到使用点，
 		// 这里就是使用点 —— 只看 at 会**整条静默放行**（010 语料实测）。
 		if u.kind == unInt || u.kind == unUint {
 			c.errorAt(parse.ExprPos(e), "a bare integer is not an error code",
@@ -535,8 +535,8 @@ func (c *Checker) checkErrCodeArg(e parse.Expr, what string) {
 		"declare `enum PkgErr: ErrCode { ... }` and write Err(PkgErr.Variant, \"msg\") (AIC language spec §7.2)")
 }
 
-// requirePrintable 校验一个值能否打印（§十四）：
-//   - class（含 @packed）必须带 @derive(ToString)——没有 ToString 的 class 是编译错；
+// requirePrintable 校验一个值能否打印：
+//   - class（含 struct）必须带 derive ToString——没有 ToString 的 class 是编译错；
 //   - 容器/数组/enum 负载递归检查（打印会穿透到元素，规则同源）；
 //   - 其余（数值/bool/str/Err/nil/无数据 enum）恒可打印。
 //
@@ -549,9 +549,9 @@ func (c *Checker) requirePrintable(at parse.Expr, t Type, pos parse.Pos) {
 	if bad == nil {
 		return
 	}
-	c.errorAt(pos, "printing a class needs @derive(ToString)",
+	c.errorAt(pos, "printing a class needs derive ToString",
 		"type "+bad.String()+" has no ToString",
-		"annotate the class with @derive(ToString), or print its fields individually (core design §14)")
+		"annotate the class with derive ToString, or print its fields individually (core design §14)")
 }
 
 // unprintableClass 返回类型里第一个不可打印的 class（可打印返回 nil）。

@@ -10,10 +10,10 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 函数/方法签名、返回结构、原型、入口包装 (核心设计 §四/§六/§八)。
+// 函数/方法签名、返回结构、原型、入口包装 。
 //
 // 返回形状: 0 个 = void; 1 个 = 该类型; ≥2 个 = 合成 struct aic_r_<形状>
-// (元组非一等类型, 只是调用约定糖, §二.2; Err 只占末位, §六)。
+// (元组非一等类型, 只是调用约定糖; Err 只占末位)。
 // ---------------------------------------------------------------------------
 
 // stdRetStructs 是 runtime/aic_std.h 已声明的合成返回结构（键 = 返回位的 mangling 段）。
@@ -59,7 +59,7 @@ func (c *Ctx) retCT(sig *types.FuncSig) string {
 }
 
 // cFuncName 返回函数/方法在 C 侧的符号名。
-// 规则 (§八): extern/export = 原名直出; 其余 = aic_<pkg>_<name>, 方法加类型名。
+// 规则: extern/export = 原名直出; 其余 = aic_<pkg>_<name>, 方法加类型名。
 func (c *Ctx) cFuncName(sig *types.FuncSig) string {
 	if sig.Extern || sig.Export {
 		return ExternName(sig.Name)
@@ -67,7 +67,7 @@ func (c *Ctx) cFuncName(sig *types.FuncSig) string {
 	return MangleFunc(c.pkg(), sig.Recv, sig.Name)
 }
 
-// paramList 返回 C 形参表文本 (方法首位补 this, §八: this 为第一参数)。
+// paramList 返回 C 形参表文本 (方法首位补 this 为第一参数)。
 func (c *Ctx) paramList(sig *types.FuncSig) string {
 	parts := make([]string, 0, len(sig.Params)+1)
 	if sig.Recv != "" {
@@ -251,7 +251,7 @@ func (c *Ctx) storageClass(sig *types.FuncSig) string {
 }
 
 // emitEntry 发射 C 入口: 建任务根区域 + os 参数 + Err 出口 (main 内逃逸 =
-// 退出码 1 + stderr 打印 err.msg, §六)。
+// 退出码 1 + stderr 打印 err.msg)。
 func (c *Ctx) emitEntry() {
 	if c.Info == nil {
 		return
@@ -273,14 +273,14 @@ func (c *Ctx) emitEntry() {
 	c.line("int main(int argc, char **argv) {")
 	c.line("    aic_task_init(%s, %d);", cstr(c.Path), line)
 	if c.needed["l2"] {
-		// 调度层起手初始化（存活任务计数 / 串行模式令牌）。只在用到 L2 时发（红线 16）。
+		// 调度层起手初始化（存活任务计数 / 串行模式令牌）。只在用到 L2 时发。
 		c.line("    aic_sched_init();")
 	}
 	c.line("    aic_os_init(argc, argv);")
 	if sig.HasErrResult() {
 		c.line("    aic_Err _err = %s();", mainSym)
 		c.line("    if (_err.code != 0) {")
-		// cause 链逐级打印（§16 N5 ④ 规则 5）；无链时与原来逐字节一致。
+		// cause 链逐级打印（§16 ④ 规则 5）；无链时与原来逐字节一致。
 		c.line("        aic_err_report(_err); /* stderr：规范「退出码 1 + stderr」 */")
 		c.line("        return 1;")
 		c.line("    }")

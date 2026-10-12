@@ -7,7 +7,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// interface 发射（核心设计 §四 值 = {data, vt}；§十 见证表 + trampoline）。
+// interface 发射（值 = {data, vt}； 见证表 + trampoline）。
 //
 //   装箱    class → ((aic_iface){ .data = obj, .vt = &aic_vt_<Ifc>__<Ty> })
 //   见证表  aic_vt_<IfcPkg>_<Ifc>__<TyPkg>_<Ty>[槽位] = 薄 trampoline
@@ -18,8 +18,8 @@ import (
 // 一份（禁为每个接口复制方法体）。见证表按 (接口, 具体类) 配对登记，名字唯一且
 // 每 TU 自足（单文件编译 + 无 LTO 下跨 TU extern 见证表会有链接期顺序问题）。
 //
-// @packed 满足接口 = 装箱**值副本**（当前区域分配带头对象、拷入 packed 值；
-// 经接口修改副本不回写原值，§四）。
+// struct 满足接口 = 装箱**值副本**（当前区域分配带头对象、拷入 struct 值；
+// 经接口修改副本不回写原值）。
 // ---------------------------------------------------------------------------
 
 // witnessEntry 是一张已登记的见证表。
@@ -29,7 +29,7 @@ type witnessEntry struct {
 	ifc  *types.Interface
 }
 
-// witnessName 是见证表的 C 符号名（唯一实现，与 §八 命名规则同源）。
+// witnessName 是见证表的 C 符号名（唯一实现，与命名规则同源）。
 func witnessName(ifc *types.Interface, cl *types.Class) string {
 	return fmt.Sprintf("aic_vt_%s_%s__%s_%s", ifc.Pkg, ifc.Name, cl.Pkg, cl.Name)
 }
@@ -111,11 +111,11 @@ func (c *Ctx) trampName(table int, slot string) string {
 func (c *Ctx) emitTrampoline(table int, w witnessEntry, slot string) error {
 	msig, _ := w.cl.Method(slot)
 	// data 指向**对象**（typedef 名），不是「指针的指针」：cTypeName(引用类) 带 ` *`，
-	// 直接拼会得到 `aic_ok_Rect * *`。@packed 的方法 this 是**值**（装箱副本），
-	// 故取 `*` 解引用（§四：@packed 满足接口 = 装箱值副本）。
+	// 直接拼会得到 `aic_ok_Rect * *`。struct 的方法 this 是**值**（装箱副本），
+	// 故取 `*` 解引用（struct 满足接口 = 装箱值副本）。
 	ct := c.typedefName(c.ownerPkg(w.cl.Pkg), w.cl.Name)
 	recv := fmt.Sprintf("(%s *)self.data", ct)
-	if w.cl.Packed {
+	if w.cl.Struct {
 		recv = "*" + recv
 	}
 	args := make([]string, 0, len(msig.Params))
@@ -139,9 +139,9 @@ func commaPrefix(params string) string {
 }
 
 // ---------------------------------------------------------------------------
-// 接口值的打印（§十四 的扩展槽）：接口的动态类型在编译期未知，故见证表在方法槽
+// 接口值的打印（扩展槽）：接口的动态类型在编译期未知，故见证表在方法槽
 // 之后追加**打印槽**（下标 = 接口方法数）。打印槽的 trampoline 调具体类型的打印
-// 函数；具体类型没有 @derive(ToString) 时打印 `<类名>`（确定性、不 trap）。
+// 函数；具体类型没有 derive ToString 时打印 `<类名>`（确定性、不 trap）。
 // ---------------------------------------------------------------------------
 
 // ifacePrintKey 是接口打印槽的登记键（包名限定，跨包同名接口不混）。
@@ -187,7 +187,7 @@ func (c *Ctx) emitIfacePrintTramp(table int, w witnessEntry) error {
 			return err
 		}
 		recv := fmt.Sprintf("(%s *)self.data", c.typedefName(c.ownerPkg(w.cl.Pkg), w.cl.Name))
-		if w.cl.Packed {
+		if w.cl.Struct {
 			recv = "*" + recv
 		}
 		c.line("    %s(%s, 0);", pn, recv)

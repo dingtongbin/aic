@@ -8,8 +8,8 @@ package lex
 // v7 换基：36 硬关键字，**0 个上下文关键字**，**0 个注解**。
 //   - 相对 v2 的 24 关键字，新增 struct/errdefer/select/case/use/implements/
 //     include/derive/comptime/assert/catch/into；
-//   - `@packed` 由 struct 取代，`@derive(A,B)` 成为声明修饰词，
-//     `@noblock`/`@blocking` 成为 extern 修饰词 —— 注解机制整体删除；
+//   - 没有注解机制（`@` 不是词法合法字符）：值类型 = struct，能力 = derive，
+//     存储层级 = live，C ABI = extern，都是硬关键字，不是修饰记号；
 //   - `catch` 从上下文词升为硬关键字（错误处理必经之路，不容猜测）；
 //   - `?` 与 `or` 从运算符表删除（同一语义两种拼写，P1 违反）。
 // ---------------------------------------------------------------------------

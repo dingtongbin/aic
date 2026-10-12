@@ -13,7 +13,7 @@ import (
 	"aic/internal/types"
 )
 
-// dump-ir：把整程序降级为 AIR 并打印（核心设计 §十：文本 IR 是投影）。
+// dump-ir：把整程序降级为 AIR 并打印（文本 IR 是投影）。
 //
 // 纪律：**发射前必过 verifier**，verifier 拒绝 = 编译失败（§10.5，无 --no-verify）。
 // 当前只支持 `--stage air`（去糖后）；mair/eair/cir 随 T2 后续批次落地。
@@ -80,7 +80,7 @@ func cmdDumpIR(args []string) int {
 			return 1
 		}
 		// mair = **单态化后**：泛型函数/方法按实例各降一份体、泛型类按实例发声明，
-		// 不留类型形参（V1.2）。降级时已带实例上下文，故这里只做校验。
+		// 不留类型形参。降级时已带实例上下文，故这里只做校验。
 		var mono []string
 		if stage == "mair" || stage == "cir" {
 			mono = air.VerifyMono(m, res.Info)

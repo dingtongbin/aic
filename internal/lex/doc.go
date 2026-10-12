@@ -1,6 +1,6 @@
 // Package lex implements the AIC lexer.
 //
-// 核心设计 §2.1: 29 keywords plus reserved words (true/false/nil — nil only
+// 29 keywords plus reserved words (true/false/nil — nil only
 // legal in Err positions); identifiers start with an ASCII letter or `_` and may
 // contain digits and a single underscore, consecutive underscores rejected
 // (reserved for mangling); comments //, /* */ (non-nesting) and ///;

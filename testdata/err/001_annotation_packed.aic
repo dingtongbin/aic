@@ -1,5 +1,0 @@
-import fmt
-
-// `@packed` 不是注解：struct 是值类型拼写
-@packed
-class Point { var x i32 }

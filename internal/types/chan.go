@@ -3,8 +3,8 @@ package types
 import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
-// chan[T]（核心设计 §七）：channel 只传值，元素必须在**深拷贝安全集**内
-// （基本类型 / str / @packed / 无负载 enum 及其容器——该集合无环，深拷贝必终止）。
+// chan[T]：channel 只传值，元素必须在**深拷贝安全集**内
+// （基本类型 / str / struct / 无负载 enum 及其容器——该集合无环，深拷贝必终止）。
 // T1 面：send(v) / recv() -> (T, bool) / len()；无 select、无取消（【O3】【O4】）。
 // ---------------------------------------------------------------------------
 
@@ -107,13 +107,13 @@ func (c *Checker) resolveChanType(v *parse.NamedType) Type {
 	}
 	if !chanSafeElem(elem) {
 		c.errorAt(v.Pos, "this element type cannot cross a channel", "chan["+elem.String()+"]",
-			"a channel carries values only: basic types / str / @packed / payload-free enums and their containers (core design §7)")
+			"a channel carries values only: basic types / str / struct / payload-free enums and their containers (core design §7)")
 		return nil
 	}
 	return &ChanT{Elem: elem}
 }
 
-// chanMethod 返回 channel 内建方法签名（§七）。
+// chanMethod 返回 channel 内建方法签名。
 func chanMethod(t Type, name string) (*FuncSig, bool) {
 	ch, ok := t.(*ChanT)
 	if !ok {
@@ -124,10 +124,10 @@ func chanMethod(t Type, name string) (*FuncSig, bool) {
 		return &FuncSig{Name: name, Params: []string{"v"}, ParamTypes: []Type{ch.Elem}}, true
 	case "recv":
 		// recv() -> (T, Err)：Err = std.Code.ChanExhausted（无存活发送方且缓冲排空）。
-		// 不用 bool：错误必须是 Err 才能进统一错误处理（标准库规范 §2.4）。
+		// 不用 bool：错误必须是 Err 才能进统一错误处理（标准库规范）。
 		return &FuncSig{Name: name, Results: []Type{ch.Elem, TErr}}, true
 	case "tryRecv":
-		// 不存在 = Option（§2.4），不是零值
+		// 不存在 = Option，不是零值
 		return &FuncSig{Name: name, Results: []Type{optionInstance(ch.Elem)}}, true
 	case "drain":
 		// 非阻塞取至多 n 个
@@ -136,7 +136,7 @@ func chanMethod(t Type, name string) (*FuncSig, bool) {
 	case "len":
 		return &FuncSig{Name: name, Results: []Type{TUsize}}, true
 	case "cap":
-		// 容量（0 = 无界）：背压上界是**可观察事实**（N11 的"有界/无界"由此可判）。
+		// 容量（0 = 无界）：背压上界是**可观察事实**（"有界/无界"由此可判）。
 		return &FuncSig{Name: name, Results: []Type{TUsize}}, true
 	}
 	return nil, false

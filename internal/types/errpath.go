@@ -5,7 +5,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 错误通路 E1–E4（核心设计 §15.7 / §16 N5）。
+// 错误通路 E1–E4（§16）。
 //
 //   E1 传播 `expr?`      —— 等价于既有 `check expr`（解析层已归一到 CheckExpr）
 //   E2 降级 `expr or d`  —— 末位 Err 非 nil 取默认值，不中断
@@ -13,11 +13,11 @@ import (
 //                          表达式语句结尾（那条表达式的值即整个表达式的值）
 //   E4 断言 `expr!`      —— 出错 = trap（含 code/msg/位置）
 //
-// 四条通路只对**末位 Err**生效（Err 恒为返回位末位，红线 2）。E2/E3/E4 都
+// 四条通路只对**末位 Err**生效（Err 恒为返回位末位）。E2/E3/E4 都
 // **不要求所在函数带 Err 位**：它们不传播。
 // ---------------------------------------------------------------------------
 
-// rejectUnconsumedErr 实现 §15.7 规则③在**无人接收结果**的语句位上（defer / spawn）：
+// rejectUnconsumedErr 实现规则③在**无人接收结果**的语句位上（defer / spawn）：
 // 调用的末位是 Err ⇒ 那个错误永远观察不到 ⇒ 编译错。
 func (c *Checker) rejectUnconsumedErr(e parse.Expr, where string, at parse.Pos) {
 	call, ok := e.(*parse.Call)
@@ -139,8 +139,8 @@ func alwaysExitsBlock(b *parse.Block) bool {
 func BlockAlwaysExits(b *parse.Block) bool { return alwaysExitsBlock(b) }
 
 // ---------------------------------------------------------------------------
-// N2 字符串插值（核心设计 §16）：占位符只接受能**最短往返**格式化的类型。
-// 数值走与 print 族同一套 aic_fmt_*（红线 20：禁第二套格式化），字符串恒等，
+// 字符串插值：占位符只接受能**最短往返**格式化的类型。
+// 数值走与 print 族同一套 aic_fmt_*（禁第二套格式化），字符串恒等，
 // bool 为 true/false。其余类型（class/enum/容器/函数/Err）一律编译错。
 // ---------------------------------------------------------------------------
 
@@ -150,7 +150,7 @@ func (c *Checker) checkInterp(v *parse.InterpLit) (Type, bound, untyped) {
 		vt, _, u := c.checkExprFull(e, nil)
 		if vt == nil {
 			// 占位符是**未定型常量**（`{1000}` / `{6 & 3}` / `{~0}`）：检查器
-			// 按 §一 把定型推迟到使用点 —— 插值选格式化器正是那个使用点
+			// 按把定型推迟到使用点 —— 插值选格式化器正是那个使用点
 			// （与 `var x = …` 的 inferFromInit 同源）。不定型则 c.types[e] 恒为
 			// nil，IR-1 的 ValueTys 拿不到类型，去糖无从选格式化器（002/003/017
 			// 语料实测全部卡在降级）。
@@ -165,7 +165,7 @@ func (c *Checker) checkInterp(v *parse.InterpLit) (Type, bound, untyped) {
 		}
 		c.errorAt(parse.ExprPos(e), "this type cannot be interpolated into a string",
 			exprText(e)+" has type "+vt.String(),
-			"interpolation formats str, integers, floats and bool only; convert explicitly first (str.fromI64 / str.fromF64 / str.fromBool), or give the type @derive(ToString) and interpolate its fields (core design §16 N2)")
+			"interpolation formats str, integers, floats and bool only; convert explicitly first (str.fromI64 / str.fromF64 / str.fromBool), or give the type derive ToString and interpolate its fields (core design §16 N2)")
 	}
 	return TStr, nilBound, untyped{}
 }
@@ -196,7 +196,7 @@ func interpFormattable(t Type) bool {
 func InterpFormattable(t Type) bool { return interpFormattable(t) }
 
 // ---------------------------------------------------------------------------
-// N1 闭包捕获（核心设计 §16 N1）。
+// 闭包捕获。
 //
 // 语义：**按值捕获**——捕获时点拷贝一份；捕获项集合 = 环境结构体。
 // 判定「是不是捕获」只看名字的解析落点：命中点在当前闭包自己的作用域
@@ -222,7 +222,7 @@ func (c *Checker) noteCapture(e parse.Expr, name string, sym *Symbol) {
 	if c.caps == nil {
 		return
 	}
-	// 捕获物不得是可变全局（红线 21：无顶层 var）—— 语言层已不可能，这里只做
+	// 捕获物不得是可变全局（无顶层 var）—— 语言层已不可能，这里只做
 	// 防御：常量/函数/类型不是值，下面按 Kind 过滤。
 	switch sym.Kind {
 	case SymVar, SymConst:
@@ -260,7 +260,7 @@ func (c *Checker) noteCapture(e parse.Expr, name string, sym *Symbol) {
 
 // closureBound 是闭包值的区域界。捕获项一律来自**外层或当前块**（深度 ≤ 创建点），
 // 故闭包与其它创建表达式同形：off = 创建点深度，exact = true ——
-// 「在 region 内创建、存进 region 外的变量」因此是**编译错**（N1 的既定语义）。
+// 「在 region 内创建、存进 region 外的变量」因此是**编译错**（既定语义）。
 func closureBound(caps []capture, cur int) bound {
 	off := cur
 	for _, cp := range caps {

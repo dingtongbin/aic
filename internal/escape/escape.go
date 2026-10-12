@@ -1,8 +1,8 @@
-// Package escape 是 AIR 上的逃逸与区域分析（核心设计 §10.3）。
+// Package escape 是 AIR 上的逃逸与区域分析。
 //
 // **证明与消除分成两个 pass**：`Prove` 产事实（每个值与宿主的深度界），`Elim` 只
 // 消费事实（不得自行推导）。消去 = 四条可解释规则 E1–E4，各自独立计数；verifier
-// 复核每条消去的前提（V8），不接受「分析器说安全」。
+// 复核每条消去的前提，不接受「分析器说安全」。
 //
 // 本包**不管释放**（aic 无 GC/RC/free）：产出是①消去存储点守卫 ②为 restrict 提供
 // 依据 ③为值语义聚合的 SROA 提供依据 ④校验区域归属决策。
@@ -18,7 +18,7 @@ import (
 )
 
 // Bound 是一个值的深度界：Depth = 相对当前 region 深度的偏移（exact = 精确界）。
-// 深度语义与检查器同一套（§五 R3）：创建 = 精确偏移；变量读 = 声明偏移；
+// 深度语义与检查器同一套：创建 = 精确偏移；变量读 = 声明偏移；
 // 字段/元素读 = 宿主界；参数 = 0；调用 = 调用点偏移 + 摘要(=0)。
 type Bound struct {
 	Depth int
@@ -46,7 +46,7 @@ type Fact struct {
 	HostB    Bound
 	Limit    string
 	PlaceVar string // 目标 place 的根变量名（E1 用）
-	Live     bool   // 目标变量带 @live（E1 必须保留的反例）
+	Live     bool   // 目标变量带 live（E1 必须保留的反例）
 	DeclIn   bool   // 目标变量声明在**本 region 实例内**（E1 的充分条件）
 }
 
@@ -61,7 +61,7 @@ type Report struct {
 	Elims      []Elim
 }
 
-// Elim 是一条消去记录（V8：每条消去都能在 IR 里查到对应 store + 规则 + 理由）。
+// Elim 是一条消去记录（每条消去都能在 IR 里查到对应 store + 规则 + 理由）。
 type Elim struct {
 	Fn, Block string
 	Rule      string
@@ -111,7 +111,7 @@ func proveFunc(f *air.Func, out map[storeKey]Fact) {
 		params[p.Name] = true
 		// 参数界 = **非精确**的入口位 0。
 		//
-		// 设计 §五 R3 的参数定理只保证「参数派生链写本函数**局部变量**恒安全」（局部的
+		// 设计参数定理只保证「参数派生链写本函数**局部变量**恒安全」（局部的
 		// 存储深度 ≥ 0 ≥ 参数的相对界）；它**不**保证两个参数之间的深度顺序。这里
 		// 若写 exact(0)，`func sink(h Holder, t Buf) { h.b = t }` 的字段存会被 E2
 		// （两边都是"精确 0"）消去 —— 实测：`region { var t = Buf{}; sink(h, t) }`
@@ -191,7 +191,7 @@ func boundOfRHS(r air.RHS, depth int, vars map[string]Bound) Bound {
 	case *air.VarRef:
 		return boundOfVal(v.Name, depth, vars)
 	case *air.Call:
-		// 调用表达式 = 调用点偏移 + 返回摘要(=0)（§五 R3：摘要必须 = 0）→ 非精确
+		// 调用表达式 = 调用点偏移 + 返回摘要(=0)（摘要必须 = 0）→ 非精确
 		return inexact(depth)
 	case *air.CallInd:
 		return inexact(depth) // 间接调用：实参升 Top，界不可知

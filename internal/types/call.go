@@ -8,8 +8,8 @@ import (
 
 
 // ---------------------------------------------------------------------------
-// 调用 / 成员访问 / 下标（核心设计 §二.2 容器面、§二.3 str、§三、§四 构造、
-// §八 FFI 句柄不涉区域）。
+// 调用 / 成员访问 / 下标（容器面、 str、 构造、
+// FFI 句柄不涉区域）。
 // ---------------------------------------------------------------------------
 
 func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
@@ -33,7 +33,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			return c.checkStdCall(v, id.Name, expect)
 		}
 	}
-	// Err.wrap(code, msg, cause)：内建错误链构造（§16 N5 ④）。Fn = Field{Err, wrap}，
+	// Err.wrap(code, msg, cause)：内建错误链构造（§16 ④）。Fn = Field{Err, wrap}，
 	// 必须在"包成员"分派之前认出来（Err 不是包，否则会报"未声明的名字 Err"）。
 	if f, isField := v.Fn.(*parse.Field); isField {
 		if base, isID := f.X.(*parse.Ident); isID && base.Name == "Err" {
@@ -73,7 +73,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			}
 		}
 	}
-	// channel 构造：chan[T].new()（类型由类型实参给出，§七）
+	// channel 构造：chan[T].new()（类型由类型实参给出）
 	if field, ok := v.Fn.(*parse.Field); ok && field.Name == "new" {
 		if ix, isIx := field.X.(*parse.Index); isIx {
 			if id, isID := ix.X.(*parse.Ident); isID && id.Name == "chan" {
@@ -89,8 +89,8 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 				if ct == nil {
 					return nil, nilBound, untyped{}
 				}
-				// N11：`chan[T].new()` = **无界**缓冲（§七【O2 决议】）；`new(cap)` cap>0 = 有界
-				// （满即背压点，串行 L2 下 trap）；cap 0 与省略同义。无 rendezvous 形（规划 §十二 R9）。
+				// `chan[T].new()` = **无界**缓冲（【O2 决议】）；`new(cap)` cap>0 = 有界
+				// （满即背压点，串行 L2 下 trap）；cap 0 与省略同义。无 rendezvous 形（规划）。
 				if len(v.Args) > 1 {
 					c.errorAt(v.Pos, "chan.new takes at most one capacity argument", "chan[T].new(cap)",
 						"write chan[T].new() for an unbounded channel, or chan[T].new(cap) with cap > 0 for backpressure (core design §16 N11)")
@@ -111,7 +111,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			}
 		}
 	}
-	// 容器构造：set.new() / map.new()（类型来自声明处，§二.2）
+	// 容器构造：set.new() / map.new()（类型来自声明处）
 	if field, ok := v.Fn.(*parse.Field); ok {
 		if id, isId := field.X.(*parse.Ident); isId && (id.Name == "set" || id.Name == "map") && field.Name == "new" {
 			if len(v.Args) > 0 {
@@ -159,11 +159,11 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 		}
 	}
 
-	// 编译期内省原语（N4）：typeName(T) / sizeOf(T) / isValueType(T)。
+	// 编译期内省原语：typeName(T) / sizeOf(T) / isValueType(T)。
 	if name := comptimeIntrinsic(v); name != "" {
 		return c.checkComptimeCall(v, name, expect)
 	}
-	// 类型级方法调用（N4）：`Class.method(args)` —— 方法带 NoRecv（如 @derive(Default)
+	// 类型级方法调用：`Class.method(args)` —— 方法带 NoRecv（如 derive Default
 	// 生成的 default()），接收者是**类型名**而不是值，故必须在求值接收者之前处理。
 	if field, ok := v.Fn.(*parse.Field); ok {
 		if id, isID := field.X.(*parse.Ident); isID {
@@ -174,7 +174,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			}
 		}
 	}
-	// map/set 构造：`map[K]V.new()` / `set[T].new()`（§四：唯一构造 = .new()）
+	// map/set 构造：`map[K]V.new()` / `set[T].new()`（唯一构造 = .new()）
 	// **必须在通用"方法调用"分支之前**：那里会把 map[K]V 当值求值，
 	// 报出"未声明的名字 map"这种与真实错误无关的诊断（与泛型类同题）。
 	if field, ok := v.Fn.(*parse.Field); ok && field.Name == "new" {
@@ -194,7 +194,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 				}
 				if !hashable(key) {
 					c.errorAt(tn.Pos, "the map key type is not hashable", typeText(key),
-						"a key allows numeric / bool / str / payload-free enum / @packed only (AIC language spec §4)")
+						"a key allows numeric / bool / str / payload-free enum / struct only (AIC language spec §4)")
 					return nil, nilBound, untyped{}
 				}
 				if _, ok := RuntimeMapKeySuffix(key); !ok {
@@ -249,7 +249,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 		recvTy, recvBound, recvInfo := c.checkExprFull(field.X, nil)
 		if recvTy == nil {
 			// **字面量接收者**：按字面量的默认类型定型（`"abc".isEmpty()` / `(1).…` 这类
-			// 最常用形态）。默认类型由 literalDefault 给（§一 字面量取最窄）。
+			// 最常用形态）。默认类型由 literalDefault 给（字面量取最窄）。
 			if dt := c.literalDefault(recvInfo, parse.ExprPos(field.X)); dt != nil {
 				recvTy, recvBound = dt, bound{}
 			}
@@ -274,7 +274,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			sym.Used = true // C22：调用闭包值 = 一次读（不走 checkIdent，这里补）
 			if ft, isFnT := sym.Type.(*FuncT); isFnT {
 				// 记录被调名自身的类型：AIR/发射侧靠它区分「直接调用自由函数」与
-				// 「调用闭包值」（后者要带环境，N1）。
+				// 「调用闭包值」（后者要带环境）。
 				if c.types != nil {
 					c.types[id] = ft
 				}
@@ -306,7 +306,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 		}
 		if _, isPkg := c.imports[id.Name]; !isPkg {
 			if isComptimeOnlyName(id.Name) {
-				// N4：内省原语只在编译期可用 —— 报"没有运行期形态"，而不是"未声明的函数"。
+				// 内省原语只在编译期可用 —— 报"没有运行期形态"，而不是"未声明的函数"。
 				c.errorAt(v.Pos, "compile-time introspection has no runtime form", id.Name,
 					id.Name+"(T) exists in constant positions only (const / comptime block / [T;N] size): the compiler emits no type metadata (core design §16 N4)")
 				return nil, nilBound, untyped{}
@@ -321,13 +321,13 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 	return nil, nilBound, untyped{}
 }
 
-// checkInvoke 校验实参并返回调用结果类型与界（界 = 调用点偏移，§五 R3）。
+// checkInvoke 校验实参并返回调用结果类型与界（界 = 调用点偏移）。
 //
 // recv 非 nil 时为方法调用，但 **ParamTypes 不含接收者槽位**：语义侧的
-// FuncSig.ParamTypes 一律只列真实形参（this 由接收者提供，§八 的「this 为第一
+// FuncSig.ParamTypes 一律只列真实形参（this 由接收者提供，「this 为第一
 // 参数」是 C 侧调用约定，不是语义签名的一部分）。此处用 `params[1:]` 去砍
 // 首位会让零参方法直接切片越界 panic、有参方法丢掉第一个实参位——两处各写
-// 一份「this 占不占槽位」的必然结果（红线 10 的同款病）。
+// 一份「this 占不占槽位」的必然结果（同款病）。
 func (c *Checker) checkInvoke(v *parse.Call, sig *FuncSig, recv Type, recvBound bound, expect Type) (Type, bound, untyped) {
 	params := sig.ParamTypes
 	args := v.Args
@@ -339,7 +339,7 @@ func (c *Checker) checkInvoke(v *parse.Call, sig *FuncSig, recv Type, recvBound 
 	}
 	for i, a := range args {
 		at, _, ainfo := c.checkExprFull(a, params[i])
-		// §二.2：多返回值**不可传参**（它是调用点语义，不是值）。只在 var 声明处拦，
+		// 多返回值**不可传参**（它是调用点语义，不是值）。只在 var 声明处拦，
 		// `print.println(f(3))`（f 带 Err 位）会过 check、到发射才炸出无关诊断
 		// （"type (i32, Err) cannot be printed"）—— check 与 build 分叉。
 		if mt, isMulti := at.(*MultiType); isMulti {
@@ -365,7 +365,7 @@ func (c *Checker) checkInvoke(v *parse.Call, sig *FuncSig, recv Type, recvBound 
 	return res, bound{off: off}, untyped{}
 }
 
-// MultiType 是调用点语义的多返回值（不可存储/传参，§二.2）。
+// MultiType 是调用点语义的多返回值（不可存储/传参）。
 type MultiType struct{ Elems []Type }
 
 func (*MultiType) typeNode() {}
@@ -412,7 +412,7 @@ func (c *Checker) checkConversion(v *parse.Call, target *Basic) (Type, bound, un
 	}
 	at, _, ainfo := c.checkExprFull(v.Args[0], target)
 	if at == nil && (ainfo.kind == unInt || ainfo.kind == unUint || ainfo.kind == unFloat) {
-		at = target // 字面量按目标类型做范围证明（§二.4）
+		at = target // 字面量按目标类型做范围证明
 	}
 	if at == nil {
 		return nil, nilBound, untyped{}
@@ -553,7 +553,7 @@ func (c *Checker) checkMethodCall(v *parse.Call, field *parse.Field, recvTy Type
 	if isStr(recvTy) {
 		return c.checkStrMethod(v, field, recvBound, expect)
 	}
-	// channel 方法（§七：send/recv/len）
+	// channel 方法（send/recv/len）
 	if sig, ok := chanMethod(recvTy, field.Name); ok {
 		return c.checkContainerMethod(v, recvTy, recvBound, sig, recvTy, expect)
 	}
@@ -582,7 +582,7 @@ func (c *Checker) checkMethodCall(v *parse.Call, field *parse.Field, recvTy Type
 					return nil, nilBound, untyped{}
 				}
 				// 单态化（mair）要按实例各降一份方法体：把 (方法, 实例实参) 登记下来
-				// —— 与泛型自由函数同一条纪律（实例键与符号名同源，红线 11）。
+				// —— 与泛型自由函数同一条纪律（实例键与符号名同源）。
 				if len(bcl.TypeParams) > 0 {
 					c.noteMethodInst(m, inst.Args)
 				}
@@ -603,8 +603,8 @@ func (c *Checker) checkMethodCall(v *parse.Call, field *parse.Field, recvTy Type
 			"see the interface declaration for its method set")
 		return nil, nilBound, untyped{}
 	}
-	// N3：泛型形参上的方法调用由**约束**授权（接口约束按签名分发；Ord/Hash 授权
-	// compare/hash 这两个 @derive 生成的方法）。方法体只写一次，实例化时按约束
+	// 泛型形参上的方法调用由**约束**授权（接口约束按签名分发；Ord/Hash 授权
+	// compare/hash 这两个 derive 生成的方法）。方法体只写一次，实例化时按约束
 	// 直接落到具体方法上。
 	if tp, ok := recvTy.(*TypeParam); ok {
 		if sig, ok2 := c.constraintMethod(tp.Name, field.Name, tp, v.Pos); ok2 {
@@ -649,7 +649,7 @@ func errMethod(name string) (*FuncSig, bool) {
 	return nil, false
 }
 
-// constraintMethod 在泛型形参的约束集里找方法（N3）。
+// constraintMethod 在泛型形参的约束集里找方法。
 // 找到 = 返回按形参代换过的签名；找不到 = 已报错（返回 false）。
 func (c *Checker) constraintMethod(param, method string, tp *TypeParam, at parse.Pos) (*FuncSig, bool) {
 	cons := c.constraintsOfParam(param)
@@ -694,8 +694,8 @@ func ContainerMethodSig(t Type, name string) (*FuncSig, bool) {
 	return sig, ok
 }
 
-// containerMethod 返回容器内建方法签名（核心设计 §二.2）。
-// scalarMethod 返回标量数值方法签名（《AIC 标准库规范》§2.5）。
+// containerMethod 返回容器内建方法签名。
+// scalarMethod 返回标量数值方法签名（《AIC 标准库规范》）。
 // math 包已取消：`x.sqrt()` 而非 `math.sqrt(x)`（划界第 1 条：纯值变换 = 方法）。
 func scalarMethod(ty string, name string, self *Basic) (*FuncSig, bool) {
 	switch ty {
@@ -855,7 +855,7 @@ func (c *Checker) checkContainerMethod(v *parse.Call, recvTy Type, recvBound bou
 }
 
 // markStoreGuard 对「把引用型值写入深度 ≤ 接收者界的存储」判定守卫/编译错
-// （存储点全清单 ⓪–⑥，核心设计 §五 R3）。
+// （存储点全清单 ⓪–⑥）。
 func (c *Checker) markStoreGuard(value parse.Expr, targetBound bound, what string) {
 	vt, vb, _ := c.checkExprFull(value, nil)
 	if vt == nil {
@@ -865,7 +865,7 @@ func (c *Checker) markStoreGuard(value parse.Expr, targetBound bound, what strin
 		return // 值类型无引用，免守卫
 	}
 	if vb.off <= targetBound.off {
-		// 静态可证安全 —— **但两个参数之间除外**：参数定理（§五 R3）只给出
+		// 静态可证安全 —— **但两个参数之间除外**：参数定理只给出
 		// "形参绝对深度 ≤ 入口"，因此参数派生值写本函数**局部变量**恒安全；
 		// 而参数 A 的字段/容器（宿主也是参数）与参数 B 的值之间**没有深度顺序**。
 		// 一律跳过会让 `func sink(h Holder, t Buf) { h.b = t }` 无守卫，

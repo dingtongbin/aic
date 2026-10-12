@@ -9,14 +9,19 @@ package types
 // ---------------------------------------------------------------------------
 
 // RuntimeSuffix 报告元素类型在容器/通道实例化表里的短后缀。
-// 规则：基本类型（除 Err）= 类型名；非 @packed 类 = "Box"（void* 槽）；
+// 规则：基本类型（除 Err）= 类型名；非 struct 类 = "Box"（void* 槽）；
 // 接口 = "iface"（两字结构专用实例）；其余未实例化。
+// 例外是 rune：语言里它是独立基本类型，运行期槽位就是 u32
+// （aic_std_str_codepoints 交回 aic_list_u32 *）—— 没有 aic_list_rune
+// 这一份实例，多开一份只会让同一个标量值有两种 C 形态。
 func RuntimeSuffix(t Type) (string, bool) {
 	if t == nil {
 		return "", false
 	}
 	if b, ok := t.(*Basic); ok {
 		switch b.Name {
+		case "rune":
+			return "u32", true
 		case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize",
 			"f32", "f64", "bool", "str":
 			return b.Name, true
@@ -24,16 +29,16 @@ func RuntimeSuffix(t Type) (string, bool) {
 		return "", false
 	}
 	if cl, ok := t.(*Class); ok {
-		if !cl.Packed {
+		if !cl.Struct {
 			return "Box", true
 		}
 		return "", false
 	}
 	// 泛型实例：引用类实例 = 指针 ⇒ 与用户类指针共用 void* 槽位（Box）；
-	// @packed 实例是值类型（按 C struct 布局）⇒ 无运行期实例后缀。
+	// struct 实例是值类型（按 C struct 布局）⇒ 无运行期实例后缀。
 	// 缺这一条会让 `Box[i32][]` / `map[str]Box[i32]` 报"元素类型未实例化"。
 	if inst, ok := t.(*Instance); ok {
-		if cl, isCl := IsClass(inst.Base); isCl && !cl.Packed {
+		if cl, isCl := IsClass(inst.Base); isCl && !cl.Struct {
 			return "Box", true
 		}
 		return "", false
@@ -41,7 +46,7 @@ func RuntimeSuffix(t Type) (string, bool) {
 	if _, ok := t.(*Interface); ok {
 		return "iface", true
 	}
-	// R21 audit ③：**嵌套容器元素走 Box 句柄槽** —— `i64[][]` = list of `void*`
+	// audit ③：**嵌套容器元素走 Box 句柄槽** —— `i64[][]` = list of `void*`
 	// （内层 list 本身就是句柄），map/set 值同理。语义类型与槽位之间的强转在
 	// emit 侧（irBoxElem/irUnboxElem）。
 	if isContainerTy(t) {
@@ -62,7 +67,7 @@ func isContainerTy(t Type) bool {
 
 // RuntimeMapKeySuffix：map[K]V 的键后缀 = runtime/aic_l1_map.h 实例表的**精确互射**
 // （POD 键 i32/i64/u32/u64/usize/bool + str 键按内容哈希）。
-// enum / @packed / i8/u8 等窄整型键暂无运行期实例（per-type 哈希属单态化面，P3）
+// enum / struct / i8/u8 等窄整型键暂无运行期实例（per-type 哈希属单态化面，P3）
 // ⇒ 检查器必须按本表提前拒（审计 ③：旧行为是检查器放行、emit 才炸
 // "malformed map symbol" —— 不可操作的晚期错误）。
 func RuntimeMapKeySuffix(t Type) (string, bool) {
@@ -89,7 +94,7 @@ func RuntimeMapValueSuffix(t Type) (string, bool) {
 		}
 		return "", false
 	}
-	if cl, ok := t.(*Class); ok && !cl.Packed {
+	if cl, ok := t.(*Class); ok && !cl.Struct {
 		return "Box", true
 	}
 	// 泛型枚举实例（Option[T] / Result[T] / Value）作 map 值：走 Box 句柄槽。
@@ -105,7 +110,7 @@ func RuntimeMapValueSuffix(t Type) (string, bool) {
 	if _, ok := t.(*Interface); ok {
 		return "iface", true
 	}
-	// R21 audit ③：嵌套容器作 map 值同样走 Box 句柄槽（`map[str]i64[]` =
+	// audit ③：嵌套容器作 map 值同样走 Box 句柄槽（`map[str]i64[]` =
 	// list 句柄塞 void* 值槽）；强转在 emit 侧。
 	if isContainerTy(t) {
 		return "Box", true

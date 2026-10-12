@@ -9,14 +9,14 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// cir = **C 形态 IR**（核心设计 §十：tast → air → mair → eair → cir）。
+// cir = **C 形态 IR**（tast → air → mair → eair → cir）。
 //
 // 与 air 的差别只有一条，但很关键：**控制流是结构化的**（if / for / switch），
 // 不是 CFG + goto 汤。C 后端因此可以直接发 `if`/`for`/`switch` —— 既保住可读性，
 // 也保住 C 编译器对 for 的识别（向量化的前提）。
 //
 // 叶子指令**直接复用 air 的指令集**（Let/Store/Call/… 都是 C 形态的线性指令）：
-// 再造一套叶子类型就是"同一条规则两处实现"（红线 10），而 air 的叶子在 CIR 层
+// 再造一套叶子类型就是"同一条规则两处实现"，而 air 的叶子在 CIR 层
 // 无需任何改写。新增的只有**结构化节点**（If/For/Switch/Region/Return/Break/…）。
 //
 // 区域与守卫在 CIR 层是**显式语句**：`region { … }` 是 `Region` 语句，
@@ -40,7 +40,7 @@ type Func struct {
 	Flags  []string
 	Body   []Stmt
 	Loc    air.Loc
-	// SrcHash 是**降级前**的 AIR 函数体内容哈希（F1 增量翻译的缓存键原料：
+	// SrcHash 是**降级前**的 AIR 函数体内容哈希（增量翻译的缓存键原料：
 	// CIR 是折叠后的形态，缺了折叠期的注释/边界信息，直接哈希 CIR 会让
 	// "同一个源函数的合法再折叠"误失效；用 AIR 原文哈希则稳定）。空 = 未填
 	// （老路径/测试），此时调用方自行退化为 CIR 形态哈希。
@@ -97,7 +97,7 @@ type Switch struct {
 	Loc   air.Loc
 }
 
-// Region 是一个 region 块（进入/退出显式成对，V3.1 在 air 层已保证）。
+// Region 是一个 region 块（进入/退出显式成对， 在 air 层已保证）。
 // Scope = `scope { }` 任务域（退出 join spawn 的任务），非 Scope = `region { }` 内存区域。
 type Region struct {
 	Body  []Stmt
@@ -110,7 +110,7 @@ type Region struct {
 // 仍折成 Region{Body}；跨块只能平铺——"出口在后面的块"这条边在树形结构里无处安放。
 //
 // 这是"每请求一区域"的标准写法（B10 实测）：region 包住每轮的容器/循环，退出整块
-// 回滚。air 层 V3.1 已保证结构化配平（沿 CFG 边传播深度），折叠器只需按遇到顺序
+// 回滚。air 层已保证结构化配平（沿 CFG 边传播深度），折叠器只需按遇到顺序
 // 平铺，配对由 fl.regOpen 栈跨块记录。
 //
 // Scope = `scope { }` 任务域（Name = 该域的 aic_scope 变量名，spawn 站点取用）；
@@ -221,9 +221,9 @@ func (p *Prog) Print() string {
 func printType(b *strings.Builder, td *air.TypeDecl) {
 	switch td.Kind {
 	case "struct":
-		kind := "struct"
-		if td.Packed {
-			kind = "@packed struct"
+		kind := "class"
+		if td.Struct {
+			kind = "struct"
 		}
 		fmt.Fprintf(b, "type %s = %s\n", td.Sym, kind)
 		for _, f := range td.Fields {

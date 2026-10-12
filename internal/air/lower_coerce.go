@@ -10,10 +10,10 @@ import (
 // ---------------------------------------------------------------------------
 // 隐式转换的**显式化**（IR 收集完备性的一部分）。
 //
-// 语言层只有一条「值 → 槽位」的隐式转换：**具体类值 → 接口值**（核心设计 §十：
+// 语言层只有一条「值 → 槽位」的隐式转换：**具体类值 → 接口值**（
 // 接口装箱 + 见证表）。C 没有这条转换（`aic_iface s = aic_ok_Rect *a;` 直接非法：
 // "invalid initializer"），所以它必须在 IR 里显式成 `box <值>, <接口>`
-// —— 后端只发 IR 里有的东西，**不让后端猜**（红线 10/23）。
+// —— 后端只发 IR 里有的东西，**不让后端猜**。
 //
 // 734/787/788/760 实测：AIR 里只有 `var s : ok_Shape = a`，值名是具体类，C 层
 // 无从下手。装箱的判据必须是"值的类型 ≠ 槽位类型而且两者是具体类/接口关系"，
@@ -30,7 +30,7 @@ import (
 //
 // 与 placeType/declType 的差别很重要：那两者给复合赋值兜底 `i32`（有意的窄化默认），
 // 而隐式转换的判据绝不能拿兜底值当真 —— 把类值装进一个假的 `i32` 槽位会发出
-// `box <Buf*>, i32`，verifier 立刻报 V5.3（"守卫存储的值不是引用"，779/748 实测）。
+// `box <Buf*>, i32`，verifier 立刻报（"守卫存储的值不是引用"，779/748 实测）。
 func (l *lowerer) slotTextKnown(e parse.Expr) string {
 	if t := l.typeOf(e); t != nil {
 		return l.ty(t)
@@ -76,8 +76,8 @@ func (l *lowerer) coerce(val string, e parse.Expr, slotText string) string {
 	return t
 }
 
-// isRefClassValue 报告一个类型是不是"引用类值"（非 @packed 类 / 引用类实例 / @packed 类）。
-// @packed 类也要装箱（C 侧按值拷进堆盒，见 emit 的 irBox），故两种类都算。
+// isRefClassValue 报告一个类型是不是"引用类值"（非 struct 类 / 引用类实例 / struct 类）。
+// struct 类也要装箱（C 侧按值拷进堆盒，见 emit 的 irBox），故两种类都算。
 func isRefClassValue(t types.Type) bool {
 	if _, ok := types.IsClass(t); ok {
 		return true

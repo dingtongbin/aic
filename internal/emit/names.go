@@ -189,7 +189,7 @@ func (c *Ctx) ti(e parse.Expr) types.Type {
 		if call, ok := e.(*parse.Call); ok {
 			return c.substT(c.callResultType(call))
 		}
-		// s[i..j] = str 视图（§二.3）：视图永远是 str，与元素类型无关
+		// s[i..j] = str 视图：视图永远是 str，与元素类型无关
 		if ix, ok := e.(*parse.Index); ok {
 			if ix.End != nil {
 				return types.TStr
@@ -225,7 +225,7 @@ func (c *Ctx) ti(e parse.Expr) types.Type {
 			}
 		}
 	}
-	// 未定型字面量（含一元负号）在类型表里本就是 nil：按 §一 最窄可容纳定宽。
+	// 未定型字面量（含一元负号）在类型表里本就是 nil：按最窄可容纳定宽。
 	// 少了这一路，`println("")` / `"a" == "b"` 这类全字面量表达式就发不出去。
 	return c.literalType(e)
 }

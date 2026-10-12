@@ -3,7 +3,7 @@ package lex
 import "fmt"
 
 // Kind classifies a lexical token. The set is frozen together with the
-// surface itself (核心设计 §2.1 / H7 / D9-D10).
+// surface itself (H7 / D9-D10).
 type Kind int
 
 const (

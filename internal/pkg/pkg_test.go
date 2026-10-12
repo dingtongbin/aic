@@ -187,7 +187,7 @@ func TestUnitHash(t *testing.T) {
 	}
 	// 缓存读写：未命中 → 命中 → 字节一致。
 	// 键里带本次测试的临时目录（每次运行唯一），故不存在"本机残留"导致的假命中
-	// ——门禁禁止白名单外的 t.Skip（§三.3），测试必须自己保证可重复。
+	// ——门禁禁止白名单外的 t.Skip，测试必须自己保证可重复。
 	key := Hash("test", a.UnitHash(), t.TempDir())
 	if _, ok := CacheGet(key); ok {
 		t.Fatal("新键竟然已命中（缓存目录被复用？）")

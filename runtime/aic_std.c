@@ -157,6 +157,65 @@ aic_str aic_std_str_from_f64(aic_f64 v, aic_u32 line) { return aic_fmt_f64(v, li
 
 aic_str aic_std_str_from_bool(bool v) { return aic_fmt_bool(v); }
 
+/* --- str：rune 构造 / 大小写 ---------------------------------------------- */
+/* UTF-8 编码：标量值 → 1..4 字节（调用方已验过域，这里只做编码）。 */
+static aic_usize aic_utf8_put(aic_u8 *buf, aic_u32 c) {
+    if (c < 0x80u) {
+        buf[0] = (aic_u8)c;
+        return 1;
+    }
+    if (c < 0x800u) {
+        buf[0] = (aic_u8)(0xC0u | (c >> 6));
+        buf[1] = (aic_u8)(0x80u | (c & 0x3Fu));
+        return 2;
+    }
+    if (c < 0x10000u) {
+        buf[0] = (aic_u8)(0xE0u | (c >> 12));
+        buf[1] = (aic_u8)(0x80u | ((c >> 6) & 0x3Fu));
+        buf[2] = (aic_u8)(0x80u | (c & 0x3Fu));
+        return 3;
+    }
+    buf[0] = (aic_u8)(0xF0u | (c >> 18));
+    buf[1] = (aic_u8)(0x80u | ((c >> 12) & 0x3Fu));
+    buf[2] = (aic_u8)(0x80u | ((c >> 6) & 0x3Fu));
+    buf[3] = (aic_u8)(0x80u | (c & 0x3Fu));
+    return 4;
+}
+
+aic_str aic_std_str_from_rune(aic_u32 c, const char *file, int line) {
+    if (c > 0x10FFFFu || (c >= 0xD800u && c <= 0xDFFFu)) {
+        aic_trap_ctx(AIC_TRAP_INTEGER_OVERFLOW, file, line,
+                     "rune is outside the Unicode scalar value range");
+    }
+    aic_u8 buf[4];
+    aic_usize n = aic_utf8_put(buf, c);
+    aic_str s = aic_str_alloc(n, (aic_u32)line);
+    if (n != 0) {
+        memcpy((void *)s.p, buf, n);
+    }
+    return (aic_str){ s.p, n };
+}
+
+/* 大小写共用一个骨架：只有 'A'..'Z' 参与映射，其余字节原样拷。
+ * aic_str_alloc 交回的是 {p, 0}（长度由调用方定），故这里显式带 len 返回。 */
+static aic_str aic_str_case(aic_str s, aic_u8 lo, aic_u8 hi, aic_u8 delta, aic_u32 line) {
+    aic_str out = aic_str_alloc(s.len, line);
+    aic_usize i;
+    for (i = 0; i < s.len; i++) {
+        aic_u8 b = (aic_u8)s.p[i];
+        ((aic_u8 *)out.p)[i] = (b >= lo && b <= hi) ? (aic_u8)(b + delta) : b;
+    }
+    return (aic_str){ out.p, s.len };
+}
+
+aic_str aic_std_str_to_upper(aic_str s, aic_u32 line) {
+    return aic_str_case(s, (aic_u8)'a', (aic_u8)'z', (aic_u8)('A' - 'a'), line);
+}
+
+aic_str aic_std_str_to_lower(aic_str s, aic_u32 line) {
+    return aic_str_case(s, (aic_u8)'A', (aic_u8)'Z', (aic_u8)('a' - 'A'), line);
+}
+
 aic_r_i64_err aic_std_str_to_i64(aic_str s, const char *file, int line) {
     aic_i64 v = 0;
     if (!aic_str_try_i64(s, &v)) {

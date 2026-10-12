@@ -9,25 +9,25 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 跨包名解析（核心设计 §四 可见性、§十一 包管理器）。
+// 跨包名解析（可见性、 包管理器）。
 //
 // 目录即包：`import util` 把 util 目录里的包级名带进来，用 `util.Name` 限定访问。
-// 可见性（核心设计 §四）：**顶层名首字符是 Unicode 大写字母 = 跨包可见**；
+// 可见性：**顶层名首字符是 Unicode 大写字母 = 跨包可见**；
 // 小写开头与 `_` 前缀一律包私有（`_Name` 也私有 —— 前导下划线不构成公开）。
 // 成员名（字段/方法）：随类型可见性 —— 类型跨包可见则其非 `_` 成员跨包可访问。
 //
 // 唯一入口：depInfo / depType / depFunc / depConst —— 禁在检查器别处再写一份
-// 「去 deps 里翻表」的逻辑（红线 10）。
+// 「去 deps 里翻表」的逻辑。
 // ---------------------------------------------------------------------------
 
-// exported 报告名字是否跨包可见（§四：首字符 Unicode 大写 = 公开）。
-// 唯一的判定入口：checker 与 emit 都走这里（红线 10：禁第二份）。
+// exported 报告名字是否跨包可见（首字符 Unicode 大写 = 公开）。
+// 唯一的判定入口：checker 与 emit 都走这里（禁第二份）。
 func exported(name string) bool {
 	r, _ := utf8.DecodeRuneInString(name)
 	return unicode.IsUpper(r)
 }
 
-// memberVisible 判定**跨包成员访问**：`_` 前缀成员是包私有，跨包一律拒（R7 决策一：
+// memberVisible 判定**跨包成员访问**：`_` 前缀成员是包私有，跨包一律拒（决策一：
 // 成员不按大小写判定，但 `_` 前缀仍是私有 —— 类型公开不等于它的 `_` 成员公开）。
 // 返回 false 表示已报错，调用方直接返回。
 func (c *Checker) memberVisible(ownerPkg, ownerName, member string, at parse.Pos) bool {

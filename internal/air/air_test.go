@@ -11,7 +11,7 @@ func sampleModule() *Module {
 	return &Module{
 		Pkg: "main",
 		Types: []*TypeDecl{{
-			Sym: "aic_main_Point", Kind: "struct", Loc: loc,
+			Sym: "aic_main_Point", Kind: "struct", Struct: true, Loc: loc,
 			Fields: []Field{{Idx: 0, Name: "x", Ty: "i32"}, {Idx: 1, Name: "y", Ty: "i32"}},
 		}},
 		Funcs: []*Func{{
@@ -30,7 +30,7 @@ func sampleModule() *Module {
 	}
 }
 
-// TestPrintGrammarShape：打印形态符合 §10.1.1（module 头 / 指令一行一条 / loc 前缀）。
+// TestPrintGrammarShape：打印形态符合（module 头 / 指令一行一条 / loc 前缀）。
 func TestPrintGrammarShape(t *testing.T) {
 	out := Print(sampleModule())
 	for _, want := range []string{
@@ -125,7 +125,7 @@ func TestVerifyRejects(t *testing.T) {
 		{"V7.1 指令缺 loc", "V7.1", func(m *Module) {
 			m.Funcs[0].Blocks[0].Insts[0].(*Let).Loc = Loc{}
 		}},
-		{"V7.3 @live 不在 region 块内", "V7.3", func(m *Module) {
+		{"V7.3 live 不在 region 块内", "V7.3", func(m *Module) {
 			m.Funcs[0].Blocks[0].Insts = append([]Inst{
 				&Var{Name: "x", Ty: "aic_main_Point*", Live: true, Loc: loc},
 			}, m.Funcs[0].Blocks[0].Insts...)

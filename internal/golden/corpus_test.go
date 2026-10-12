@@ -1,11 +1,11 @@
 // Package golden is the test-only corpus harness.
 //
-// R1 stage (黄金执行规划 §四.3 SKIP 白名单)：本阶段只承载 lex+parse 层门禁 —
+// stage (SKIP 白名单)：本阶段只承载 lex+parse 层门禁 —
 //   - ok/ 语料必须词法+语法干净（H1–H4 属 emit/CLI 门，按白名单合法未亮）；
 //   - err/ 语料中解析层产生的诊断必须过三段式（H5 解析层）并与 .err 快照
-//     逐字节一致；检查器层语料（R2 回收）此时不产生解析诊断，记录数量。
+//     逐字节一致；检查器层语料（回收）此时不产生解析诊断，记录数量。
 //
-// R2/R3 重建完整管线后，本文件按对应 R 档扩回运行门禁。
+// / 重建完整管线后，本文件按对应 R 档扩回运行门禁。
 package golden
 
 import (
@@ -21,7 +21,7 @@ import (
 
 // renderAll merges all layer diagnostics in the canonical single-\n block
 // format produced by each package's FormatAll — 快照只有一种格式。
-// err/ 语料在语法干净时进检查器（R2 起全管线视角，与 aic check 一致）。
+// err/ 语料在语法干净时进检查器（起全管线视角，与 aic check 一致）。
 func renderAll(path string, src string, lexErrs []lex.LexerError, parseErrs []parse.ParseError) string {
 	var parts []string
 	if s := lex.FormatAll(path, lexErrs); s != "" {
@@ -130,7 +130,7 @@ func TestOkCorpusParses(t *testing.T) {
 
 // TestErrCorpusParseLayer: err/ diagnostics produced at lex+parse time must be
 // three-part (H5) and match the .err snapshot byte for byte. Files that parse
-// clean belong to the checker layer (R2 回收) — they must still carry an .err
+// clean belong to the checker layer (回收) — they must still carry an .err
 // snapshot so the layer hand-off is explicit.
 func TestErrCorpusParseLayer(t *testing.T) {
 	deferred := 0

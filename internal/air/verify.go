@@ -6,18 +6,18 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// IR 校验器（核心设计 §10.5）。**不是调试工具，是后端正确性的门禁**：
+// IR 校验器。**不是调试工具，是后端正确性的门禁**：
 // 凡 `aic build` 发射的 IR 必先过 verifier，拒绝 = 编译失败（即使 C 语法上能发）；
 // 不提供 `--no-verify`。任一条失败 = **编译器自身缺陷**（不是用户代码错误）。
 //
-// 本文件实现结构性可判定的部分（V1 类型表/下标、V2 CFG/def-use、V3 区域与 defer
-// 配对、V4 Err 与出口、V5 守卫形态、V6 调用与能力、V7 loc/分配/@live、V8 消去
+// 本文件实现结构性可判定的部分（类型表/下标、 CFG/def-use、 区域与 defer
+// 配对、 Err 与出口、 守卫形态、 调用与能力、 loc/分配/live、 消去
 // 计数）。每条都有正例与**反例**（反例 = 手写 IR，期望被拒）。
 // ---------------------------------------------------------------------------
 
 // Violation 是一条校验失败（含 IR 片段与源 loc，便于三段式报错）。
 type Violation struct {
-	Rule string // V1.1 / V2.5 / …
+	Rule string // / / …
 	Msg  string
 	Loc  Loc
 }
@@ -63,7 +63,7 @@ func (v *verifier) run() {
 	}
 }
 
-// checkTypeDecl：V1.4（下标等于声明序）、V1.5（变体/tag 一致）、V1.7（@packed 白名单）。
+// checkTypeDecl：（下标等于声明序）、（变体/tag 一致）、（struct 白名单）。
 func (v *verifier) checkTypeDecl(t *TypeDecl) {
 	for i, f := range t.Fields {
 		if f.Idx != i {
@@ -72,9 +72,9 @@ func (v *verifier) checkTypeDecl(t *TypeDecl) {
 		if f.Ty == "" {
 			v.fail("V1.1", "field "+f.Name+" has no type", t.Loc)
 		}
-		if t.Packed && strings.Contains(f.Ty, "*") {
-			// @packed 白名单：禁引用与容器（V7.4 的静态部分）
-			v.fail("V7.4", "packed field "+f.Name+" has a reference type "+f.Ty, t.Loc)
+		if t.Struct && strings.Contains(f.Ty, "*") {
+			// struct 白名单：禁引用与容器（静态部分）
+			v.fail("V7.4", "struct field "+f.Name+" has a reference type "+f.Ty, t.Loc)
 		}
 	}
 	for i, va := range t.Variants {
@@ -89,7 +89,7 @@ func (v *verifier) checkTypeDecl(t *TypeDecl) {
 	}
 }
 
-// checkFunc：逐块走 V2/V3/V4/V5/V7。
+// checkFunc：逐块走///。
 func (v *verifier) checkFunc(f *Func) {
 	if len(f.Blocks) == 0 {
 		v.fail("V2.1", "function "+f.Sym+" has no blocks", f.Loc)
@@ -107,7 +107,7 @@ func (v *verifier) checkFunc(f *Func) {
 		}
 		labels[b.Label] = b
 	}
-	// V2.1：每块恰一个终结符。
+	// 每块恰一个终结符。
 	//
 	// IR-1 例外（§13.1）：**含 IR-1 原语的块的 Term 由 desugar 填**——原语的
 	// 控制流（check 的两分支、match 的分发、propagate 的传播）在 IR-1 里还
@@ -118,7 +118,7 @@ func (v *verifier) checkFunc(f *Func) {
 			v.fail("V2.1", "block "+b.Label+" has no terminator", b.Loc)
 		}
 	}
-	// V2.2：跳转目标存在
+	// 跳转目标存在
 	for _, b := range f.Blocks {
 		for _, tgt := range termTargets(b.Term) {
 			if labels[tgt] == nil {
@@ -126,7 +126,7 @@ func (v *verifier) checkFunc(f *Func) {
 			}
 		}
 	}
-	// V2.3：无不可达块（从入口块可达）
+	// 无不可达块（从入口块可达）
 	//
 	// IR-1 例外（§13.1）：以原语收尾的块 Term 待 desugar 填，但它的控制流
 	// 目标是已知的（原语的 After 字段）—— 可达性按 After 继续走，否则
@@ -157,7 +157,7 @@ func (v *verifier) checkFunc(f *Func) {
 			v.fail("V2.3", "unreachable block "+b.Label+" in "+f.Sym, b.Loc)
 		}
 	}
-	// 值 → 类型表（V5.3 按类型判定被守卫的值是不是引用）。
+	// 值 → 类型表（按类型判定被守卫的值是不是引用）。
 	valTypes := map[string]string{}
 	for _, p := range f.Params {
 		valTypes[p.Name] = p.Ty
@@ -172,13 +172,13 @@ func (v *verifier) checkFunc(f *Func) {
 			}
 		}
 	}
-	// V3.1/V3.2/V3.3/V7.3 的地基：沿 CFG 边把每块入口的区域深度算出来。
+	// ///地基：沿 CFG 边把每块入口的区域深度算出来。
 	// 结构化配平 = 同一块从任何路径到达时深度一致；不一致即 enter/exit 不是词法
 	// 配对的（如 exit 走岔路漏弹一级）。per-block 扫描从入口深度起算——
 	// 循环体块**继承**区域深度，按块从 0 起算会把 region 里的 exit 误判成未配平
 	// （B10 "每请求一 region" 惯用法实测）。
 	regionDepth := regionDepths(f, v)
-	// V2.4/V2.5/V2.6：定义先于使用、临时量恰定义一次、同块变量不重复声明
+	// //定义先于使用、临时量恰定义一次、同块变量不重复声明
 	defs := map[string]Loc{}
 	blockVars := map[string]map[string]bool{}
 	for _, b := range f.Blocks {
@@ -192,7 +192,7 @@ func (v *verifier) checkFunc(f *Func) {
 	//
 	// IR-1 例外（§13.1）：match 的 payload 绑定由 desugar 插在臂 prologue 里，
 	// lowering 期的 IR-1 里它还没有定义。这里把原语声明的绑定**预先登记为
-	// 已定义**（它由原语引入，语义上等于定义），否则 V2.4 会对每个
+	// 已定义**（它由原语引入，语义上等于定义），否则会对每个
 	// `Option.Some(v) => …` 误报"v 未定义"（实测）。
 	for _, b := range f.Blocks {
 		for _, bind := range primBindings(b) {
@@ -213,14 +213,14 @@ func (v *verifier) checkFunc(f *Func) {
 			}
 			if d := instDef(in); d != "" {
 				if _, isLet := in.(*Let); isLet {
-					// 临时量：全局恰定义一次（V2.5）
+					// 临时量：全局恰定义一次
 					if _, dup := defs[d]; dup {
 						v.fail("V2.5", "temporary "+d+" defined twice in "+f.Sym, inLoc(in))
 					}
 					defs[d] = inLoc(in)
 					continue
 				}
-				// 变量：同块不重复声明（V2.6）；跨块重名 = 源级遮蔽，合法
+				// 变量：同块不重复声明；跨块重名 = 源级遮蔽，合法
 				if blockVars[b.Label][d] {
 					v.fail("V2.6", "variable "+d+" declared twice in block "+b.Label, inLoc(in))
 				}
@@ -238,7 +238,7 @@ func (v *verifier) checkFunc(f *Func) {
 				v.fail("V2.4", "value "+name+" used before definition in "+f.Sym, termLoc(b.Term))
 			}
 		}
-		// V3.1/V3.2/V3.3/V7.3：区域配平与深度。
+		// ///区域配平与深度。
 		//
 		// 顺序很重要：**先**沿 CFG 边把每块入口深度算出来（结构化配平：同一块从任何
 		// 路径到达深度必须一致），**再**从入口深度起逐指令走。旧的按块判"块内
@@ -262,7 +262,7 @@ func (v *verifier) checkFunc(f *Func) {
 					v.fail("V3.1", "region.exit without matching region.enter in "+f.Sym, inLoc(in))
 				}
 			case *SelWait:
-				// V6.4：select 至少一臂，且臂与通道一一对应（后端按对展开描述符数组）。
+				// select 至少一臂，且臂与通道一一对应（后端按对展开描述符数组）。
 				if len(t.Chans) == 0 {
 					v.fail("V6.4", "select.wait without arms in "+f.Sym, inLoc(in))
 				}
@@ -271,15 +271,15 @@ func (v *verifier) checkFunc(f *Func) {
 				}
 			case *Var:
 				if t.Live && depth == 0 {
-					v.fail("V7.3", "@live variable "+t.Name+" outside a region block", t.Loc)
+					v.fail("V7.3", "live variable "+t.Name+" outside a region block", t.Loc)
 				}
 			}
 		}
-		// V3.3：ret 时区域必须已全部 pop（区域未闭合就返回 = 泄漏区域帧）
+		// ret 时区域必须已全部 pop（区域未闭合就返回 = 泄漏区域帧）
 		if _, isRet := b.Term.(*Ret); isRet && depth != 0 {
 			v.fail("V3.3", "ret bypasses an unclosed region in "+f.Sym, termLoc(b.Term))
 		}
-		// V5.1/V5.3：守卫只作为 store 修饰符，且被守卫的值必须是**带头的引用**。
+		// /守卫只作为 store 修饰符，且被守卫的值必须是**带头的引用**。
 		// 判定按类型（值→类型表来自 param/let/var），不用名字启发式 —— 临时量名
 		// （t3）不含类型信息，启发式会误报（实测）。
 		for _, in := range b.Insts {
@@ -296,7 +296,7 @@ func (v *verifier) checkFunc(f *Func) {
 			}
 		}
 	}
-	// V4.2：checkfail 只在有 Err 位的函数里
+	// checkfail 只在有 Err 位的函数里
 	hasErr := false
 	for _, r := range f.Rets {
 		if r == "Err" || strings.HasSuffix(r, "Err") {
@@ -308,7 +308,7 @@ func (v *verifier) checkFunc(f *Func) {
 			v.fail("V4.2", "checkfail in "+f.Sym+" which has no Err result", termLoc(b.Term))
 		}
 	}
-	// V7.1：loc 覆盖每条指令与终结符
+	// loc 覆盖每条指令与终结符
 	for _, b := range f.Blocks {
 		for _, in := range b.Insts {
 			if inLoc(in).File == "" {
@@ -326,7 +326,7 @@ func (v *verifier) checkFunc(f *Func) {
 // 结构化配平判定：同一块从不同路径到达时，入口深度必须一致 —— 不一致说明
 // enter/exit 在控制流上不是词法配对的（漏 exit / 多 exit / exit 走岔路）。
 // 这正是"region 块里含 for/if"的正确口径：enter 与 exit 天然在不同块、循环体块
-// 继承区域深度，都不是未配平。失败时直接 v.fail(V3.1) 并返回 nil。
+// 继承区域深度，都不是未配平。失败时直接 v.fail 并返回 nil。
 func regionDepths(f *Func, v *verifier) map[string]int {
 	out := map[string]int{}
 	if len(f.Blocks) == 0 {
@@ -368,7 +368,7 @@ func regionDepths(f *Func, v *verifier) map[string]int {
 		for _, s := range termTargets(b.Term) {
 			sb, ok := byLabel[s]
 			if !ok {
-				continue // 未知后继：V2.x 已报
+				continue // 未知后继：.x 已报
 			}
 			if old, seen := out[s]; !seen {
 				out[s] = d
@@ -382,11 +382,11 @@ func regionDepths(f *Func, v *verifier) map[string]int {
 }
 
 // isRefType 判定类型文本是否为**带头引用**（指针 / 接口 / 容器句柄）。
-// 值语义聚合（@packed、[T;N]、无头 enum）加守卫是错的（V5.3 的另一半）。
+// 值语义聚合（struct、[T;N]、无头 enum）加守卫是错的（另一半）。
 // blockEndsInPrim 报告块是否以 IR-1 原语收尾（Term 待 desugar 补齐）。
 // 这是 IR-1 与 IR-2 的分界在 verifier 上的投影：IR-2 里不存在这种块。
 // primBindings 返回 IR-1 原语**引入的绑定名**（desugar 会在臂 prologue 里
-// 为它们发 Var）。V2.4 据此把它们预登记为已定义 —— 否则 IR-1 期每个
+// 为它们发 Var）。 据此把它们预登记为已定义 —— 否则 IR-1 期每个
 // `Pattern(binding) => …` 都报"binding 未定义"。
 func primBindings(b *Block) []string {
 	var out []string
@@ -484,12 +484,12 @@ func instUses(in Inst) []string {
 	case *DeferInit:
 		return v.Vals
 	case *Spawn:
-		// spawn 的实参同样是使用点（在 spawn 点求值，V2 的使用前定义覆盖它们）。
+		// spawn 的实参同样是使用点（在 spawn 点求值，使用前定义覆盖它们）。
 		return v.Vals
 	case *TrapIfErr:
 		return []string{v.Err}
 	case *SelWait:
-		// V6.4：select 的分支通道与截止点都是使用点；臂数与通道数必须一致。
+		// select 的分支通道与截止点都是使用点；臂数与通道数必须一致。
 		out := make([]string, 0, len(v.Chans)+1)
 		out = append(out, v.Chans...)
 		if v.Deadline != "" {
@@ -507,7 +507,7 @@ func placeUses(p Place) []string {
 	case *FieldPlace:
 		return placeUses(v.Base)
 	case *StrViewPlace:
-		// Lo/Hi 是值名：漏了它们，未定义边界的视图就查不出来（V2 的使用前定义）。
+		// Lo/Hi 是值名：漏了它们，未定义边界的视图就查不出来（使用前定义）。
 		return append([]string{v.Lo, v.Hi}, placeUses(v.Base)...)
 	}
 	return nil

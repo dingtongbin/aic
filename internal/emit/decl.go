@@ -6,8 +6,8 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 文件骨架 + 具名类型声明 (核心设计 §四 布局确定性: class 字段按声明序自然
-// 对齐, 禁重排; @packed = 严格 C 布局)。
+// 文件骨架 + 具名类型声明 (布局确定性: class 字段按声明序自然
+// 对齐, 禁重排; struct = 严格 C 布局)。
 // ---------------------------------------------------------------------------
 
 const headerGuard = "AIC_EMIT_TU_H"
@@ -19,7 +19,7 @@ func (c *Ctx) prologue() error {
 	c.line("#include \"aic_l0.h\"")
 	c.line("#include \"aic_l1.h\"")
 	c.line("#include \"aic_std.h\"")
-	// L2（调度层）按需 include：不用 spawn/scope 的程序根本不拉它（红线 16）。
+	// L2（调度层）按需 include：不用 spawn/scope 的程序根本不拉它。
 	if c.needed["l2"] {
 		c.line("#include \"aic_l2.h\"")
 	}
@@ -41,7 +41,7 @@ func (c *Ctx) pkg() string {
 	return "main"
 }
 
-// forwardTypes 发射本文件具名类型的前向 typedef (class 可自引用, §二.6)。
+// forwardTypes 发射本文件具名类型的前向 typedef (class 可自引用)。
 // 整程序发射时全部包的前向声明都排在完整定义之前。
 // 泛型类不在这里发（按实例发，见 emitInstances）。
 func (c *Ctx) forwardTypes() {
@@ -65,8 +65,8 @@ func (c *Ctx) forwardTypes() {
 
 // emitTypeDefs 发射本文件具名类型的完整定义。
 //
-// **顺序 = 依赖序（拓扑）**：值类型可以按值嵌入别的值类型（enum 负载是 @packed 类、
-// @packed 字段是另一个 @packed、`[T;N]` 的元素是值类型）。C 里按值成员要求被嵌类型
+// **顺序 = 依赖序（拓扑）**：值类型可以按值嵌入别的值类型（enum 负载是 struct 类、
+// struct 字段是另一个 struct、`[T;N]` 的元素是值类型）。C 里按值成员要求被嵌类型
 // **已完整定义**，按源码序发会在"枚举在前、其负载类在后"时得到
 // `field 'Rect' has incomplete type`。引用类型只出现指针，不构成依赖。
 func (c *Ctx) emitTypeDefs() error {
@@ -90,7 +90,7 @@ func (c *Ctx) emitTypeDefs() error {
 			seen[name] = true
 			cl := v
 			deps := []string{}
-			if cl.Packed {
+			if cl.Struct {
 				for i := range cl.Fields {
 					deps = append(deps, c.valueTypeDeps(cl.Fields[i].Type)...)
 				}
@@ -154,7 +154,7 @@ func (c *Ctx) emitTypeDefs() error {
 }
 
 // valueTypeDeps 报告一个类型作为**按值成员**时的依赖（C 类型名）：
-// @packed 类、enum、`[T;N]`（元素递归）。引用类型/标量 = 无依赖。
+// struct 类、enum、`[T;N]`（元素递归）。引用类型/标量 = 无依赖。
 func (c *Ctx) valueTypeDeps(te parse.TypeExpr) []string {
 	if te == nil {
 		return nil
@@ -165,7 +165,7 @@ func (c *Ctx) valueTypeDeps(te parse.TypeExpr) []string {
 	}
 	switch v := t.(type) {
 	case *types.Class:
-		if v.Packed {
+		if v.Struct {
 			return []string{c.namedTypeName(v.Pkg, v.Name)}
 		}
 	case *types.Enum:
@@ -180,7 +180,7 @@ func (c *Ctx) valueTypeDeps(te parse.TypeExpr) []string {
 func (c *Ctx) valueTypeDepsType(t types.Type) []string {
 	switch v := t.(type) {
 	case *types.Class:
-		if v.Packed {
+		if v.Struct {
 			return []string{c.namedTypeName(v.Pkg, v.Name)}
 		}
 	case *types.Enum:
@@ -191,12 +191,12 @@ func (c *Ctx) valueTypeDepsType(t types.Type) []string {
 	return nil
 }
 
-// emitClass 发射 class 的 C struct。布局 = 对象头 + 字段按声明序 (§四)。
-// @packed 无对象头 (值类型, 无区域托管, §五)。
+// emitClass 发射 class 的 C struct。布局 = 对象头 + 字段按声明序 。
+// struct 无对象头 (值类型, 无区域托管)。
 func (c *Ctx) emitClass(v *parse.ClassDecl) {
 	name := c.typedefName(c.pkg(), v.Name)
 	c.line("struct %s {", name)
-	if !v.Packed {
+	if !v.Struct {
 		c.line("    aic_hdr hdr;")
 	}
 	for _, f := range v.Fields {
@@ -388,7 +388,7 @@ func basicByName(name string) (types.Type, bool) {
 	return nil, false
 }
 
-// emitEnum 发射 enum: 无数据 = C enum (§四); 带数据 = {tag, union}。
+// emitEnum 发射 enum: 无数据 = C enum ; 带数据 = {tag, union}。
 func (c *Ctx) emitEnum(v *parse.EnumDecl) {
 	name := c.typedefName(c.pkg(), v.Name)
 	if !hasDataVariants(v) {
@@ -432,7 +432,7 @@ func (c *Ctx) emitEnum(v *parse.EnumDecl) {
 	c.line("")
 }
 
-// hasDataVariants 报告 enum 是否有带数据变体 (§四: 带数据 = {tag, union} 布局)。
+// hasDataVariants 报告 enum 是否有带数据变体 (带数据 = {tag, union} 布局)。
 func hasDataVariants(v *parse.EnumDecl) bool {
 	for _, va := range v.Variants {
 		if va.Payload != nil {

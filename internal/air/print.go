@@ -6,11 +6,11 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// `.air` 文本投影（核心设计 §10.1.1 文法）。**编译器不解析它**——只有 verifier 的
+// `.air` 文本投影（文法）。**编译器不解析它**——只有 verifier 的
 // 反例语料以手写 `.air` 为输入；故打印机只需单向保真：
-//   - 一行一条指令，行首可选 `loc <file>:<line>:<col>`（红线 9 的 IR 载体，V7.1）；
+//   - 一行一条指令，行首可选 `loc <file>:<line>:<col>`（IR 载体）；
 //   - 缩进仅助读，verifier 以显式 <label> 为准；
-//   - **同一输入两次 dump 必须逐字节一致**（V7.1/H8）⇒ 禁止 map 遍历序进文本。
+//   - **同一输入两次 dump 必须逐字节一致**（H8）⇒ 禁止 map 遍历序进文本。
 // ---------------------------------------------------------------------------
 
 // Print 把一个 Module 渲染成 `.air` 文本（确定性）。
@@ -44,11 +44,13 @@ func PrintAll(mods []*Module) string {
 func printTypeDecl(b *strings.Builder, t *TypeDecl) {
 	switch t.Kind {
 	case "struct":
-		packed := ""
-		if t.Packed {
-			packed = " packed"
+		// Kind 恒为 "struct"（类型声明的统称），值/引用由 Struct 二分：
+		// 源码写 struct 的是值类型，写 class 的是引用类型。
+		kind := "class"
+		if t.Struct {
+			kind = "struct"
 		}
-		fmt.Fprintf(b, "type %s = struct%s\n", t.Sym, packed)
+		fmt.Fprintf(b, "type %s = %s\n", t.Sym, kind)
 		for _, f := range t.Fields {
 			fmt.Fprintf(b, "    %d:%s:%s\n", f.Idx, f.Name, f.Ty)
 		}
@@ -398,13 +400,13 @@ func printPlace(p Place) string {
 	return fmt.Sprintf("<unknown place %T>", p)
 }
 
-// --- 位置访问（verifier 的 V7.1 覆盖检查与 printer 共用） ---------------------
+// --- 位置访问（verifier 的覆盖检查与 printer 共用） ---------------------
 
 // inLoc 取一条指令的位置（verifier 的诊断锚点）。
 //
 // 这是 **InstLoc 的转发**，不是第二份 switch —— 各自维护两份时，加新节点
 // 时改一份漏一份的表现是"新节点的指令报 without loc"（本次 IR-1 原语落地时
-// 实测：verify 报 V7.1，根因就是这里漏登记）。单一来源见 InstLoc。
+// 实测：verify 报，根因就是这里漏登记）。单一来源见 InstLoc。
 func inLoc(in Inst) Loc { return InstLoc(in) }
 
 func termLoc(t Term) Loc {
@@ -420,7 +422,7 @@ func termLoc(t Term) Loc {
 	case *Ret:
 		return v.Loc
 	case *MatchTerm:
-		// IR-1 原语终结符（§13.1）：也带 Loc，否则 verify 的 V7.1 会误报
+		// IR-1 原语终结符（§13.1）：也带 Loc，否则 verify 的会误报
 		// "terminator without loc" —— 实测正是这样。
 		return v.Loc
 	}

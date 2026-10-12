@@ -73,7 +73,7 @@ func emitSrc(t *testing.T, src string) string {
 	return out.C
 }
 
-// TestEmitIsPure: 红线 12「emit 纯函数，无全局状态」—— 同一 AST 两次 emit 必须
+// TestEmitIsPure:「emit 纯函数，无全局状态」—— 同一 AST 两次 emit 必须
 // 逐字节相同（同时也是 H2 构建确定性的第一层）。
 func TestEmitIsPure(t *testing.T) {
 	src := `import fmt
@@ -108,7 +108,7 @@ func main() {
 	}
 }
 
-// TestManglingTableIsSingle: 红线 10「mangling 单表」—— 函数/方法/泛型/类型
+// TestManglingTableIsSingle:「mangling 单表」—— 函数/方法/泛型/类型
 // 四条命名规则各钉一个锚点；改动命名 = 这里的断言先红。
 func TestManglingTableIsSingle(t *testing.T) {
 	cases := []struct {
@@ -128,7 +128,7 @@ func TestManglingTableIsSingle(t *testing.T) {
 	}
 }
 
-// TestLineDirectivesCoverEverySite: 红线 9「#line 全覆盖，禁裸 emit」—— 每个
+// TestLineDirectivesCoverEverySite:「#line 全覆盖，禁裸 emit」—— 每个
 // 函数定义与语句块前都必须有回指 .aic 的 #line。
 func TestLineDirectivesCoverEverySite(t *testing.T) {
 	src := `import fmt
@@ -156,7 +156,7 @@ func main() {
 	if !strings.Contains(out, `#line 11 "t.aic"`) {
 		t.Errorf("#line 未覆盖变量声明的下一行语句：\n%s", out)
 	}
-	// main 的 wrapper 必须建任务根区域并注册 os 参数（§六 main 内逃逸语义的前提）
+	// main 的 wrapper 必须建任务根区域并注册 os 参数（main 内逃逸语义的前提）
 	if !strings.Contains(out, "aic_task_init(") || !strings.Contains(out, "aic_os_init(") {
 		t.Errorf("入口未建任务区域/未注册 os 参数：\n%s", out)
 	}
@@ -193,7 +193,7 @@ func main() {
 	}
 }
 
-// TestProvableDeeperStoreIsCompileError: 「块内创建直接存入更浅存储」是 §五 R5
+// TestProvableDeeperStoreIsCompileError: 「块内创建直接存入更浅存储」是
 // 里句法可判的一类，只有两种合法结局，二者必居其一且互斥：
 //
 //	a) 检查期拒（可证必违 = 编译错），或
@@ -230,7 +230,7 @@ func main() {
 	}
 }
 
-// TestRegionPushPop: region 块必须发射 push/pop（弹出 = bump 复位，§五 R1）。
+// TestRegionPushPop: region 块必须发射 push/pop（弹出 = bump 复位）。
 func TestRegionPushPop(t *testing.T) {
 	src := `import fmt
 import str

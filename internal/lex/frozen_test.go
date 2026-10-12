@@ -100,11 +100,14 @@ func TestFrozenSurface(t *testing.T) {
 	})
 
 	t.Run("no-annotations", func(t *testing.T) {
-		// 语言没有注解机制。@packed/@derive/@noblock/@blocking 都不是合法写法，
-		// `@` 不是词法可接受字符，出现即词法错误。
-		_, errs := File("t.aic", "@packed class P { var x i32 }")
-		if len(errs) == 0 {
-			t.Fatalf("@packed 应报词法错误（语言没有注解机制）")
+		// 语言没有注解机制：`@` 不是词法可接受字符，出现即恰好一个词法错误。
+		// 这里不拿任何具体注解当语料 —— 注解形态从来不在语言里，不存在
+		// "某注解拼写被废弃"这回事：值类型是 struct、能力是 derive、存储层级是
+		// live、C ABI 是 extern，全是硬关键字。
+		for _, src := range []string{"@annot x", "@x = 1", "var @y i32"} {
+			if _, errs := File("t.aic", src); len(errs) != 1 {
+				t.Fatalf("%q 应恰好一个词法错误（@ 非法），实际 %d 个", src, len(errs))
+			}
 		}
 	})
 
@@ -132,8 +135,8 @@ func TestFrozenSurface(t *testing.T) {
 	})
 
 	t.Run("live-is-a-keyword", func(t *testing.T) {
-		// `live` 是变量存储层级修饰关键字（第 7 个），不是注解、不是标识符。
-		// `@live` 不是合法写法 —— `@` 不是词法可接受字符，报"无法识别字符"。
+		// `live` 是变量存储层级修饰关键字（第 7 个），是标识符位上的硬关键字，
+		// 与 `var`/`func` 同类。
 		toks, errs := File("t.aic", "var live x")
 		if len(errs) != 0 {
 			t.Fatalf("`var live x` 应词法干净: %v", errs)
@@ -144,14 +147,10 @@ func TestFrozenSurface(t *testing.T) {
 				t.Errorf("token[%d] kind = %s，期望 %s", i, toks[i].Kind, k)
 			}
 		}
-		// @live 现在只能得到"非法字符"，因为 @ 已不是词法字符
-		if _, errs := File("t.aic", "@live x"); len(errs) != 1 {
-			t.Errorf("旧 @live 应恰好一个词法错误（@ 已非法），实际 %d 个", len(errs))
-		}
 	})
 
 	t.Run("reserved-not-keyword-behavior", func(t *testing.T) {
-		// nil/true/false must lex as RES, never as IDENT (核心设计 §一:
+		// nil/true/false must lex as RES, never as IDENT (
 		// nil = 任意类型零值字面量，词法层必须先认出它是保留字).
 		toks, errs := File("t.aic", "nil true false")
 		if len(errs) != 0 {
@@ -165,7 +164,7 @@ func TestFrozenSurface(t *testing.T) {
 		}
 	})
 
-	t.Run("blank-and-private-underscore", func(t *testing.T) {		// 核心设计 §一: `_` 单独 = 弃位 token；`_name` = 包私有标识符；
+	t.Run("blank-and-private-underscore", func(t *testing.T) {		// `_` 单独 = 弃位 token；`_name` = 包私有标识符；
 		// `__` 相邻拒绝（保留给 mangling）；`0..n` 的 `..` 不得吞进数字。
 		toks, errs := File("t.aic", "_ _x x_ a__ 0..n 1_000")
 		if len(errs) != 1 {

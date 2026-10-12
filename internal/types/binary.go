@@ -3,7 +3,7 @@ package types
 import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
-// 二元运算（核心设计 §一 运算符全表 + §三 比较语义）。禁混算 f32/f64；无隐式
+// 二元运算（运算符全表 + 比较语义）。禁混算 f32/f64；无隐式
 // 转换；未类型化字面量与定型操作数混合时按可表示性落入对方类型。
 // ---------------------------------------------------------------------------
 
@@ -23,7 +23,7 @@ func (c *Checker) checkBinary(v *parse.Binary, expect Type) (Type, bound, untype
 		return nil, nilBound, untyped{}
 	}
 
-	// N3：泛型形参上的比较由**约束**授权 —— `[T: Ord]` 允许 </<=/>/>=，
+	// 泛型形参上的比较由**约束**授权 —— `[T: Ord]` 允许 </<=/>/>=，
 	// `[T: Eq]`（或 Ord）允许 ==/!=。约束是唯一的授权来源：没有约束的 T
 	// 一律不能比较（否则模板体会在实例化时才炸）。
 	if tp, ok := lt.(*TypeParam); ok {
@@ -41,7 +41,7 @@ func (c *Checker) checkBinary(v *parse.Binary, expect Type) (Type, bound, untype
 
 	// str 连接/比较：未类型化 str 字面量按对侧（或彼此）定型为 str。
 	// 少了这一步，"x" + a、a + ""、"a" + "b" 全被判成「运算符两侧类型不符」——
-	// 字面量在运算位按对侧定型是 §一 的通用规则，数值位有 unifyOperands 承担，
+	// 字面量在运算位按对侧定型是通用规则，数值位有 unifyOperands 承担，
 	// str 位必须同样处理（否则 str + str 这条运算符只在两侧都已是变量时可用）。
 	if linfo.kind == unStr || rinfo.kind == unStr {
 		if isStr(lt) {
@@ -55,7 +55,7 @@ func (c *Checker) checkBinary(v *parse.Binary, expect Type) (Type, bound, untype
 		}
 	}
 
-	// 字符串连接与比较（§一/§三）
+	// 字符串连接与比较
 	if isStr(lt) && isStr(rt) {
 		switch v.Op {
 		case "+":
@@ -103,8 +103,8 @@ func (c *Checker) checkBinary(v *parse.Binary, expect Type) (Type, bound, untype
 		return lt, nilBound, untyped{}
 	}
 
-	// 位运算（§一 7/8/9 级）与移位（4 级）：整数专属。
-	// 移位量的范围（count ≥ 左操作数位宽）在**发射侧**带 trap（§一「移位语义」）。
+	// 位运算（7/8/9 级）与移位（4 级）：整数专属。
+	// 移位量的范围（count ≥ 左操作数位宽）在**发射侧**带 trap（「移位语义」）。
 	switch v.Op {
 	case "&", "|", "^":
 		if !intOperand(lt, linfo) || !intOperand(rt, rinfo) {
@@ -137,18 +137,18 @@ func (c *Checker) checkBinary(v *parse.Binary, expect Type) (Type, bound, untype
 		return lt, nilBound, untyped{}
 	}
 
-	// 比较（§三 比较语义）
+	// 比较（比较语义）
 	switch v.Op {
 	case "<", "<=", ">", ">=":
 		if !numOperand(lt, linfo) || !numOperand(rt, rinfo) {
-			// §三：**无负载 enum 可按 tag 排序**（带负载的必须用 match）；`@packed` 需 @derive(Compare)。
+			// **无负载 enum 可按 tag 排序**（带负载的必须用 match）；`struct` 需 derive Compare。
 			if _, ok := orderedEnumOperand(lt, rt); ok {
 				return TBool, nilBound, untyped{}
 			}
-			if cl, ok := packedCompareOperand(lt, rt); ok {
+			if cl, ok := structCompareOperand(lt, rt); ok {
 				if !cl.Derived["Compare"] {
-					c.errorAt(v.Pos, "ordering a @packed value needs @derive(Compare)", cl.Name+" "+v.Op+" "+cl.Name,
-						"add @derive(Compare) to "+cl.Name+", or compare fields explicitly (core design §3)")
+					c.errorAt(v.Pos, "ordering a struct value needs derive Compare", cl.Name+" "+v.Op+" "+cl.Name,
+						"add derive Compare to "+cl.Name+", or compare fields explicitly (core design §3)")
 					return nil, nilBound, untyped{}
 				}
 				return TBool, nilBound, untyped{}
@@ -169,7 +169,7 @@ func (c *Checker) checkBinary(v *parse.Binary, expect Type) (Type, bound, untype
 	return nil, nilBound, untyped{}
 }
 
-// orderedEnumOperand 报告两个操作数是否是**同一个无负载 enum**（可按 tag 排序，§三：
+// orderedEnumOperand 报告两个操作数是否是**同一个无负载 enum**（可按 tag 排序，
 // 带负载的 enum 禁 `==`/`<`，必须用 match；无负载的 tag 就是它的值）。
 func orderedEnumOperand(lt, rt Type) (*Enum, bool) {
 	l, ok1 := lt.(*Enum)
@@ -180,11 +180,11 @@ func orderedEnumOperand(lt, rt Type) (*Enum, bool) {
 	return l, true
 }
 
-// packedCompareOperand 报告两个操作数是否是**同一个** @packed 类（`<` 等需要 Compare）。
-func packedCompareOperand(lt, rt Type) (*Class, bool) {
+// structCompareOperand 报告两个操作数是否是**同一个** struct 类（`<` 等需要 Compare）。
+func structCompareOperand(lt, rt Type) (*Class, bool) {
 	l, ok1 := lt.(*Class)
 	r, ok2 := rt.(*Class)
-	if !ok1 || !ok2 || !l.Packed || !r.Packed || l.Name != r.Name || l.Pkg != r.Pkg {
+	if !ok1 || !ok2 || !l.Struct || !r.Struct || l.Name != r.Name || l.Pkg != r.Pkg {
 		return nil, false
 	}
 	return l, true
@@ -196,7 +196,7 @@ func isFloatType(t Type) bool {
 	return ok && (b.Name == "f32" || b.Name == "f64")
 }
 
-// checkEquality 实现 §三 比较语义：无数据 enum、@packed 逐字段、class 身份、
+// checkEquality 实现比较语义：无数据 enum、struct 逐字段、class 身份、
 // err==nil、容器与普通 class 无 <。
 func (c *Checker) checkEquality(v *parse.Binary, lt Type, lb bound, rt Type, rb bound, linfo, rinfo untyped) (Type, bound, untyped) {
 	if !c.operandsReady(v, lt, rt, linfo, rinfo, nil) {
@@ -242,7 +242,7 @@ func (c *Checker) checkEquality(v *parse.Binary, lt Type, lb bound, rt Type, rb 
 	switch t := lt.(type) {
 	case *Basic:
 		if t.Name == "Err" {
-			// §三 只定义了 `err == nil` / `err != nil`（= code == 0 的内建比较）；
+			// 只定义了 `err == nil` / `err != nil`（= code == 0 的内建比较）；
 			// 两个 Err 之间没有定义的相等语义（发出去就是非法的 C 结构体比较）。
 			c.errorAt(v.Pos, "two Err values cannot be compared", "Err "+v.Op+" Err",
 				"test err != nil, or compare the fields: err.code == 0 / err.msg == \"\" (core design §3)")
@@ -257,13 +257,13 @@ func (c *Checker) checkEquality(v *parse.Binary, lt Type, lb bound, rt Type, rb 
 		}
 		return TBool, nilBound, untyped{}
 	case *Class:
-		if !t.Packed {
+		if !t.Struct {
 			return TBool, nilBound, untyped{} // 身份比较（引用相等）
 		}
-		return TBool, nilBound, untyped{} // @packed 逐字段
+		return TBool, nilBound, untyped{} // struct 逐字段
 	case *Interface:
 		// 接口值没有定义好的相等语义（{data, vt} 逐字比较既非身份也非结构相等）
-		// ⇒ 编译期拒，指向可写的替代（§三 只定义了 class 身份、@packed 逐字段、err==nil）。
+		// ⇒ 编译期拒，指向可写的替代（只定义了 class 身份、struct 逐字段、err==nil）。
 		c.errorAt(v.Pos, "an interface value does not support ==", t.String(),
 			"compare the concrete values after a type switch, or compare a field you control (core design §3)")
 		return nil, nilBound, untyped{}
@@ -359,7 +359,7 @@ func (c *Checker) unifyOperands(v *parse.Binary, lt, rt *Type, linfo, rinfo unty
 		}
 		*rt = *lt
 	} else if *lt == nil && *rt == nil {
-		// 双字面量：取最窄可容纳（§一）
+		// 双字面量：取最窄可容纳
 		*lt = c.widenLiterals(linfo, rinfo)
 		*rt = *lt
 	}
@@ -376,7 +376,7 @@ func (c *Checker) widenLiterals(l, r untyped) Type {
 	return TI32
 }
 
-// untypedFits: 字面量对目标类型的可表示性（§二.4）。
+// untypedFits: 字面量对目标类型的可表示性。
 func (c *Checker) untypedFits(info untyped, ty Type) bool {
 	if info.kind == unNone || info.kind == unNil {
 		return true

@@ -1,0 +1,5 @@
+import fmt
+
+// 没有注解机制：`@` 不是词法可接受字符，出现即报"无法识别字符"。
+@x
+class Point { var x i32 }

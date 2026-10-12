@@ -1,9 +1,9 @@
 package parse
 
 // ---------------------------------------------------------------------------
-// AST for the grammar (核心设计 §〇–§九: 36 关键字, 无注解).
-// Parsing accepts the whole surface from day one; type checking opens at R2
-// (黄金执行规划 §七).
+// AST for the grammar (36 关键字, 无注解).
+// Parsing accepts the whole surface from day one; type checking opens at
+// .
 //
 // 语句/表达式节点：RegionStmt（区域块）、CompositeLit（C{f: v}）、
 // LambdaExpr（纯 lambda）、MatchExpr（match 表达式形）、Index 的 i..j 视图形。
@@ -54,7 +54,7 @@ type (
 		Text string // raw, including quotes
 		Pos  Pos
 	}
-	// InterpLit is the interpolated string `"id={id}"` (N2, 核心设计 §16).
+	// InterpLit is the interpolated string `"id={id}"`.
 	// 占位符只接受**名字或字段访问**（无表达式、无格式说明符）；`{{` / `}}`
 	// 是字面 `{` / `}` 的转义。Texts 恒比 Values 多一项（首尾可为空串）。
 	InterpLit struct {
@@ -68,7 +68,7 @@ type (
 		Value bool
 		Pos   Pos
 	}
-	// NilLit is the reserved word: the zero value of every type (核心设计 §二.3).
+	// NilLit is the reserved word: the zero value of every type .
 	NilLit struct {
 		Ann
 		Pos Pos
@@ -101,7 +101,7 @@ type (
 		Pos
 	}
 	// MultiAssign is `a, err = f()` — every target must already exist, `_`
-	// excepted (核心设计 §六 绑定规则).
+	// excepted (绑定规则).
 	MultiAssign struct {
 		Ann
 		Op    string
@@ -116,7 +116,7 @@ type (
 		Args []Expr
 		Pos
 	}
-	// Index is a[i], or the str view a[i..j] when End != nil (核心设计 §二.3).
+	// Index is a[i], or the str view a[i..j] when End != nil .
 	Index struct {
 		Ann
 		X     Expr
@@ -135,7 +135,7 @@ type (
 		Pos
 	}
 	// CheckExpr is `check f()`, or `f()?` when Postfix is set (两者等价,
-	// 核心设计 §15.7 E1). The operand must be a call whose last result is
+	// E1). The operand must be a call whose last result is
 	// Err (checker-enforced); err != nil propagates the enclosing function.
 	// `check` 只允许出现在 var 初始化/独立语句的**最外层**（解析层规则）；
 	// `?` 是后缀运算符、位置无关（推荐写法）。
@@ -155,7 +155,7 @@ type (
 		Block *Block
 		Pos
 	}
-	// AssertExpr is `expr!` (E4 断言, 核心设计 §15.7): 末位 Err 非 nil = trap
+	// AssertExpr is `expr!` (E4 断言): 末位 Err 非 nil = trap
 	// （含 code/msg/位置）；值 = 去掉末位 Err 之后的负载。
 	AssertExpr struct {
 		Ann
@@ -163,14 +163,14 @@ type (
 		Pos
 	}
 	// ArrayLit is [] or [a, b, c] — the list literal. 元素类型必须写在声明处：
-	// `var xs = []` is a compile error (核心设计 §二.2).
+	// `var xs = []` is a compile error .
 	ArrayLit struct {
 		Ann
 		Elems []Expr
 		Pos
 	}
 	// CompositeLit is C{f: v} — class construction when the class has no init
-	// (核心设计 §四). Unlisted fields take the zero value.
+	// . Unlisted fields take the zero value.
 	CompositeLit struct {
 		Ann
 		TypeName Expr // Ident or package-qualified Field
@@ -183,7 +183,7 @@ type (
 		Pos
 	}
 	// LambdaExpr is the lambda: x => e / (a, b) => e / (a) => { … } (纯 lambda,
-	// 参数不带类型), or the N1 closure literal `func(x i32) -> i32 { … }`
+	// 参数不带类型), or the closure literal `func(x i32) -> i32 { … }`
 	// (参数带类型 + 可选返回位, 可**按值捕获**外层局部变量).
 	// Capturing is allowed only for the `func` form; the arrow form stays pure.
 	LambdaExpr struct {
@@ -201,14 +201,14 @@ type (
 		Pos
 	}
 	// MatchExpr is the expression-position match: every arm is an expression
-	// and 穷尽性 guarantees a value (核心设计 §三).
+	// and 穷尽性 guarantees a value .
 	MatchExpr struct {
 		Ann
 		Subject Expr
 		Arms    []MatchArm
 		Pos
 	}
-	// MatchPattern is one level deep (核心设计 §三): an enum variant name, or
+	// MatchPattern is one level deep: an enum variant name, or
 	// that variant with a single binding `Name(binding)`. No wildcard.
 	MatchPattern struct {
 		Kind    string // "value" | "payload"
@@ -257,7 +257,7 @@ type (
 		Pos
 	}
 	// VarTarget is one name in a declaration. Live marks `var live x` (外一层
-	// 区域创建，核心设计 §五 R4; R20 起是关键字不是注解); Blank marks the `_` 弃位.
+	// 区域创建; 起是关键字不是注解); Blank marks the `_` 弃位.
 	VarTarget struct {
 		Name  string
 		Live  bool
@@ -265,7 +265,7 @@ type (
 		Pos
 	}
 	// VarDecl covers class fields and local declarations. 顶层 var = 编译错
-	// (红线 21)，由 parseDecl 拒绝。
+	// ，由 parseDecl 拒绝。
 	VarDecl struct {
 		Targets []VarTarget
 		Type    TypeExpr // nil when inferred
@@ -285,7 +285,7 @@ type (
 		Else *Block // nil when absent
 		Pos
 	}
-	// ForStmt covers all three forms (核心设计 §三):
+	// ForStmt covers all three forms:
 	//	for cond { }        Init=Cond=Post=nil after Cond
 	//	for init; c; post   C-style
 	//	for i, x in xs { }  IsRange; Names = bindings (1–2, `_` allowed);
@@ -303,7 +303,7 @@ type (
 		Pos
 	}
 	// ReturnStmt carries zero or more results (multi-return is call-position
-	// sugar; 元组不可存储，核心设计 §二.2).
+	// sugar; 元组不可存储).
 	ReturnStmt struct {
 		Results []Expr
 		Pos
@@ -328,13 +328,13 @@ type (
 		Pos
 	}
 	// DeferStmt is `defer f()` or `defer { … }` — function-level LIFO
-	// (核心设计 §三). region 块退出不触发 defer。
+	// . region 块退出不触发 defer。
 	DeferStmt struct {
 		Call  Expr
 		Block *Block
 		Pos
 	}
-	// ErrDeferStmt is `errdefer f()` / `errdefer { … }` (N8, 核心设计 §16):
+	// ErrDeferStmt is `errdefer f()` / `errdefer { … }`:
 	// **仅在函数因 Err 返回时**执行；与 defer 共用同一栈（LIFO），实参在注册点
 	// 求值；正常返回不执行。所在函数必须有 Err 位，否则编译错。
 	ErrDeferStmt struct {
@@ -343,12 +343,12 @@ type (
 		Pos
 	}
 	// RegionStmt is `region { }`: 每轮执行为独立区域实例，弹出 = bump 指针
-	// 复位 (核心设计 §五 R1)。块内逃逸 = 编译错误 (R2 checker)。
+	// 复位 。块内逃逸 = 编译错误 (checker)。
 	RegionStmt struct {
 		Body *Block
 		Pos
 	}
-	// SpawnStmt is `spawn f()`; 只能出现在 scope { } 内 (红线 5, 词法级强制).
+	// SpawnStmt is `spawn f()`; 只能出现在 scope { } 内 (词法级强制).
 	// 文法形态详见开放点 O1。
 	SpawnStmt struct {
 		Call Expr
@@ -358,14 +358,14 @@ type (
 		Pos
 	}
 	// ScopeStmt is `scope { }`: 退出 join 全部任务; IsTimeout = `scope.timeout(ms) { }`
-	// (N6: 到点取消该域内全部任务 —— 结构化取消，任务树向下传播).
+	// (到点取消该域内全部任务 —— 结构化取消，任务树向下传播).
 	ScopeStmt struct {
 		Body      *Block
 		Timeout   Expr
 		IsTimeout bool
 		Pos
 	}
-	// SelectStmt is `select { case … }` (N6, 核心设计 §16): 多个通道/超时分支里
+	// SelectStmt is `select { case … }`: 多个通道/超时分支里
 	// **任选一个就绪的**；锚点必须与选择顺序无关。
 	SelectStmt struct {
 		Arms []SelectArm
@@ -411,14 +411,14 @@ type (
 		Name string
 		Pos
 	}
-	// ConstDecl: 仅数值/bool/str 的折叠字面量算术，无函数调用 (核心设计 §三).
+	// ConstDecl: 仅数值/bool/str 的折叠字面量算术，无函数调用 .
 	ConstDecl struct {
 		Name string
 		Type TypeExpr // nil when inferred
 		Init Expr
 		Pos
 	}
-	// ComptimeBlock is the package-level `comptime { … }` (N4, 核心设计 §16):
+	// ComptimeBlock is the package-level `comptime { … }`:
 	// 体里只允许 `const 名 = <可折叠表达式>` 与 `assert <可折叠 bool>`；
 	// **全部在编译期求值，不生成任何运行期代码**（emit/air 都按未知 Decl 跳过）。
 	// 它是"编译期语句化"的唯一落点：`fieldsOf(T)` 这类内省原语的合法归宿。
@@ -439,7 +439,7 @@ type (
 		Type TypeExpr
 		Pos
 	}
-	// Result is one return slot. ErrPosition is checked by checkErrLast (红线 2).
+	// Result is one return slot. ErrPosition is checked by checkErrLast .
 	Result struct {
 		Type TypeExpr
 		Pos
@@ -450,7 +450,7 @@ type (
 		Recv       string
 		Name       string
 		TypeParams []string
-		// Constraints 是泛型形参的约束（N3，核心设计 §16）：与 TypeParams 同名
+		// Constraints 是泛型形参的约束：与 TypeParams 同名
 		// （未写约束的形参不出现在这里）。
 		Constraints []TypeParamConstraint
 		Params      []Param
@@ -474,12 +474,12 @@ type (
 		Init    Expr
 		Pos
 	}
-	// ClassDecl: 无继承——组合 + 接口 (核心设计 §四).
+	// ClassDecl: 无继承——组合 + 接口 .
 	ClassDecl struct {
 		Name       string
-		Packed     bool
+		Struct     bool
 		TypeParams []string
-		// Constraints 是泛型形参的约束（N3）。
+		// Constraints 是泛型形参的约束。
 		Constraints []TypeParamConstraint
 		Fields      []*FieldDecl
 		Methods     []*FuncDecl
@@ -524,7 +524,7 @@ type (
 	InterfaceDecl struct {
 		Name    string
 		Methods []*FuncDecl // signature-only (Body == nil)
-		// Embeds 是嵌入的接口（N9，核心设计 §16）：接口**并集**（槽位 = 嵌入接口
+		// Embeds 是嵌入的接口：接口**并集**（槽位 = 嵌入接口
 		// 槽位 + 自身方法，按声明序）。AfterMethod = 它前面已有几个方法，用于
 		// 还原声明序（不是继承：无覆盖、无层次、无默认实现）。
 		Embeds []IfaceEmbed

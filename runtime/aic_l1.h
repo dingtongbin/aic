@@ -21,7 +21,7 @@ static inline aic_u64 aic_hash_bytes(const void *p, aic_usize n) {
     return h;
 }
 
-/* 增量混合：@derive(Hash) 的字段级哈希按字段序折叠（同一初值 + 同一字段序 =
+/* 增量混合：derive Hash 的字段级哈希按字段序折叠（同一初值 + 同一字段序 =
  * 同一结果，跨配置确定）。数值按值混合、str 按内容、嵌套对象按各自 hash。 */
 static inline aic_u64 aic_hash_mix(aic_u64 h, aic_u64 v) {
     h ^= v;
@@ -39,7 +39,7 @@ static inline aic_u64 aic_hash_f64(aic_u64 h, aic_f64 v) {
 static inline aic_u64 aic_hash_str(aic_u64 h, aic_str s) {
     return aic_hash_mix(h, aic_hash_bytes(s.p, s.len));
 }
-/* @derive(Hash) 的初值（FNV-1a offset basis）。 */
+/* derive Hash 的初值（FNV-1a offset basis）。 */
 #define AIC_HASH_SEED 1469598103934665603ULL
 
 /* POD 键：按字节哈希、按 ABI 相等比较。str 键：按内容哈希/比较。 */

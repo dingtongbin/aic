@@ -1,11 +1,11 @@
-// Package emit turns a checked AST into C11 text (核心设计 §十: AST → C 文本,
+// Package emit turns a checked AST into C11 text (AST → C 文本,
 // 纯函数, 无全局状态).
 //
 // 纪律:
-//   - 纯函数: 同一输入两次调用必须产出逐字节相同的文本 (红线 12, H2)。
+//   - 纯函数: 同一输入两次调用必须产出逐字节相同的文本 (H2)。
 //     故本包不持有包级可变状态; 一切状态都在 Ctx 里, 每次 Emit 新建。
-//   - 每条语句/表达式前带 #line 回指 .aic 源 (红线 9), 由 Ctx.line 统一发射。
-//   - 类型→C 名与 mangling 各只有一处实现 (红线 10, 防坑 5)。
+//   - 每条语句/表达式前带 #line 回指 .aic 源 , 由 Ctx.line 统一发射。
+//   - 类型→C 名与 mangling 各只有一处实现 (防坑 5)。
 //   - 发射目标 = runtime/*.h 已定案的 ABI (L0 区域/守卫/trap/浮点, L1 容器)。
 package emit
 
@@ -35,7 +35,7 @@ type Result struct {
 	C string
 	// Warnings 是"emittable but semantically incomplete"的提示 (不阻断编译)。
 	Warnings []string
-	// Needed 是本产物用到的运行时能力 (排序稳定; 红线 16: L2 按需链接)。
+	// Needed 是本产物用到的运行时能力 (排序稳定; L2 按需链接)。
 	Needed []string
 	// Guards 是守卫点计数（--report-guards）。
 	Guards GuardCounts
@@ -78,32 +78,32 @@ type Ctx struct {
 	names nameTypes
 	// warnings 收集非阻断提示。
 	warnings []string
-	// needed 记录本翻译单元需要的运行时能力 (L2 按需链接的判据, 红线 16)。
+	// needed 记录本翻译单元需要的运行时能力 (L2 按需链接的判据)。
 	needed map[string]bool
-	// insts/instSeen 是泛型实例登记 (确定性顺序 + 实例缓存, 红线 11)。
+	// insts/instSeen 是泛型实例登记 (确定性顺序 + 实例缓存)。
 	insts    []instEntry
 	instSeen map[string]bool
-	// printers/printSeen/printSeq 是按需合成的打印函数登记 (§十四 任意单值)。
+	// printers/printSeen/printSeq 是按需合成的打印函数登记 (任意单值)。
 	printers  []printerEntry
 	printSeen map[string]string
 	printSeq  int
-	// witnesses/witnessSeen 是 interface 见证表登记 (§十 槽位分发 + trampoline)。
+	// witnesses/witnessSeen 是 interface 见证表登记 (槽位分发 + trampoline)。
 	witnesses   []witnessEntry
 	witnessSeen map[string]bool
-	// ifacePrint 是需要打印槽的接口集合 (§十四 扩展槽；键 = 包名.接口名)。
+	// ifacePrint 是需要打印槽的接口集合 (扩展槽；键 = 包名.接口名)。
 	ifacePrint map[string]bool
-	// packedCmp/packedCmpUse/packedCmpOrder 是 @packed 比较助手登记（§三：`==` 逐字段、
-	// `<` 等需 @derive(Compare)）。键 = 包名.类名；助手原型在原型段、体在 TU 末尾。
-	packedCmp      map[string]bool
-	packedCmpUse   map[string]string
-	packedCmpOrder []*types.Class
+	// structCmp/structCmpUse/structCmpOrder 是 struct 比较助手登记（`==` 逐字段、
+	// `<` 等需 derive Compare）。键 = 包名.类名；助手原型在原型段、体在 TU 末尾。
+	structCmp      map[string]bool
+	structCmpUse   map[string]string
+	structCmpOrder []*types.Class
 	// seeded 报告本次是否为第二遍 (带着第一遍的发现结果发射)。
 	seeded bool
 	// substParams/substArgs 是当前发射上下文的类型代换（泛型实例化时 T → 实参）。
 	// 类型名、表达式类型表、类型表达式三处都要过它，否则实例化后的 C 里会残留 T。
 	substParams []string
 	substArgs   []types.Type
-	// funcInsts/funcInstSeen 是泛型函数实例的发射登记 (§十 单态化 + 实例缓存)。
+	// funcInsts/funcInstSeen 是泛型函数实例的发射登记 (单态化 + 实例缓存)。
 	funcInsts    []funcInstEntry
 	funcInstSeen map[string]bool
 	// lenFacts 是「容器长度 = 常量」的事实（仅对字面量初始化且无变更点的容器成立）。
@@ -114,11 +114,11 @@ type Ctx struct {
 	lenMutated map[string]bool
 	// unchecked 是本产物发出的 unchecked 访问次数（--report-guards 报告用）。
 	unchecked int
-	// declaredVars 是本函数**已声明**的变量（F5 只能缓存循环前已可见的容器）。
+	// declaredVars 是本函数**已声明**的变量（只能缓存循环前已可见的容器）。
 	declaredVars map[string]bool
-	// indexUsed 是探测遍里「被下标访问的容器名」（F5 适用面）。
+	// indexUsed 是探测遍里「被下标访问的容器名」（适用面）。
 	indexUsed map[string]bool
-	// cached 是当前循环体内走缓存形态的容器（名 → 缓存 id，见 proofcache.go 的 F5）。
+	// cached 是当前循环体内走缓存形态的容器（名 → 缓存 id，见 proofcache.go 的）。
 	cached map[string]string
 	// cachedCT 是缓存容器的 C 元素类型（名 → C 类型文本）。
 	cachedCT map[string]string
@@ -126,7 +126,7 @@ type Ctx struct {
 	cacheSeq int
 	// guards 是守卫点计数（--report-guards / H9③：无 region 块的语料 kept 必须为 0）。
 	guards GuardCounts
-	// liveNext 为真时，紧随其后的创建表达式用 aic_alloc_live（live 存储层级，§五 R4）。
+	// liveNext 为真时，紧随其后的创建表达式用 aic_alloc_live（live 存储层级）。
 	liveNext bool
 
 	// --- IR 路径（体从 IR 取，不走 AST）------------------------------------
@@ -168,13 +168,13 @@ type Ctx struct {
 	// 序号按发现序 = 确定性，H2）。
 	irSpawns   []irSpawnSite
 	irSpawnSeq int
-	// FuncCache 是 F1 增量翻译的函数级缓存（nil = 不用；--emit-c 与门禁路径必须
+	// FuncCache 是增量翻译的函数级缓存（nil = 不用；--emit-c 与门禁路径必须
 	// 保持 nil —— H2/H3 判的就是发射文本的确定性与可编译性，走缓存会把门禁判据
 	// 变成缓存命中）。见 func_cache.go。
 	FuncCache *FuncCache
 }
 
-// emitRaw 把一段缓存文本原样追加进主输出（F1 命中路径：跳过全部发射）。
+// emitRaw 把一段缓存文本原样追加进主输出（命中路径：跳过全部发射）。
 // 文本自身已含行尾，故不追加换行；probe 模式（空跑）不写。
 func (c *Ctx) emitRaw(b []byte) {
 	if c.probe {
@@ -251,7 +251,7 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		c.printers = append([]printerEntry{}, pre.printers...)
 		c.printSeen = make(map[string]string, len(pre.printers))
 		for _, e := range pre.printers {
-			// **键方案必须与登记时一致**（红线 10）：接口打印器登记用的是
+			// **键方案必须与登记时一致**：接口打印器登记用的是
 			// ifacePrintKey（`pkg.Name`），这里曾一律用 typeSeg ⇒ 接口键对不上、
 			// 第二遍又想登记一次 ⇒ "printer for interface … only surfaced on the
 			// second pass" —— 接口值打印因此完全不可用。
@@ -271,7 +271,7 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		for _, k := range pre.ifacePrint {
 			c.ifacePrint[k] = true
 		}
-		// 运行时能力（红线 16 按需链接）：第一遍发现，第二遍据此发 include。
+		// 运行时能力（按需链接）：第一遍发现，第二遍据此发 include。
 		for _, k := range pre.needed {
 			c.needed[k] = true
 		}
@@ -328,7 +328,7 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		return nil, nil, err
 	}
 	c.emitIRSpawnProtos()
-	c.emitPackedCmpProtos()
+	c.emitStructCmpProtos()
 	if _, err := c.emitInstMethodProtos(u); err != nil {
 		return nil, nil, err
 	}
@@ -339,7 +339,7 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 			return nil, nil, err
 		}
 	}
-	// N10 委托方法的原型在全部原型之后（它们的体要调用被委托类的方法）。
+	// 委托方法的原型在全部原型之后（它们的体要调用被委托类的方法）。
 	if err := c.emitDelegatedProtos(); err != nil {
 		return nil, nil, err
 	}
@@ -369,7 +369,7 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	// spawn thunk 的定义（取上下文块字段直调；原型已在原型段发过）。
 	c.emitIRSpawnBodies()
 	c.emitEntry()
-	if err := c.emitPackedCmpBodies(); err != nil { // struct 比较助手（同上：末尾定义）
+	if err := c.emitStructCmpBodies(); err != nil { // struct 比较助手（同上：末尾定义）
 		return nil, nil, err
 	}
 	c.epilogue()
@@ -409,7 +409,7 @@ func (c *Ctx) line(format string, args ...any) {
 	c.w("\n")
 }
 
-// srcLine 发射 #line, 使其后一行在 C 侧报错时回指 .aic 源行 (红线 9)。
+// srcLine 发射 #line, 使其后一行在 C 侧报错时回指 .aic 源行 。
 func (c *Ctx) srcLine(pos parse.Pos) {
 	line := pos.Line
 	if line <= 0 {
@@ -474,7 +474,7 @@ func cstr(s string) string {
 	return b.String()
 }
 
-// strLit 返回一个 aic_str 字面量表达式, 字节入任务区域 (§二.3: str 字节恒任务区域)。
+// strLit 返回一个 aic_str 字面量表达式, 字节入任务区域 (str 字节恒任务区域)。
 // 静态文本直接引用 C 字面量: 生命周期 = 程序全程, 不违反区域纪律。
 func (c *Ctx) strLit(s string) string {
 	return fmt.Sprintf("((aic_str){ %s, %d })", cstr(s), len(s))

@@ -7,11 +7,11 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 类型 → C 名 (核心设计 §十: 只有一处实现; 红线 10 的同款纪律)。
+// 类型 → C 名 (只有一处实现; 同款纪律)。
 //
 // 对齐 runtime/aic_l0.h 已定案的 ABI:
 //   基本类型 = aic_i32 … aic_str;  Err = aic_Err (按值两字);
-//   普通 class = 指针 (引用对象, 带头);  @packed class = 值 (C struct);
+//   class = 指针 (引用对象, 带头);  struct = 值 (C struct);
 //   T[] = aic_list_<SUF> *;  map[K]V = aic_map_<KS>_<VS> *;
 //   set[T] = aic_set_<SUF> *;  [T;N] = 内联数组 (值);
 //   interface = aic_iface (两机器字);  enum = 无数据 C enum / 带数据 {tag, union};
@@ -27,6 +27,10 @@ var BasicCName = map[string]string{
 	"bool": "bool",
 	"str":  "aic_str",
 	"Err":  "aic_Err",
+	// rune = Unicode 标量值。运行期槽位就是 u32（aic_std_str_codepoints 返回
+	// aic_list_u32 *，同一个定案）；合法域检查在 str.fromRune 的构造点做，
+	// 不在每个赋值点做 —— 那会把同一约束查 N 遍。
+	"rune": "aic_u32",
 }
 
 // cTypeName 返回一个语义类型的 C 类型名。
@@ -44,17 +48,17 @@ func (c *Ctx) cTypeName(t types.Type) string {
 		return "aic_Err"
 	}
 	if inst, ok := t.(*types.Instance); ok {
-		// 泛型实例：typedef 名 = 实例键（§十 10.2 键与名同源）。
-		// 引用类的实例仍是指针（Box[i32] *）；@packed 实例是值（C struct）。
+		// 泛型实例：typedef 名 = 实例键（10.2 键与名同源）。
+		// 引用类的实例仍是指针（Box[i32] *）；struct 实例是值（C struct）。
 		name := c.registerInstance(inst)
-		if cl, isCl := types.IsClass(inst.Base); isCl && !cl.Packed {
+		if cl, isCl := types.IsClass(inst.Base); isCl && !cl.Struct {
 			return name + " *"
 		}
 		return name
 	}
 	if cl, ok := types.IsClass(t); ok {
-		// 普通 class = 引用对象 (指针); @packed = 值 (C struct)
-		if cl.Packed {
+		// 普通 class = 引用对象 (指针); struct = 值 (C struct)
+		if cl.Struct {
 			return c.namedTypeName(cl.Pkg, cl.Name)
 		}
 		return c.namedTypeName(cl.Pkg, cl.Name) + " *"
@@ -192,7 +196,7 @@ func (c *Ctx) cTypeDecl(t types.Type, name string) string {
 	return c.cTypeName(t) + " " + name
 }
 
-// zeroValue 返回某类型的 C 零值表达式 (核心设计 §二.3: 数值 0 / false / "" /
+// zeroValue 返回某类型的 C 零值表达式 (数值 0 / false / "" /
 // 引用与 Err = NULL / 结构体 = {0})。
 func (c *Ctx) zeroValue(t types.Type) string {
 	if t == nil {
@@ -207,7 +211,7 @@ func (c *Ctx) zeroValue(t types.Type) string {
 		return "AIC_ERR_NONE"
 	}
 	// interface 是两机器字结构（不是指针）：零值必须写成结构字面量，
-	// 发 NULL 会让 C 报 invalid initializer（§四 值 = {data, vt}）。
+	// 发 NULL 会让 C 报 invalid initializer（值 = {data, vt}）。
 	if _, isIfc := types.IsInterface(t); isIfc {
 		return "((aic_iface){ 0 })"
 	}

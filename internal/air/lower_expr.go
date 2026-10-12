@@ -15,7 +15,7 @@ import (
 //
 // 纪律（§10.1）：**有副作用的子表达式一律提升为独立 let**，实参与二元操作数的
 // 左到右由语句序编码 —— C 层不得依赖 C 的求值顺序。
-// 类型名/符号名复用 §八 mangling 单表（禁第二份拼法）。
+// 类型名/符号名复用 mangling 单表（禁第二份拼法）。
 // ---------------------------------------------------------------------------
 
 // value 把表达式降级成一个值名（必要时先发 let）。
@@ -37,7 +37,7 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 	case *parse.NilLit:
 		return "nil", nil
 	case *parse.Ident:
-		// N1 闭包：捕获引用读环境槽（按节点判定，同名局部量遮蔽不受影响）。
+		// 闭包：捕获引用读环境槽（按节点判定，同名局部量遮蔽不受影响）。
 		if l.envCur != "" {
 			if slot, ok := l.info.CapRef(v); ok {
 				t := l.tmp("t")
@@ -189,12 +189,12 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 // （见 funcDecl），调用点不带接收者会让 AIR 与符号签名不一致 —— 那是"能过
 // verifier 但语义错"的形态，T-B 的 C 发射无法复原。
 func (l *lowerer) call(v *parse.Call) (string, error) {
-	// N4 编译期内省：折成常量或 sizeof，**绝不**把它当普通调用降级
-	// （`typeName(Pair)` 的实参是类型名，当值用会触发 V2.4）。
+	// 编译期内省：折成常量或 sizeof，**绝不**把它当普通调用降级
+	// （`typeName(Pair)` 的实参是类型名，当值用会触发）。
 	if e, handled, err := l.comptimeCall(v); handled {
 		return e, err
 	}
-	// 闭包值调用（N1）：被调是函数类型 → 值自身携带环境。
+	// 闭包值调用：被调是函数类型 → 值自身携带环境。
 	if id, ok := v.Fn.(*parse.Ident); ok {
 		if _, isFn := l.typeOf(id).(*types.FuncT); isFn {
 			val, err := l.value(id)
@@ -276,7 +276,7 @@ func (l *lowerer) call(v *parse.Call) (string, error) {
 	} else {
 		args = l.coerceArgs(v.Args, args, params)
 	}
-	// N10 委托方法：接收者换成 `recv.<字段>`，被调 = 目标类的同名方法。
+	// 委托方法：接收者换成 `recv.<字段>`，被调 = 目标类的同名方法。
 	if f, ok := v.Fn.(*parse.Field); ok && isMethod {
 		if inner, sym2, handled := l.delegateCall(v, f, recvVal); handled {
 			args[0] = inner
@@ -287,7 +287,7 @@ func (l *lowerer) call(v *parse.Call) (string, error) {
 	return l.emitCall(v, sym, ta, args)
 }
 
-// delegateCall 处理 N10 的委托方法调用：`a.m()` → 目标类方法 + 接收者换成 `a.<字段>`。
+// delegateCall 处理委托方法调用：`a.m()` → 目标类方法 + 接收者换成 `a.<字段>`。
 // 返回 (值名, 符号名, 是否已处理)。
 func (l *lowerer) delegateCall(v *parse.Call, field *parse.Field, recvVal string) (string, string, bool) {
 	rt := l.typeOf(field.X)
@@ -324,7 +324,7 @@ func (l *lowerer) emitCall(v *parse.Call, sym string, ta, args []string) (string
 	call := &Call{Sym: sym, TypeArgs: ta, Args: args}
 	// 存储点 ③：容器方法的**末位实参**是存储点（append 的值 / insert(i, v) 的 v），
 	// 检查器把 GuardSpec 打在那个实参节点上（types/call.go）。这里随调用把它带上
-	// IR —— 漏了这一路，跨区存入容器的守卫就静默消失（§五 R5：既不拒也不守 = 漏）。
+	// IR —— 漏了这一路，跨区存入容器的守卫就静默消失（既不拒也不守 = 漏）。
 	if len(v.Args) > 0 && len(args) > 0 {
 		last := v.Args[len(v.Args)-1]
 		if g, ok := l.info.HasGuard(last); ok {
@@ -394,7 +394,7 @@ func constText(cv types.ConstVal) string {
 	return "const 0"
 }
 
-// comptimeCall 降级内省原语（N4）：typeName / isValueType 已在 checker 折成常量，
+// comptimeCall 降级内省原语：typeName / isValueType 已在 checker 折成常量，
 // sizeOf 可折则常量、不可折则 `sizeof <ty>`（真尺寸只由 C 给）。
 func (l *lowerer) comptimeCall(v *parse.Call) (string, bool, error) {
 	cv, ok := l.info.ComptimeOf(v)
@@ -432,7 +432,7 @@ func (l *lowerer) callee(v *parse.Call) (string, []string) {
 		if sig, ok := l.info.Funcs[fn.Name]; ok {
 			return mangleFunc(l.in.Pkg, "", sig.Name), l.typeArgsOf(v)
 		}
-		// 类工厂：C(args) → <pkg>_C_init（init 是至多一个的构造函数，§四）
+		// 类工厂：C(args) → <pkg>_C_init（init 是至多一个的构造函数）
 		if cl, ok := l.info.Classes[fn.Name]; ok {
 			return mangleFunc(cl.Pkg, cl.Name, "init"), nil
 		}
@@ -477,7 +477,7 @@ func (l *lowerer) callee(v *parse.Call) (string, []string) {
 			return recvTypeSym(rt) + "_" + fn.Name, nil
 		}
 		if id, isID := fn.X.(*parse.Ident); isID {
-			// 类型级方法（N4）：`Class.default()` → <pkg>_<Cls>_default
+			// 类型级方法：`Class.default()` → <pkg>_<Cls>_default
 			if cl, isCl := l.info.Classes[id.Name]; isCl {
 				if _, has := cl.Method(fn.Name); has {
 					return mangleFunc(cl.Pkg, cl.Name, fn.Name), nil
@@ -599,7 +599,7 @@ func (l *lowerer) composite(v *parse.CompositeLit) (string, error) {
 	obj := l.tmp("obj")
 	kind := "region"
 	if l.depth == 0 {
-		kind = "task" // 深度 0 = 任务区域（§五 R1）
+		kind = "task" // 深度 0 = 任务区域
 	}
 	// alloc 分配的是**对象类型**（不带引用后缀）；变量/返回位才是指针形态。
 	objTy := strings.TrimSuffix(ty, "*")
@@ -610,7 +610,7 @@ func (l *lowerer) composite(v *parse.CompositeLit) (string, error) {
 	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: obj, Ty: objTy + ptr,
 		Rhs: &Alloc{Kind: kind, Ty: objTy}, Loc: LocOf(v.Pos)})
 	// 字段存储：下标 = **类声明序**（不是字面量里的位置 —— `Point{y:2, x:1}`
-	// 按位置写会静默把 y 存进 x 的槽）。未列出的字段 = 零值（§二.3）：区域分配
+	// 按位置写会静默把 y 存进 x 的槽）。未列出的字段 = 零值：区域分配
 	// 不清零（只复位 bump 指针），不显式存零 = 新对象读到该内存上一个对象的
 	// 残留 —— 716/752 实测（`Log{}` 的 s/n 是垃圾，`this.s + t` 拿垃圾长度
 	// 去分配，只在特定内存布局下不炸）。这是 soundness 洞不是性能问题。
@@ -674,7 +674,7 @@ func (l *lowerer) place(e parse.Expr) (Place, error) {
 		idx, ok := l.fieldIndex(v)
 		if !ok {
 			// 下标取不到 = 接收者类型不在检查产物里（记录缺陷），绝不能默认 0：
-			// 那会把 `this.b = 2` 静默写进字段 a（752 实测，红线 23）。
+			// 那会把 `this.b = 2` 静默写进字段 a（752 实测）。
 			return nil, fmt.Errorf("air: cannot resolve the field index of %s (receiver type unknown, line %d)",
 				exprFieldText(v), parse.ExprPos(v).Line)
 		}
@@ -753,7 +753,7 @@ func (l *lowerer) placeValue(p Place, at parse.Pos) (string, error) {
 	return t, nil
 }
 
-// fieldIndex 取字段在声明序中的下标（ABI 冻结：禁重排，V1.4）。
+// fieldIndex 取字段在声明序中的下标（ABI 冻结：禁重排）。
 func (l *lowerer) fieldIndex(v *parse.Field) (int, bool) {
 	rt := l.typeOf(v.X)
 	// Err 的字段（code/msg/cause）：冻结下标见 types.ErrFieldIndex（唯一实现）。
@@ -807,7 +807,7 @@ func (l *lowerer) typeArgsOfInstance(inst *types.Instance) []string {
 	return out
 }
 
-// --- 类型与符号文本（§八 mangling 单表的 AIR 侧投影） -------------------------
+// --- 类型与符号文本（mangling 单表的 AIR 侧投影） -------------------------
 
 // tyText 是类型在 `.air` 里的规范拼写（键与名同源：闭集基本名 + <pkg>_<Name>）。
 func tyText(t types.Type) string {
@@ -886,7 +886,7 @@ func tyText(t types.Type) string {
 
 // refSuffix：引用类在 AIR 里带 `*`（值类无）。
 func refSuffix(cl *types.Class) string {
-	if cl.Packed {
+	if cl.Struct {
 		return ""
 	}
 	return "*"
@@ -922,7 +922,7 @@ func sigText(sig *types.FuncSig) string {
 	return out + ")"
 }
 
-// sortedKeys 是 map 键的确定序遍历（AIR 文本禁 map 序，H8/V7.1）。
+// sortedKeys 是 map 键的确定序遍历（AIR 文本禁 map 序，H8）。
 func sortedKeys[T any](m map[string]T) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

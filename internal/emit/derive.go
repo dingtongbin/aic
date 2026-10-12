@@ -8,7 +8,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// @derive(Compare) / @derive(Hash) 的方法体合成（核心设计 §四 三件套）。
+// derive Compare / derive Hash 的方法体合成（三件套）。
 //
 // 派生方法就是普通方法：签名由检查器装配（types.deriveMethods），名字走同一张
 // mangling 表（aic_<pkg>_<C>_compare / _hash），调用点与显式方法无差别。
@@ -49,7 +49,7 @@ func (c *Ctx) emitDerived() error {
 				c.line("static aic_u64 %s(%s);", c.cMethodName(cl, "hash"), c.cTypeDecl(cl, "this__"))
 			}
 		}
-		// N4：@derive(Default) / @derive(Clone) —— default() 返回全零实例，
+		// derive Default / derive Clone —— default() 返回全零实例，
 		// clone() 返回按值拷贝（引用字段在检查器已被拒，故这里是纯值拷贝）。
 		if cl.HasDerive("Default") {
 			if _, ok := cl.Method("default"); ok {
@@ -98,7 +98,7 @@ func (c *Ctx) emitDerived() error {
 // （值类型）或分配一个全零对象（引用类型）。
 func (c *Ctx) emitDefaultBody(cl *types.Class) error {
 	ct := c.cTypeName(cl)
-	if cl.Packed {
+	if cl.Struct {
 		c.line("static %s %s(void) { return (%s){0}; }", ct, c.cMethodName(cl, "default"), ct)
 		return nil
 	}
@@ -113,10 +113,10 @@ func (c *Ctx) emitDefaultBody(cl *types.Class) error {
 	return nil
 }
 
-// emitCloneBody：按值拷贝（@packed 直接整结构赋值；引用类分配 + 逐字段拷贝）。
+// emitCloneBody：按值拷贝（struct 直接整结构赋值；引用类分配 + 逐字段拷贝）。
 func (c *Ctx) emitCloneBody(cl *types.Class) error {
 	ct := c.cTypeName(cl)
-	if cl.Packed {
+	if cl.Struct {
 		c.line("static %s %s(%s) { return this__; }", ct, c.cMethodName(cl, "clone"), c.cTypeDecl(cl, "this__"))
 		return nil
 	}
@@ -130,9 +130,9 @@ func (c *Ctx) emitCloneBody(cl *types.Class) error {
 	return nil
 }
 
-// fieldAccess 是派生方法体内的字段访问（@packed = 值，用 `.`；引用对象用 `->`）。
+// fieldAccess 是派生方法体内的字段访问（struct = 值，用 `.`；引用对象用 `->`）。
 func (c *Ctx) fieldAccess(cl *types.Class, base, field string) string {
-	if cl.Packed {
+	if cl.Struct {
 		return base + "." + field
 	}
 	return base + "->" + field
@@ -169,7 +169,7 @@ func (c *Ctx) compareExpr(t types.Type, lhs, rhs string) (string, error) {
 			// bool 无序：false < true（与 tag 比较同构）
 			return fmt.Sprintf("(aic_i32)%s - (aic_i32)%s", lhs, rhs), nil
 		case types.IsNumeric(b):
-			// 浮点 NaN 会让两个 if 都不成立 → 落到 return 0，与 == 语义一致（§三）
+			// 浮点 NaN 会让两个 if 都不成立 → 落到 return 0，与 == 语义一致
 			return fmt.Sprintf("((%s > %s) ? 1 : ((%s < %s) ? -1 : 0))", lhs, rhs, lhs, rhs), nil
 		}
 		return "", fmt.Errorf("emit: field type %s is not comparable (the checker should have rejected it)", b.Name)

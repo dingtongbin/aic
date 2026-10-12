@@ -3,11 +3,11 @@ package types
 import "aic/internal/parse"
 
 // ---------------------------------------------------------------------------
-// 复合字面量 / 列表字面量 / lambda / match 表达式 / check（核心设计 §三/§四/§六）。
+// 复合字面量 / 列表字面量 / lambda / match 表达式 / check。
 // ---------------------------------------------------------------------------
 
-// checkComposite: C{f: v}——无 init 类的构造（核心设计 §四）。
-// 类型头可以是裸类名 C、跨包限定名 pkg.C，或泛型实例 Box[i32]（§四 可见性 + 泛型）。
+// checkComposite: C{f: v}——无 init 类的构造。
+// 类型头可以是裸类名 C、跨包限定名 pkg.C，或泛型实例 Box[i32]（可见性 + 泛型）。
 func (c *Checker) checkComposite(v *parse.CompositeLit, expect Type) (Type, bound, untyped) {
 	cl, inst := c.compositeClass(v)
 	if cl == nil {
@@ -96,7 +96,7 @@ func typeExprOf(e parse.Expr) parse.TypeExpr {
 }
 
 // compositeClass 解析复合字面量的类型头 → (类, 泛型实例或 nil)。
-// 唯一实现：本包裸名 / 跨包限定名 / 泛型实例 Box[i32]（三处各写一份 = 红线 10 的病）。
+// 唯一实现：本包裸名 / 跨包限定名 / 泛型实例 Box[i32]（三处各写一份 = 病）。
 func (c *Checker) compositeClass(v *parse.CompositeLit) (*Class, *Instance) {
 	switch head := v.TypeName.(type) {
 	case *parse.Ident:
@@ -168,7 +168,7 @@ func (c *Checker) classInit(cl *Class) *FuncSig {
 	return nil
 }
 
-// checkArrayLit: [] 或 [a, b, c]——不参与类型推断（§二.2），元素类型来自上下文。
+// checkArrayLit: [] 或 [a, b, c]——不参与类型推断，元素类型来自上下文。
 func (c *Checker) checkArrayLit(v *parse.ArrayLit, expect Type) (Type, bound, untyped) {
 	var elem Type
 	switch e := expect.(type) {
@@ -200,7 +200,7 @@ func (c *Checker) checkArrayLit(v *parse.ArrayLit, expect Type) (Type, bound, un
 	return &Slice{Elem: elem}, bound{off: c.regionOff, exact: true}, untyped{}
 }
 
-// checkLambda: lambda 需要上下文函数类型（核心设计 §三）；N1 的 `func` 字面量
+// checkLambda: lambda 需要上下文函数类型；`func` 字面量
 // （参数带类型）自带签名，可以没有上下文类型，并且**按值捕获**外层局部。
 func (c *Checker) checkLambda(v *parse.LambdaExpr, expect Type) (Type, bound, untyped) {
 	target, ok := expect.(*FuncT)
@@ -329,7 +329,7 @@ func withCaptures(ft *FuncT, caps []capture) *FuncT {
 	return out
 }
 
-// checkCheckExpr: check 表达式前缀（§六）。
+// checkCheckExpr: check 表达式前缀。
 func (c *Checker) checkCheckExpr(v *parse.CheckExpr, expect Type) (Type, bound, untyped) {
 	call, ok := v.X.(*parse.Call)
 	if !ok {

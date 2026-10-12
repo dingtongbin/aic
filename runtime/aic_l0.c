@@ -578,7 +578,7 @@ static const char *trap_fix(aic_trap_code code) {
     case AIC_TRAP_UNREACHABLE:
         return "the match is exhaustive yet control reached here; check arm coverage";
     case AIC_TRAP_OUT_OF_MEMORY:
-        return "allocate less; confirm objects promoted by @live really need the heap";
+        return "allocate less; confirm objects promoted by live really need the heap";
     case AIC_TRAP_STACK_OVERFLOW:
         return "region nesting or defer depth exceeded the static capacity; split the function";
     case AIC_TRAP_REGION_ESCAPED:
@@ -645,6 +645,25 @@ aic_Err aic_err_wrap(aic_i32 code, aic_str msg, aic_Err cause) {
     aic_Err *node = (aic_Err *)aic_alloc_in(0, sizeof(aic_Err), 0);
     *node = cause;
     return (aic_Err){ code, msg, node };
+}
+
+/* Err.is(c)：沿 cause 链任一层命中即真（§7.1）。
+ * 链上限 AIC_ERR_CAUSE_DEPTH：链由 Err.wrap 逐层构筑，正常程序离这个量级
+ * 很远；走到上限还不停 = 自指或环。那不是要遍历的链，是要报的 bug ——
+ * 上限是判据，不是资源限额（死循环比慢循环坏得多）。 */
+#define AIC_ERR_CAUSE_DEPTH 256
+
+bool aic_err_is(aic_Err e, aic_i32 code) {
+    aic_usize depth = 0;
+    for (;;) {
+        if (e.code == code) return true;
+        if (e.cause == NULL) return false;
+        if (++depth > AIC_ERR_CAUSE_DEPTH) {
+            aic_trap_ctx(AIC_TRAP_UNREACHABLE, "<runtime: err chain>", 0,
+                         "the cause chain is cyclic or deeper than 256 levels");
+        }
+        e = *e.cause;
+    }
 }
 
 /* 判空解引用（§九）：p == NULL 就 trap NULL_DEREF（带调用点位置），否则返回 p。

@@ -5,13 +5,13 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// N3 泛型约束（核心设计 §16 N3）。
+// 泛型约束。
 //
 // 语法：`func max[T: Ord](a T, b T) -> T` / `[T: Hash + Eq]` / `[T: Shape]` /
 // `[T: value]` / `[T: ref]`。
 //
 // 三类约束，语义各不相同：
-//   - **能力约束**（Eq / Ord / Hash / Print / Zero）= @derive 的**同一封闭集合**，
+//   - **能力约束**（Eq / Ord / Hash / Print / Zero）= derive 的**同一封闭集合**，
 //     不引入新概念；
 //   - **接口约束** = 结构化满足（与接口变量同一机制，按见证表分发）；
 //   - **值性约束**（value / ref）= 统一现在散落的"安全集"判断。
@@ -33,7 +33,7 @@ func (c *Checker) constraintsOfParam(name string) []string {
 	return nil
 }
 
-// opAllowedByConstraint 报告约束集合是否授权某个运算符（N3）：
+// opAllowedByConstraint 报告约束集合是否授权某个运算符：
 // Ord ⇒ </<=/>/>=/==/!=；Eq ⇒ ==/!=；接口约束 ⇒ ==/!=（接口按内容比较不安全，
 // 故接口只授权方法调用，不授权运算符）。
 func opAllowedByConstraint(cons []string, op string) bool {
@@ -54,7 +54,7 @@ func opAllowedByConstraint(cons []string, op string) bool {
 	return false
 }
 
-// resolveTypeArgName 把一个**类型名表达式**解析成语义类型（N4 内省原语的实参）：
+// resolveTypeArgName 把一个**类型名表达式**解析成语义类型（内省原语的实参）：
 // 支持 `i32` 这样的基本类型名、本包具名类型、跨包 `pkg.Type`。
 // 非类型名 = 返回 nil（调用方报"需要类型名"）。
 func (c *Checker) resolveTypeArgName(e parse.Expr) Type {
@@ -84,7 +84,7 @@ func (c *Checker) resolveTypeArgName(e parse.Expr) Type {
 	return nil
 }
 
-// checkComptimeCall 检查一次内省调用（N4）：定型 + 记折叠结果（emit 按它发常量）。
+// checkComptimeCall 检查一次内省调用：定型 + 记折叠结果（emit 按它发常量）。
 func (c *Checker) checkComptimeCall(v *parse.Call, name string, expect Type) (Type, bound, untyped) {
 	if len(v.Args) != 1 {
 		c.errorAt(v.Pos, name+" takes exactly one type argument", name+"(T)",
@@ -271,8 +271,8 @@ func hashableType(t Type) string {
 	case *Basic:
 		return ""
 	case *Class:
-		if !v.Packed {
-			return "a reference class has no content hash; use @packed or @derive(Hash)"
+		if !v.Struct {
+			return "a reference class has no content hash; use struct or derive Hash"
 		}
 		why, _ := firstNonHashable(v)
 		return why
@@ -300,7 +300,7 @@ func hashableType(t Type) string {
 	return "this type has no hash (containers, interfaces and functions are not hashable)"
 }
 
-// orderedType 报告类型是否自带全序（数值 / str / @derive(Compare) 的类）。
+// orderedType 报告类型是否自带全序（数值 / str / derive Compare 的类）。
 func orderedType(t Type) bool {
 	if b, ok := t.(*Basic); ok {
 		switch b.Name {
@@ -345,7 +345,7 @@ func (c *Checker) checkCallConstraints(at parse.Pos, owner string, tps []parse.T
 		}
 		// 形参自身仍是**类型参数**时无法判定满足性（模板体内的自引用，
 		// 如 `func init(v T) -> Box[T]` 的 Box[T]）——推迟到实例化点，
-		// 与 @packed 字段白名单同一模式（含 TypeParam 就推迟）。
+		// 与 struct 字段白名单同一模式（含 TypeParam 就推迟）。
 		if containsTypeParam(arg) {
 			continue
 		}

@@ -6,7 +6,7 @@ import (
 )
 
 // CheckerError is one collected type-check failure in the frozen three-part
-// shape (H5 / 核心设计 §三 报错三段式) — identical to the parse layer's shape.
+// shape (H5 / 报错三段式) — identical to the parse layer's shape.
 type CheckerError struct {
 	Pos     parsePos
 	Desc    string
@@ -39,7 +39,7 @@ func (e CheckerError) Format() string {
 	return b.String()
 }
 
-// FormatAll renders every diagnostic in source order (多错一次报, 红线 14).
+// FormatAll renders every diagnostic in source order (多错一次报).
 //
 // 两条纪律（诊断审计驱动）：
 //   - **按源码位置排序**（行、列稳定序）：按检查顺序输出会让 `a, b = f()` 里
