@@ -1731,7 +1731,12 @@ func (c *Ctx) irLeaf(in air.Inst, ind string) error {
 		c.line("%saic_trap(%s, %s, %d);", ind, v.Code, cstr(c.locFile(v.Loc)), locLine(v.Loc))
 		return nil
 	case *air.TrapIfErr:
-		return fmt.Errorf("emit(IR): trap.if.err is not emitted yet (line %d)", v.Line)
+		// `expr!`（E4 断言）：末位 Err 的 code ≠ 0 → 报告（含 code/msg/位置）后 trap，
+		// 不返回；否则继续。零值 = ok（AIC_ERR_NONE.code == 0）。
+		c.srcLine(v.Loc.Pos(c.Path))
+		c.line("%sif ((%s).code != 0) { aic_err_report(%s); aic_trap(AIC_TRAP_ASSERT_FAILED, %s, %d); }",
+			ind, v.Err, v.Err, cstr(c.locFile(v.Loc)), locLine(v.Loc))
+		return nil
 	case *air.Spawn:
 		return c.irSpawn(v, ind)
 	case *air.SelWait:
