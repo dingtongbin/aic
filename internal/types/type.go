@@ -98,8 +98,11 @@ type Enum struct {
 	HasData    bool
 	TypeParams []string
 	// ErrCode = true 表示 `enum X: ErrCode { … }`：错误码约束枚举。
-	// 码由编译器按（模块路径哈希, 变体序号）分配，构建图内冲突 = 编译错误（C26）。
+	// 码由编译器按（包身份哈希, 变体序号）分配，构建图内冲突 = 编译错误（C26）。
 	ErrCode bool
+	// Codes 是 ErrCode 枚举每个变体的错误码（下标 = 变体序号）；其余枚举为 nil。
+	// 分配见 errcode.go —— 那是码的唯一实现，emit 与 is() 只读它。
+	Codes []int32
 	// DeclPos 是声明位置（诊断用：负载解析推迟到类型收齐后，报错仍要指回声明处）。
 	DeclPos parse.Pos
 }
@@ -370,6 +373,7 @@ func containsReference(t Type) bool {
 // 全字段值类型的 struct**。背后的两条理由（§5.3 判据 1、2）：
 //  1. 值类型 ⇒ 闭包环境是纯值结构体，**无区域头**；
 //  2. 不含引用 ⇒ 随闭包值拷贝后没有任何指针可能悬垂。
+//
 // 合起来才是规范说的"可证无悬垂"。class / 容器 / 接口 / chan / 带负载且含引用的
 // enum 一律 false —— 捕获它们 = 编译错误，修复提示改用显式上下文参数。
 func captureSafe(t Type, depth int) bool {

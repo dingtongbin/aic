@@ -393,24 +393,26 @@ func (c *Ctx) emitEnum(v *parse.EnumDecl) {
 	name := c.typedefName(c.pkg(), v.Name)
 	if !hasDataVariants(v) {
 		c.line("enum %s {", name)
+		codes := c.errCodesOf(v.Name)
 		for i, va := range v.Variants {
 			sep := ","
 			if i == len(v.Variants)-1 {
 				sep = ""
 			}
-			c.line("    %s_%s = %d%s", name, va.Name, i, sep)
+			c.line("    %s_%s = %d%s", name, va.Name, variantCode(codes, i), sep)
 		}
 		c.line("};")
 		c.line("")
 		return
 	}
 	c.line("enum %s_tag {", name)
+	codes := c.errCodesOf(v.Name)
 	for i, va := range v.Variants {
 		sep := ","
 		if i == len(v.Variants)-1 {
 			sep = ""
 		}
-		c.line("    %s_%s = %d%s", name, va.Name, i, sep)
+		c.line("    %s_%s = %d%s", name, va.Name, variantCode(codes, i), sep)
 	}
 	c.line("};")
 	c.line("struct %s {", name)
@@ -433,6 +435,27 @@ func (c *Ctx) emitEnum(v *parse.EnumDecl) {
 }
 
 // hasDataVariants 报告 enum 是否有带数据变体 (带数据 = {tag, union} 布局)。
+// errCodesOf 取 ErrCode 枚举的变体码（emit 侧的**唯一读取点**；码由检查器按
+// 包身份哈希分配，见 types/errcode.go）。非 ErrCode 枚举 = nil（用变体序号）。
+func (c *Ctx) errCodesOf(name string) []int32 {
+	if c.Info == nil {
+		return nil
+	}
+	en := c.Info.Enums[name]
+	if en == nil || !en.ErrCode {
+		return nil
+	}
+	return en.Codes
+}
+
+// variantCode 取第 i 个变体的 C 枚举值：ErrCode 枚举用分配码，其余用序号。
+func variantCode(codes []int32, i int) int32 {
+	if i < len(codes) {
+		return codes[i]
+	}
+	return int32(i)
+}
+
 func hasDataVariants(v *parse.EnumDecl) bool {
 	for _, va := range v.Variants {
 		if va.Payload != nil {

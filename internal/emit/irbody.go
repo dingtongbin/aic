@@ -3022,6 +3022,18 @@ func (c *Ctx) irVariantCall(sym string, args []string) (string, bool, error) {
 	}
 	name := c.cTypeName(en)
 	if va.Payload == nil {
+		// ErrCode 枚举的无载荷变体直构（§7.2）：`X.V(msg)` ≡ `Err(X.V, msg, nil)`。
+		// 码由编译器分配（E-8），所以这里只查表，不接受任何手写数字。
+		if en.ErrCode {
+			if len(args) != 1 {
+				return "", true, fmt.Errorf("emit(IR): the error-code variant %s takes exactly one message", sym)
+			}
+			code, ok := en.CodeOf(va.Name)
+			if !ok {
+				return "", true, fmt.Errorf("emit(IR): the error-code variant %s has no assigned code", sym)
+			}
+			return fmt.Sprintf("aic_err_wrap((aic_i32)%d, %s, AIC_ERR_NONE)", code, args[0]), true, nil
+		}
 		if len(args) != 0 {
 			return "", true, fmt.Errorf("emit(IR): the variant %s takes no payload", sym)
 		}

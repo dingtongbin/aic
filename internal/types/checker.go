@@ -173,10 +173,10 @@ func CheckPackage(files []*parse.File, deps map[string]*Info) *CheckResult {
 		consts:  map[string]*Symbol{},
 		failed:  map[string]bool{},
 
-		closures: map[parse.Expr][]string{},
-		capRefs:  map[parse.Expr]int{},
-		comptime: map[parse.Expr]ComptimeVal{},
-		arrayLens: map[parse.Expr]int64{},
+		closures:      map[parse.Expr][]string{},
+		capRefs:       map[parse.Expr]int{},
+		comptime:      map[parse.Expr]ComptimeVal{},
+		arrayLens:     map[parse.Expr]int64{},
 		typeExprTypes: map[parse.TypeExpr]Type{},
 		callTypeArgs:  map[parse.Expr][]Type{},
 	}
@@ -188,6 +188,10 @@ func CheckPackage(files []*parse.File, deps map[string]*Info) *CheckResult {
 	// std 根类型枚举进入名字表：根类型无需 import 即可用（变体构造/match）
 	c.stdEnums()
 	c.collectDecls(files)
+	// 错误码分配与跨构建图前缀冲突检测（C26）在声明收齐后立刻做：
+	// 后面的函数体检查里 `e.is(X.Y)` / `X.Y(msg)` 都依赖 Codes 已就位。
+	c.assignErrCodes()
+	c.checkErrCodeConflicts()
 	// 约束名的校验**推迟到收集结束**：接口可以声明在用到它的泛型之后
 	// （`func sum[T: Shape]` 写在 `interface Shape` 之前是合法的 —— 若在收集期
 	// 逐条校验，"先写函数后写接口"就会报"未知泛型约束"）。
@@ -963,7 +967,6 @@ func (c *Checker) lookupInterfaceRef(name string) *Interface {
 }
 
 // sameSig 见 assign.go（唯一定义）。
-
 
 func (c *Checker) collectEnum(v *parse.EnumDecl) {
 	if !c.checkReservedTypeName(v.Name, "enum", v.Pos) {
