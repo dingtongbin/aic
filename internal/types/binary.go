@@ -93,7 +93,7 @@ func (c *Checker) checkBinary(v *parse.Binary, expect Type) (Type, bound, untype
 			// C 的 % 只对整数成立（发出去就是非法 C）；浮点取余要显式调用。
 			// 注意**未定型字面量**也要判（`5.5 % 2.0` 的两侧此刻都还是 nil 类型）。
 			c.errorAt(v.Pos, "the remainder operator % is integer-only", typeOrUn(lt, linfo)+" % "+typeOrUn(rt, rinfo),
-				"for floats use math.fmod(a, b); % keeps truncation semantics for integers (core design §1)")
+				"floating-point remainder is not defined: write it as a - (a / b) * b with the quotient truncated toward zero, or keep the operands integral; % truncates for integers (core design §1)")
 			return nil, nilBound, untyped{}
 		}
 		if !c.operandsReady(v, lt, rt, linfo, rinfo, isNumeric) {

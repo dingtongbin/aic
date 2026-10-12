@@ -2,9 +2,18 @@ package types
 
 import (
 	"fmt"
-	"math"
 
 	"aic/internal/parse"
+)
+
+// 整数界常量：故意不引 Go 标准库的 math 包 —— 阶段 2 出口条件要求
+// `grep -rn` 查引号包名时 internal/types/ 里只余 std 名表残留（那份残留记的是
+// AIC 的 math 包名，不是语言的一部分）。这里的常量是**编译器自己的**整数界，
+// 与 AIC 的数学面无关，因此用字面量而不是库常量。
+const (
+	maxInt32 = 1<<31 - 1
+	maxInt64 = 1<<63 - 1
+	minInt64 = -1 << 63
 )
 
 // ---------------------------------------------------------------------------
@@ -427,19 +436,19 @@ func foldInt(op string, a, b int64) (ConstVal, string) {
 		// 编译期算术**溢出 = 编译错**（可证必错 = 编译错；运行期才是 trap）。
 		// 直接 `a + b` 会让 Go 的 int64 回绕被静默接受
 		// （`const Y = 9223372036854775807 + 1` 编译通过并打印负数）。
-		if (b > 0 && a > math.MaxInt64-b) || (b < 0 && a < math.MinInt64-b) {
+		if (b > 0 && a > maxInt64-b) || (b < 0 && a < minInt64-b) {
 			return ConstVal{}, "constant addition overflows i64"
 		}
 		return ConstVal{Kind: ConstInt, Int: a + b}, ""
 	case "-":
-		if (b < 0 && a > math.MaxInt64+b) || (b > 0 && a < math.MinInt64+b) {
+		if (b < 0 && a > maxInt64+b) || (b > 0 && a < minInt64+b) {
 			return ConstVal{}, "constant subtraction overflows i64"
 		}
 		return ConstVal{Kind: ConstInt, Int: a - b}, ""
 	case "*":
 		if a != 0 && b != 0 {
 			p := a * b
-			if p/b != a || (a == -1 && b == math.MinInt64) || (b == -1 && a == math.MinInt64) {
+			if p/b != a || (a == -1 && b == minInt64) || (b == -1 && a == minInt64) {
 				return ConstVal{}, "constant multiplication overflows i64"
 			}
 			return ConstVal{Kind: ConstInt, Int: p}, ""
@@ -449,7 +458,7 @@ func foldInt(op string, a, b int64) (ConstVal, string) {
 		if b == 0 {
 			return ConstVal{}, "constant division by zero"
 		}
-		if a == math.MinInt64 && b == -1 {
+		if a == minInt64 && b == -1 {
 			return ConstVal{}, "constant division overflows i64"
 		}
 		return ConstVal{Kind: ConstInt, Int: a / b}, ""
@@ -595,12 +604,12 @@ func (c *Checker) constArrayLen(e parse.Expr) (int64, string) {
 	}
 	switch cv.Kind {
 	case ConstInt:
-		if cv.Int < 0 || cv.Int > math.MaxInt32 {
+		if cv.Int < 0 || cv.Int > maxInt32 {
 			return 0, "N must be a non-negative integer that fits i32"
 		}
 		return cv.Int, ""
 	case ConstUint:
-		if cv.Uint > math.MaxInt32 {
+		if cv.Uint > maxInt32 {
 			return 0, "N must be a non-negative integer that fits i32"
 		}
 		return int64(cv.Uint), ""
