@@ -105,6 +105,9 @@ func (c *Ctx) emitRuntimeInstances() {
 			switch {
 			case pass == 0 && e.kind == "list":
 				c.needed["l1"] = true
+				// 只发 OP：容器**类型**（`aic_list_<后缀>`）在运行期还没有配套的
+				// 显式宏（AIC_LIST_OP 只发函数），struct 元素的 list 实例编不过
+				// —— 那是运行期缺口，见提交记录里的实测证据，不在编译器侧糊过去。
 				c.line("AIC_LIST_OP(%s, %s)", e.suf, e.elem)
 			case pass == 1 && e.kind == "chan":
 				c.needed["l2"] = true
