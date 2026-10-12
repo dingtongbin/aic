@@ -5,7 +5,9 @@ import "aic/internal/parse"
 // ---------------------------------------------------------------------------
 // chan[T]：channel 只传值，元素必须在**深拷贝安全集**内
 // （基本类型 / str / struct / 无负载 enum 及其容器——该集合无环，深拷贝必终止）。
-// T1 面：send(v) / recv() -> (T, bool) / len()；无 select、无取消（【O3】【O4】）。
+// 方法集：send(v) / recv() -> (T, Err) / tryRecv() -> Option[T] / drain(n) /
+// len() / cap()。recv 的失败位是 **Err**（std.Code 的 ChanExhausted），不是 bool ——
+// 错误必须进统一错误处理（标准库规范）；"拿不到"与"不会再有"由 Err 与 Option 区分。
 // ---------------------------------------------------------------------------
 
 // ChanT 是 chan[T] 的语义类型。
