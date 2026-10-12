@@ -1,14 +1,61 @@
 package emit
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
+	"aic/internal/air"
+	"aic/internal/cir"
 	"aic/internal/parse"
 	"aic/internal/types"
 )
 
-// emitSrc 走全管线（lex → parse → types → emit），返回 C 文本。
+// emitIRFrom 跑 **§13.1 唯一管线**：降级 → 单态化 → 去糖 → 剪枝 → C 形态 →
+// IR 后端发 C。这与 cmd/aic 的 emitIRUnit 是同一条路 —— 测试与生产走两条路时，
+// 任何一边的断言都证明不了另一边（所以这里不复用任何 AST 直译入口）。
+func emitIRFrom(t *testing.T, f *parse.File, info *types.Info, path string) (*Result, error) {
+	t.Helper()
+	var imports []string
+	for im := range info.Imported {
+		imports = append(imports, im)
+	}
+	m, err := air.Lower(air.LowerInput{Pkg: info.Pkg, Files: []*parse.File{f}, Info: info, Imports: imports, Mono: true})
+	if err != nil {
+		return nil, err
+	}
+	if vs := air.Verify(m); len(vs) > 0 {
+		return nil, fmt.Errorf("IR verification failed: %s", vs[0].String())
+	}
+	if m, err = air.Monomorphize(m, info); err != nil {
+		return nil, err
+	}
+	if vs := air.VerifyMono(m, info); len(vs) > 0 {
+		return nil, fmt.Errorf("mair verification failed: %s", vs[0])
+	}
+	if m, err = air.Desugar(m); err != nil {
+		return nil, err
+	}
+	if air.HasPrim(m) {
+		return nil, fmt.Errorf("IR-1 primitives survived desugaring in package %s", info.Pkg)
+	}
+	for _, fn := range m.Funcs {
+		air.PruneUnreachable(fn)
+	}
+	cp, err := cir.Build(m)
+	if err != nil {
+		return nil, err
+	}
+	ir := NewIRProg()
+	for _, fn := range cp.Funcs {
+		if err := ir.Add(fn.Sym, fn); err != nil {
+			return nil, err
+		}
+	}
+	return EmitIRUnit(Single(f, path, info), ir)
+}
+
+// emitSrc 走全管线（lex → parse → types → 唯一 IR 管线 → C），返回 C 文本。
 func emitSrc(t *testing.T, src string) string {
 	t.Helper()
 	f, lexErrs, parseErrs := parse.Source("t.aic", src)
@@ -19,7 +66,7 @@ func emitSrc(t *testing.T, src string) string {
 	if len(res.Errors) > 0 {
 		t.Fatalf("检查器报错：\n%s", res.Errors[0].Format())
 	}
-	out, err := Emit(f, "t.aic", res.Info)
+	out, err := emitIRFrom(t, f, res.Info, "t.aic")
 	if err != nil {
 		t.Fatalf("emit 失败：%v", err)
 	}
@@ -29,7 +76,8 @@ func emitSrc(t *testing.T, src string) string {
 // TestEmitIsPure: 红线 12「emit 纯函数，无全局状态」—— 同一 AST 两次 emit 必须
 // 逐字节相同（同时也是 H2 构建确定性的第一层）。
 func TestEmitIsPure(t *testing.T) {
-	src := `import print
+	src := `import fmt
+import str
 
 class Box {
     var n i32
@@ -44,11 +92,11 @@ func main() {
     var m map[str]i32 = map.new()
     m.put("k", 7)
     var b = make(5)
-    print.println(b.n)
-    print.println(xs.len())
+    fmt.println(str.fromI64(i64(b.n)))
+    fmt.println(str.fromI64(i64(xs.len())))
     region {
         var inner = Box{n: 9}
-        print.println(inner.n)
+        fmt.println(str.fromI64(i64(inner.n)))
     }
 }
 `
@@ -83,7 +131,8 @@ func TestManglingTableIsSingle(t *testing.T) {
 // TestLineDirectivesCoverEverySite: 红线 9「#line 全覆盖，禁裸 emit」—— 每个
 // 函数定义与语句块前都必须有回指 .aic 的 #line。
 func TestLineDirectivesCoverEverySite(t *testing.T) {
-	src := `import print
+	src := `import fmt
+import str
 
 func helper(v i32) -> i32 {
     if v > 0 {
@@ -94,7 +143,7 @@ func helper(v i32) -> i32 {
 
 func main() {
     var n i32 = helper(3)
-    print.println(n)
+    fmt.println(str.fromI64(i64(n)))
 }
 `
 	out := emitSrc(t, src)
@@ -118,7 +167,8 @@ func main() {
 // trap 前缀与退出码）；emit 侧这里只钉「守卫发射后仍是 AIC_GUARD 形态」这一
 // 事实，避免出现自造的第二套守卫写法。
 func TestGuardMacroIsTheOnlyGuardForm(t *testing.T) {
-	src := `import print
+	src := `import fmt
+import str
 
 class Box {
     var n i32
@@ -129,7 +179,7 @@ func fill(xs Box[]) {
         var inner = Box{n: 2}
         xs.append(inner)
     }
-    print.println(xs.len())
+    fmt.println(str.fromI64(i64(xs.len())))
 }
 
 func main() {
@@ -171,7 +221,7 @@ func main() {
 	if len(res.Errors) > 0 {
 		return // (a) 检查期已拒
 	}
-	out, err := Emit(f, "main/t.aic", res.Info)
+	out, err := emitIRFrom(t, f, res.Info, "main/t.aic")
 	if err != nil {
 		t.Fatalf("检查期未拒，发射期又失败：%v", err)
 	}
@@ -182,13 +232,14 @@ func main() {
 
 // TestRegionPushPop: region 块必须发射 push/pop（弹出 = bump 复位，§五 R1）。
 func TestRegionPushPop(t *testing.T) {
-	src := `import print
+	src := `import fmt
+import str
 
 func main() {
     region {
-        print.println("in")
+        fmt.println("in")
     }
-    print.println("out")
+    fmt.println("out")
 }
 `
 	out := emitSrc(t, src)

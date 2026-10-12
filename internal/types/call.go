@@ -6,6 +6,7 @@ import (
 	"aic/internal/parse"
 )
 
+
 // ---------------------------------------------------------------------------
 // 调用 / 成员访问 / 下标（核心设计 §二.2 容器面、§二.3 str、§三、§四 构造、
 // §八 FFI 句柄不涉区域）。
@@ -64,19 +65,11 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 	// 变体构造 Some(x)：Some 是带数据变体名（本包枚举或 std Option）
 	if id, ok := v.Fn.(*parse.Ident); ok {
 		if en, variant, isVar := c.lookupVariantCtor(id.Name); isVar {
-			return c.checkVariantCtor(v, en, variant)
+			return c.checkVariantCtor(v, en, variant, expect)
 		}
 		if id.Name == "Some" {
 			if _, hasOpt := c.stdOptionEnum(); hasOpt {
 				return c.checkOptionSome(v)
-			}
-		}
-	}
-	// sync.Mutex.new()：值类型零值即未加锁，构造就是零值（§七）
-	if field, ok := v.Fn.(*parse.Field); ok && field.Name == "new" {
-		if inner, isF := field.X.(*parse.Field); isF {
-			if id, isID := inner.X.(*parse.Ident); isID && id.Name == "sync" && inner.Name == "Mutex" {
-				return TMutex, bound{off: c.regionOff, exact: true}, untyped{}
 			}
 		}
 	}
@@ -118,17 +111,6 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			}
 		}
 	}
-	// bytes 构造（N7）：bytes.new() / bytes.withCap(n) / bytes.fromStr(s)
-	if field, ok := v.Fn.(*parse.Field); ok {
-		if id, isID := field.X.(*parse.Ident); isID && id.Name == "bytes" {
-			if t, b, u, handled := c.checkBytesCtor(v, field.Name); handled {
-				return t, b, u
-			}
-			c.errorAt(v.Pos, "no such function on bytes", "bytes."+field.Name,
-				"the bytes surface is new / withCap / fromStr (core design §16 N7)")
-			return nil, nilBound, untyped{}
-		}
-	}
 	// 容器构造：set.new() / map.new()（类型来自声明处，§二.2）
 	if field, ok := v.Fn.(*parse.Field); ok {
 		if id, isId := field.X.(*parse.Ident); isId && (id.Name == "set" || id.Name == "map") && field.Name == "new" {
@@ -143,8 +125,8 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			case *MapT:
 				return e, bound{off: c.regionOff, exact: true}, untyped{}
 			}
-			// 修复文案必须按**实际写的包名**生成：曾经硬编码成 `set`，
-			// 于是 `map.new()` 的诊断教用户写一个 set（照做也不编译）。
+			// 修复文案必须按**实际写的包名**生成：硬编码成 `set` 会让
+			// `map.new()` 的诊断教用户写一个 set（照做也不编译）。
 			shape := "var s set[i32] = set.new()"
 			if id.Name == "map" {
 				shape = "var m map[str]i32 = map.new()"
@@ -163,7 +145,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 		if id, isID := field.X.(*parse.Ident); isID {
 			if en, isEnum := c.enums[id.Name]; isEnum {
 				if idx, isVar := en.variantI[field.Name]; isVar {
-					return c.checkVariantCtor(v, en, en.Variants[idx])
+					return c.checkVariantCtor(v, en, en.Variants[idx], expect)
 				}
 			}
 		}
@@ -171,7 +153,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 		if inner, isField := field.X.(*parse.Field); isField {
 			if pid, isID := inner.X.(*parse.Ident); isID {
 				if en, va, found := c.depVariant(pid.Name, inner.Name, field.Name, v.Pos); found {
-					return c.checkVariantCtor(v, en, va)
+					return c.checkVariantCtor(v, en, va, expect)
 				}
 			}
 		}
@@ -188,6 +170,61 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			if cl, isCl := c.classes[id.Name]; isCl {
 				if sig, has := cl.Method(field.Name); has && sig.NoRecv {
 					return c.checkInvoke(v, sig, nil, bound{}, expect)
+				}
+			}
+		}
+	}
+	// map/set 构造：`map[K]V.new()` / `set[T].new()`（§四：唯一构造 = .new()）
+	// **必须在通用"方法调用"分支之前**：那里会把 map[K]V 当值求值，
+	// 报出"未声明的名字 map"这种与真实错误无关的诊断（与泛型类同题）。
+	if field, ok := v.Fn.(*parse.Field); ok && field.Name == "new" {
+		// `map[K]V.new()` / `set[T].new()`：接收者是**表达式位类型构造子**
+		//（parse.TypeExprNode —— 值类型 V 在 `]` 之外，普通 Index 表达不了）。
+		if tn, isTN := field.X.(*parse.TypeExprNode); isTN {
+			// set[T] 只有一个类型实参（Val 为 nil）；map[K]V 有两个。
+			key := c.resolveType(tn.Key)
+			if key == nil {
+				return nil, nilBound, untyped{}
+			}
+			var ct Type
+			if tn.Val != nil {
+				val := c.resolveType(tn.Val)
+				if val == nil {
+					return nil, nilBound, untyped{}
+				}
+				if !hashable(key) {
+					c.errorAt(tn.Pos, "the map key type is not hashable", typeText(key),
+						"a key allows numeric / bool / str / payload-free enum / @packed only (AIC language spec §4)")
+					return nil, nilBound, untyped{}
+				}
+				if _, ok := RuntimeMapKeySuffix(key); !ok {
+					c.errorAt(tn.Pos, "the map key type has no runtime instance", typeText(key),
+						"keys available today: i32 / i64 / u32 / u64 / usize / bool / str (AIC language spec §4)")
+					return nil, nilBound, untyped{}
+				}
+				ct = &MapT{Key: key, Value: val}
+			} else {
+				ct = &SetT{Elem: key}
+			}
+			if len(v.Args) > 0 {
+				c.errorAt(v.Pos, tn.Name+".new takes no argument", tn.Name+"[..].new()",
+					"a container starts empty: "+tn.Name+"[..].new() (AIC standard library spec §2.3)")
+				return nil, nilBound, untyped{}
+			}
+			return ct, bound{off: c.regionOff, exact: true}, untyped{}
+		}
+	}
+	// 泛型类的静态调用：`Box[i64].init(42)`。
+	// Fn = Field(Index(Ident "Box", Index=i64), "init")。
+	// **必须在 245 的通用"方法调用"分支之前**——那里会把 Box[i64] 当值求值，
+	// 报出"未声明的名字 Box"这种与真实错误无关的诊断（诊断审计实测，err/280）。
+	// 判据：泛型类按调用点实例化（§6.1），init 是类级函数（接收者是实例，非 this），
+	// 与 `Box[T]{...}` 复合字面量互补。
+	if field, ok := v.Fn.(*parse.Field); ok {
+		if ix, isIx := field.X.(*parse.Index); isIx {
+			if id, isID := ix.X.(*parse.Ident); isID {
+				if cl, isCl := c.classes[id.Name]; isCl && len(cl.TypeParams) > 0 {
+					return c.checkGenericStaticCall(v, ix, cl, field.Name, expect)
 				}
 			}
 		}
@@ -225,7 +262,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 			// （一条错刷成两条是级联噪音，会把真正的首因埋掉）。
 			return nil, nilBound, untyped{}
 		}
-		// 接收者定型失败**必须报错**：此前静默返回 ⇒ `"abc".bogus()` 过 check 而在
+		// 接收者定型失败**必须报错**：静默返回会让 `"abc".bogus()` 过 check 而在
 		// build 阶段炸出无关诊断（"实参类型未知"），是 check↔build 分叉的根因。
 		c.errorAt(v.Pos, "cannot resolve the type of the receiver", exprText(field.X),
 			"the receiver of ."+field.Name+" must be a value with a known type: annotate it (var x T = …) or use a typed expression (core design §4)")
@@ -234,6 +271,7 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 	// lambda / 函数类型变量的调用
 	if id, ok := v.Fn.(*parse.Ident); ok {
 		if sym, found := c.scope.Lookup(id.Name); found && sym.Kind == SymVar {
+			sym.Used = true // C22：调用闭包值 = 一次读（不走 checkIdent，这里补）
 			if ft, isFnT := sym.Type.(*FuncT); isFnT {
 				// 记录被调名自身的类型：AIR/发射侧靠它区分「直接调用自由函数」与
 				// 「调用闭包值」（后者要带环境，N1）。
@@ -250,7 +288,6 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 		}
 	}
 	// 显式泛型实参的调用：`id[i32](x)` / `id[Box[i32]](b)`（Fn 是 Index 形态）。
-	// 此前这条形态落到"不可调用"⇒ 泛型函数**写不出显式实例化**（审计实测）。
 	if ix, isIx := v.Fn.(*parse.Index); isIx {
 		if id, isID := ix.X.(*parse.Ident); isID {
 			if sig, isFn := c.funcs[id.Name]; isFn && len(sig.TypeParams) > 0 {
@@ -288,8 +325,8 @@ func (c *Checker) checkCall(v *parse.Call, expect Type) (Type, bound, untyped) {
 //
 // recv 非 nil 时为方法调用，但 **ParamTypes 不含接收者槽位**：语义侧的
 // FuncSig.ParamTypes 一律只列真实形参（this 由接收者提供，§八 的「this 为第一
-// 参数」是 C 侧调用约定，不是语义签名的一部分）。此处曾经 `params[1:]` 去砍
-// 首位，于是零参方法直接切片越界 panic、有参方法丢掉第一个实参位——两处各写
+// 参数」是 C 侧调用约定，不是语义签名的一部分）。此处用 `params[1:]` 去砍
+// 首位会让零参方法直接切片越界 panic、有参方法丢掉第一个实参位——两处各写
 // 一份「this 占不占槽位」的必然结果（红线 10 的同款病）。
 func (c *Checker) checkInvoke(v *parse.Call, sig *FuncSig, recv Type, recvBound bound, expect Type) (Type, bound, untyped) {
 	params := sig.ParamTypes
@@ -302,8 +339,8 @@ func (c *Checker) checkInvoke(v *parse.Call, sig *FuncSig, recv Type, recvBound 
 	}
 	for i, a := range args {
 		at, _, ainfo := c.checkExprFull(a, params[i])
-		// §二.2：多返回值**不可传参**（它是调用点语义，不是值）。此前只在 var 声明处拦，
-		// 于是 `print.println(f(3))`（f 带 Err 位）过 check、到发射才炸出无关诊断
+		// §二.2：多返回值**不可传参**（它是调用点语义，不是值）。只在 var 声明处拦，
+		// `print.println(f(3))`（f 带 Err 位）会过 check、到发射才炸出无关诊断
 		// （"type (i32, Err) cannot be printed"）—— check 与 build 分叉。
 		if mt, isMulti := at.(*MultiType); isMulti {
 			c.errorAt(parse.ExprPos(a), "a multi-result call cannot be used as an argument",
@@ -419,8 +456,27 @@ func (c *Checker) lookupVariantCtor(name string) (*Enum, Variant, bool) {
 	return nil, Variant{}, false
 }
 
-func (c *Checker) checkVariantCtor(v *parse.Call, en *Enum, va Variant) (Type, bound, untyped) {
+func (c *Checker) checkVariantCtor(v *parse.Call, en *Enum, va Variant, expect Type) (Type, bound, untyped) {
 	if va.Payload == nil {
+		// ErrCode 枚举的**无载荷变体直构**（§7.2）：
+		// `HttpErr.Timeout("msg")` ≡ `Err(HttpErr.Timeout, "msg", nil)`。
+		// 判据：错误码枚举的每个变体就是一条错误，给它一个 str 参数直接造 Err
+		// 消掉"Err(Enum.Variant, msg)" 的重复书写——错误路径是最热的路径。
+		if en.ErrCode {
+			if len(v.Args) != 1 {
+				c.errorAt(v.Pos, "an error-code variant takes exactly one message", en.Name+"."+va.Name+"(msg)",
+					"write "+en.Name+"."+va.Name+"(\"message\"); it builds Err("+en.Name+"."+va.Name+", \"message\", nil)")
+				return nil, nilBound, untyped{}
+			}
+			mt, _, mi := c.checkExprFull(v.Args[0], TStr)
+			if mt != nil {
+				c.requireAssignableAt(v.Args[0], mt, mi, TStr, "error message")
+			} else if mi.kind != unStr {
+				c.errorAt(parse.ExprPos(v.Args[0]), "the error message must be a str", exprText(v.Args[0]),
+					"write a message string: "+en.Name+"."+va.Name+"(\"message\")")
+			}
+			return TErr, bound{off: c.regionOff, exact: true}, untyped{}
+		}
 		c.errorAt(v.Pos, "this variant carries no payload", en.Name+"."+va.Name,
 			"write "+en.Name+"."+va.Name)
 		return nil, nilBound, untyped{}
@@ -429,6 +485,42 @@ func (c *Checker) checkVariantCtor(v *parse.Call, en *Enum, va Variant) (Type, b
 		c.errorAt(v.Pos, "a variant payload is exactly one value", en.Name+"."+va.Name+"(payload)",
 			"payload type "+va.Payload.String())
 		return nil, nilBound, untyped{}
+	}
+	// 泛型枚举的变体构造（Option.Some / Result.Ok / Value.I64）：负载类型是
+	// 类型形参 T，必须由**上下文期望类型**或实参解出（§6.1 单态化）。
+	if len(en.TypeParams) > 0 {
+		m := map[string]Type{}
+		// 优先用 expect（`var o Option[i64] = Option.Some(i)` 的声明位）
+		if inst, ok := expect.(*Instance); ok && inst.Base == en {
+			for i, p := range en.TypeParams {
+				if i < len(inst.Args) {
+					m[p] = inst.Args[i]
+				}
+			}
+		}
+		payload := va.Payload
+		if len(m) == 0 {
+			// 无上下文：从实参解出 T
+			at, _, ainfo := c.checkExprFull(v.Args[0], nil)
+			if at != nil {
+				unifyTypeParam(payload, at, m, 0)
+			} else if ainfo.kind == unInt || ainfo.kind == unUint {
+				m["T"] = TI64
+			}
+		}
+		if len(m) == 0 {
+			c.errorAt(v.Pos, "cannot infer the type argument of "+en.Name, en.Name+"."+va.Name+"(payload)",
+				"give the target type in the declaration (var x Option[i64] = ...) or write "+en.Name+"[i64].Some(payload)")
+			return nil, nilBound, untyped{}
+		}
+		// 用解出的实参检查负载
+		pt := subst(payload, en.TypeParams, typeArgsOf(en.TypeParams, m))
+		at, _, ainfo := c.checkExprFull(v.Args[0], pt)
+		if at != nil {
+			c.requireAssignableAt(v.Args[0], at, ainfo, pt, "variant payload")
+		}
+		inst := &Instance{Base: en, Args: typeArgsOf(en.TypeParams, m)}
+		return inst, bound{off: c.regionOff, exact: true}, untyped{}
 	}
 	at, _, ainfo := c.checkExprFull(v.Args[0], va.Payload)
 	if at != nil {
@@ -460,10 +552,6 @@ func (c *Checker) checkMethodCall(v *parse.Call, field *parse.Field, recvTy Type
 	// str 方法
 	if isStr(recvTy) {
 		return c.checkStrMethod(v, field, recvBound, expect)
-	}
-	// sync.Mutex 方法（§七：lock/unlock）
-	if sig, ok := mutexMethod(recvTy, field.Name); ok {
-		return c.checkInvoke(v, sig, recvTy, recvBound, expect)
 	}
 	// channel 方法（§七：send/recv/len）
 	if sig, ok := chanMethod(recvTy, field.Name); ok {
@@ -506,15 +594,6 @@ func (c *Checker) checkMethodCall(v *parse.Call, field *parse.Field, recvTy Type
 			return nil, nilBound, untyped{}
 		}
 	}
-	// bytes 实例方法（N7）
-	if IsBytes(recvTy) {
-		if m, has := bytesMethod(field.Name); has {
-			return c.checkInvoke(v, m, recvTy, recvBound, expect)
-		}
-		c.errorAt(v.Pos, "bytes has no such method", "bytes."+field.Name,
-			"see core design §16 N7 for the bytes surface")
-		return nil, nilBound, untyped{}
-	}
 	// 接口方法
 	if ifc, ok := recvTy.(*Interface); ok {
 		if m, has := ifc.Methods[field.Name]; has {
@@ -533,9 +612,41 @@ func (c *Checker) checkMethodCall(v *parse.Call, field *parse.Field, recvTy Type
 		}
 		return nil, nilBound, untyped{}
 	}
+	// Err 内置方法（《AIC 语言规范》§7.1）：ok / code / is / msg。
+	// 判据：错误处理三机制都围着 Err 转，这四个是它的完整观察面——
+	// 不给方法就只能让用户解构三个字段，那会破坏"Err 布局冻结"的承诺。
+	if _, ok := recvTy.(*Basic); ok && recvTy.String() == "Err" {
+		if sig, has := errMethod(field.Name); has {
+			return c.checkInvoke(v, sig, recvTy, recvBound, expect)
+		}
+		c.errorAt(v.Pos, "Err has no such method", "Err."+field.Name,
+			"the Err method set is ok / code / is / msg (AIC language spec §7.1)")
+		return nil, nilBound, untyped{}
+	}
 	c.errorAt(v.Pos, "this type has no methods", typeOrUn(recvTy, untyped{})+"."+field.Name,
-		"methods exist on classes, interfaces, containers, and str only")
+		"methods exist on classes, interfaces, containers, str and Err only")
 	return nil, nilBound, untyped{}
+}
+
+// errMethod 返回 Err 的内置方法签名（封闭集，禁第二份）。
+func errMethod(name string) (*FuncSig, bool) {
+	switch name {
+	case "ok":
+		return &FuncSig{Name: "ok", Results: []Type{TBool}}, true
+	case "code":
+		return &FuncSig{Name: "code", Results: []Type{TI32}}, true
+	case "is":
+		// is(c) 沿 cause 链任层命中（§7.1）；参数 = ErrCode 枚举值。
+		// 签名的形参类型用 TErr 占位会导致"枚举写不进来"，故这里对
+		// ErrCode 枚举放宽（checkInvoke 的 assignable 判定对 enum→Err 放行）。
+		// **返回位 = bool**：漏写 Results 会让本调用的类型恒为 nil ——
+		// 检查器因此连"能不能插值"都判不了，IR-1 的 ValueTys 更无从取（017 实测）。
+		return &FuncSig{Name: "is", Params: []string{"c"}, ParamTypes: []Type{TErr},
+			Results: []Type{TBool}}, true
+	case "msg":
+		return &FuncSig{Name: "msg", Results: []Type{TStr}}, true
+	}
+	return nil, false
 }
 
 // constraintMethod 在泛型形参的约束集里找方法（N3）。
@@ -549,7 +660,7 @@ func (c *Checker) constraintMethod(param, method string, tp *TypeParam, at parse
 	}
 	for _, name := range cons {
 		switch name {
-		case "Ord":
+		case "Compare":
 			if method == "compare" {
 				return &FuncSig{Name: "compare", Params: []string{"other"}, ParamTypes: []Type{tp}, Results: []Type{TI32}}, true
 			}
@@ -557,9 +668,9 @@ func (c *Checker) constraintMethod(param, method string, tp *TypeParam, at parse
 			if method == "hash" {
 				return &FuncSig{Name: "hash", Results: []Type{TU64}}, true
 			}
-		case "Eq", "Print", "Zero", "value", "ref":
-			// 这些能力不提供方法（Eq = == 运算符、Print = print.println、
-			// Zero = 零值、value/ref = 值性）；落到下面的统一报错。
+		case "ToString", "Clone", "Json", "value", "ref":
+			// ToString = 插值/打印、Clone = clone()、Json = toJson/fromJson，
+			// value/ref = 值性；不在此提供方法签名，落到下面的统一报错。
 		default:
 			ifc := c.lookupInterfaceRef(name)
 			if ifc == nil {
@@ -584,8 +695,46 @@ func ContainerMethodSig(t Type, name string) (*FuncSig, bool) {
 }
 
 // containerMethod 返回容器内建方法签名（核心设计 §二.2）。
+// scalarMethod 返回标量数值方法签名（《AIC 标准库规范》§2.5）。
+// math 包已取消：`x.sqrt()` 而非 `math.sqrt(x)`（划界第 1 条：纯值变换 = 方法）。
+func scalarMethod(ty string, name string, self *Basic) (*FuncSig, bool) {
+	switch ty {
+	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize":
+		switch name {
+		case "abs":
+			return &FuncSig{Name: name, Results: []Type{self}}, true
+		case "min", "max":
+			return &FuncSig{Name: name, Params: []string{"o"}, ParamTypes: []Type{self}, Results: []Type{self}}, true
+		case "wrappingAdd", "wrappingSub", "wrappingMul":
+			// 显式回绕（S-32）：普通算术溢出是确定性 trap
+			return &FuncSig{Name: name, Params: []string{"o"}, ParamTypes: []Type{self}, Results: []Type{self}}, true
+		}
+	case "f32", "f64":
+		switch name {
+		case "abs", "floor", "ceil", "round", "trunc", "sqrt", "cbrt",
+			"exp", "log", "log2", "log10", "sin", "cos", "tan",
+			"asin", "acos", "atan":
+			return &FuncSig{Name: name, Results: []Type{self}}, true
+		case "pow", "atan2":
+			return &FuncSig{Name: name, Params: []string{"o"}, ParamTypes: []Type{self}, Results: []Type{self}}, true
+		case "isNaN", "isInf", "isFinite":
+			return &FuncSig{Name: name, Results: []Type{TBool}}, true
+		}
+	case "rune":
+		switch name {
+		case "toI64":
+			return &FuncSig{Name: name, Results: []Type{TI64}}, true
+		}
+	}
+	return nil, false
+}
+
 func containerMethod(t Type, name string) (*FuncSig, Type, bool) {
 	switch cv := t.(type) {
+	case *Basic:
+		if sig, ok := scalarMethod(cv.Name, name, cv); ok {
+			return sig, t, true
+		}
 	case *Slice:
 		switch name {
 		case "len":
@@ -599,11 +748,18 @@ func containerMethod(t Type, name string) (*FuncSig, Type, bool) {
 		case "insert":
 			return &FuncSig{Name: name, Params: []string{"i", "v"}, ParamTypes: []Type{TUsize, cv.Elem}}, t, true
 		case "remove":
-			// 曾经只给 Params 不给 ParamTypes ⇒ 检查器按 0 参放行、发射侧却取 arg0
+			// 只给 Params 不给 ParamTypes 会让检查器按 0 参放行、发射侧却取 arg0
 			// （`xs.remove(i)` 报"needs 0 arguments"、`xs.remove()` 过 check 后 build 失败）。
 			return &FuncSig{Name: name, Params: []string{"i"}, ParamTypes: []Type{TUsize}}, t, true
 		case "clear":
 			return &FuncSig{Name: name}, t, true
+		case "slice":
+			// 视图切片 `xs[a..b]`（S-21）：共享底层，越界 trap
+			return &FuncSig{Name: name, Params: []string{"a", "n"}, ParamTypes: []Type{TI64, TI64},
+				Results: []Type{&Slice{Elem: cv.Elem}}}, t, true
+		case "first", "last":
+			// 不存在 = Option（标准库规范 §2.2）
+			return &FuncSig{Name: name, Results: []Type{optionInstance(cv.Elem)}}, t, true
 		}
 	case *MapT:
 		switch name {
@@ -614,12 +770,20 @@ func containerMethod(t Type, name string) (*FuncSig, Type, bool) {
 		case "put":
 			return &FuncSig{Name: name, Params: []string{"k", "v"}, ParamTypes: []Type{cv.Key, cv.Value}}, t, true
 		case "get":
-			return &FuncSig{Name: name, Params: []string{"k"}, ParamTypes: []Type{cv.Key}, Results: []Type{cv.Value}}, t, true
-		case "has", "remove":
+			// 不存在 = Option（§2.3），不是零值也不是 Err
 			return &FuncSig{Name: name, Params: []string{"k"}, ParamTypes: []Type{cv.Key},
-				Results: boolOrNil(name)}, t, true
+				Results: []Type{optionInstance(cv.Value)}}, t, true
+		case "del":
+			return &FuncSig{Name: name, Params: []string{"k"}, ParamTypes: []Type{cv.Key}}, t, true
+		case "contains":
+			return &FuncSig{Name: name, Params: []string{"k"}, ParamTypes: []Type{cv.Key}, Results: []Type{TBool}}, t, true
+		case "has":
+			return &FuncSig{Name: name, Params: []string{"k"}, ParamTypes: []Type{cv.Key}, Results: []Type{TBool}}, t, true
 		case "clear":
 			return &FuncSig{Name: name}, t, true
+		case "keys":
+			// 插入序全量（§2.3）
+			return &FuncSig{Name: name, Results: []Type{&Slice{Elem: cv.Key}}}, t, true
 		case "keyAt", "valAt":
 			rt := cv.Key
 			if name == "valAt" {
@@ -633,15 +797,19 @@ func containerMethod(t Type, name string) (*FuncSig, Type, bool) {
 			return &FuncSig{Name: name, Results: []Type{TUsize}}, t, true
 		case "isEmpty":
 			return &FuncSig{Name: name, Results: []Type{TBool}}, t, true
-		case "add":
+		case "put", "add":
 			return &FuncSig{Name: name, Params: []string{"v"}, ParamTypes: []Type{cv.Elem}}, t, true
-		case "has", "remove":
-			return &FuncSig{Name: name, Params: []string{"v"}, ParamTypes: []Type{cv.Elem},
-				Results: boolOrNil(name)}, t, true
+		case "contains", "has":
+			return &FuncSig{Name: name, Params: []string{"v"}, ParamTypes: []Type{cv.Elem}, Results: []Type{TBool}}, t, true
+		case "del", "remove":
+			return &FuncSig{Name: name, Params: []string{"v"}, ParamTypes: []Type{cv.Elem}}, t, true
 		case "clear":
 			return &FuncSig{Name: name}, t, true
 		case "at":
 			return &FuncSig{Name: name, Params: []string{"i"}, ParamTypes: []Type{TUsize}, Results: []Type{cv.Elem}}, t, true
+		case "items":
+			// 插入序全量（§2.3）
+			return &FuncSig{Name: name, Results: []Type{&Slice{Elem: cv.Elem}}}, t, true
 		}
 	case *ArrayT:
 		switch name {
@@ -700,7 +868,7 @@ func (c *Checker) markStoreGuard(value parse.Expr, targetBound bound, what strin
 		// 静态可证安全 —— **但两个参数之间除外**：参数定理（§五 R3）只给出
 		// "形参绝对深度 ≤ 入口"，因此参数派生值写本函数**局部变量**恒安全；
 		// 而参数 A 的字段/容器（宿主也是参数）与参数 B 的值之间**没有深度顺序**。
-		// 曾经这里一律跳过 ⇒ `func sink(h Holder, t Buf) { h.b = t }` 无守卫，
+		// 一律跳过会让 `func sink(h Holder, t Buf) { h.b = t }` 无守卫，
 		// 调用点 `region { var t = Buf{}; sink(h, t) }` 之后 h.b 悬垂、区域复用内存时
 		// 静默读到别的对象（**静默内存损坏**）。故双方都是参数派生时留守卫：
 		// 该消的仍由逃逸分析 E1/E4 消（局部目标、返回值）。

@@ -13,11 +13,24 @@ func (c *Checker) checkComposite(v *parse.CompositeLit, expect Type) (Type, boun
 	if cl == nil {
 		return nil, nilBound, untyped{}
 	}
-	if init := c.classInit(cl); init != nil {
-		c.errorAt(v.Pos, "this class has an init constructor, so composite literals are disabled", cl.Name+"{…}",
-			"rewrite it as a constructor call: "+cl.Name+"(args) (core design §4)")
-		return nil, nilBound, untyped{}
+	if init := c.classInit(cl); init != nil && inst == nil {
+		// inst != nil = 带类型实参的 `Box[T]{…}`（泛型模板自引用）。
+		// c.thisClass == cl = **类体内部的自引用**（init 里构造自己）。
+		// 判据：init 工厂是"外部构造入口"，但类体内没有别的非递归自引用写法
+		// （`Buf.init(...)` 会无限递归）——所以类体内必须允许字面量。
+		// 这不是绕过工厂：外部仍只能用 Buf.init(...)，工厂内部自己造自己是模板逻辑。
+		if c.thisClass == cl {
+			// 允许：类体自引用
+		} else {
+			c.errorAt(v.Pos, "this class has an init constructor, so composite literals are disabled", cl.Name+"{…}",
+				"rewrite it as a constructor call: "+cl.Name+"(args) (AIC language spec §3.1)")
+			return nil, nilBound, untyped{}
+		}
 	}
+	// inst != nil = 带类型实参的 `Box[T]{…}`。**泛型类不受 init 工厂规则约束**：
+	// 单态化模板体内没有别的非递归自引用写法（`Box[T].init(...)` 会无限递归），
+	// 且实参化后它与工厂构造同一个实例，不存在"绕过工厂"。
+	// 判据：这是模板自引用，不是用户侧的构造捷径（§6.1 + §3.1 的交界裁决）。
 	seen := map[string]bool{}
 	for _, f := range v.Fields {
 		idx, exists := cl.fieldIdx[f.Name]
@@ -46,14 +59,14 @@ func (c *Checker) checkComposite(v *parse.CompositeLit, expect Type) (Type, boun
 }
 
 // TypeExprOfExpr 是 typeExprOf 的导出形态：emit 侧的复合字面量/泛型实例解析
-// 必须用**同一套**规则（曾经 emit 自己抄了一份、漏了嵌套 Index ⇒
+// 必须用**同一套**规则（emit 自己抄一份、漏掉嵌套 Index 会让
 // `Box[Box[i32]]{…}` 发出未定义的 typedef 名）。
 func TypeExprOfExpr(e parse.Expr) parse.TypeExpr { return typeExprOf(e) }
 
 // typeExprOf 把表达式位的类型写法还原成类型表达式（`Box[i32]` 里的 `i32` 在
 // 表达式位是 Ident，类型位是 NamedType；两者指同一个名字）。
-// **嵌套泛型**（`Box[Box[i32]]`）在表达式位是 Index，必须递归还原 —— 此前不认
-// Index ⇒ `id[Box[i32]](b)` 报"无法解析类型实参"、复合字面量静默失败。
+// **嵌套泛型**（`Box[Box[i32]]`）在表达式位是 Index，必须递归还原 —— 不认
+// Index 会让 `id[Box[i32]](b)` 报"无法解析类型实参"、复合字面量静默失败。
 func typeExprOf(e parse.Expr) parse.TypeExpr {
 	switch v := e.(type) {
 	case *parse.Ident:

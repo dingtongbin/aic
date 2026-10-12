@@ -118,8 +118,8 @@ func (l *lowerer) multiAssign(v *parse.MultiAssign) error {
 		}
 		st := &Store{Place: place, Val: t, Loc: LocOf(v.Pos)}
 		// 存储点 ⑤（多返回解构接收）：守卫标记由检查器挂在**目标名节点**上
-		// （markVarStoreAt 的 markNode = lhs；每个目标一个键）。此前 AIR 从不查
-		// ⇒ `region { a, b = mk(1) }` 静默悬垂（780 锚点：不可达的 trap）。
+		// （markVarStoreAt 的 markNode = lhs；每个目标一个键）。AIR 必须逐目标查它，
+		// 漏查则 `region { a, b = mk(1) }` 静默悬垂（780 锚点：不可达的 trap）。
 		if g, ok := l.info.HasGuard(tgt); ok {
 			st.Limit = l.limitOf(g, tgt)
 		}

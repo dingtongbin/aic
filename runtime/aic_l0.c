@@ -27,9 +27,9 @@ static void aic_binary_stdout(void) { aic_plat_binary_stdout(); }
  * 每个区域实例 = 一条页链，bump 其中。实例身份 = **(slot, gen)**（R19）：
  * push 从空闲链取 (slot, gen) 并用一次 u32 存储换发槽状态；pop 把槽标 DEAD、
  * 归还空闲链（gen 留给下一次 push 自增）。陈旧引用 = gen 不符或深度 DEAD
- * ⇒ 存储守卫必 trap（F7 不变）。gen 到顶 ⇒ 槽永久退役；空闲链耗尽 = 耗尽
- * （4096 槽 × 2^20 代 ≈ 4.3G 个实例）。记账 = 32B ×（存活 + 已退役），
- * 与总实例数脱钩（B5：2M 轮只退役 2 槽 ≈ 64B）。
+ * ⇒ 存储守卫必 trap（F7 不变）。gen 到顶 ⇒ 槽永久失效；空闲链耗尽 = 耗尽
+ * （4096 槽 × 2^20 代 ≈ 4.3G 个实例）。记账 = 32B ×（存活 + 已失效），
+ * 与总实例数脱钩（B5：2M 轮只失效 2 槽 ≈ 64B）。
  *
  * 为什么区域表必须**全局**而不是线程局部（L3 实测踩到的真缺陷）：
  * 容器/通道是**跨任务共享**的（§七「spawn 实参 = 共享引用」），子任务往父任务创建的
@@ -70,8 +70,8 @@ static AIC_TLS aic_page *aic_page_free = NULL;
  *
  * 空闲链 = **Treiber 无锁栈**（gcc/clang；tcc 无原子内建 ⇒ 退回互斥量链，
  * 该后端本来就把任务在同线程跑完，无竞争）。取槽/还槽是 region push/pop 的
- * 必经路（每请求一次），旧形态在此取全局 id 也要过一次锁 —— 无锁化后单对
- * push+pop 实测 62.4ns → 见 benches/report.md 的记账段。
+ * 必经路（每请求一次），无锁化后单对 push+pop 实测 62.4ns → 见
+ * benches/report.md 的记账段。
  *
  * 链上只存槽索引；**待发的代龄存在槽自己的 state 里**（空闲态 state =
  * (next_gen << 9) | DEAD），如此取到槽后读一次 state 即得 gen，且归还时
@@ -175,7 +175,7 @@ static void slot_chain_push(aic_u32 slot) {
 #endif
 
 /* 取一个可用槽（连同它要发的 gen）。调用后**独占**该槽：状态换发与页链操作都
- * 不再需要链锁。gen 到顶 ⇒ 该槽永久退役（状态永记 DEAD、不再回流），换下一个；
+ * 不再需要链锁。gen 到顶 ⇒ 该槽永久失效（状态永记 DEAD、不再回流），换下一个；
  * 链空 = 实例空间耗尽（含可操作修复的 trap）。 */
 static aic_free_ent slot_acquire(const char *file, aic_u32 line) {
     aic_free_ent e;
@@ -198,8 +198,8 @@ static aic_free_ent slot_acquire(const char *file, aic_u32 line) {
         /* 槽已归我们独占：state 的无锁读安全（别的线程只有拿回链上控制权才能碰它）。 */
         aic_u32 gen = AIC_REGION_STATE_GEN(aic_gslots[idx].state);
         if (gen > AIC_REGION_GEN_MAX) {
-            /* 该槽第 2^20 代已发完：永久退役（任何陈旧引用读它必得 DEAD），
-             * 不再回流。退役速率 = 每百万次区域实例一个槽。 */
+            /* 该槽第 2^20 代已发完：永久失效（任何陈旧引用读它必得 DEAD），
+             * 不再回流。失效速率 = 每百万次区域实例一个槽。 */
             aic_gslots[idx].state = AIC_REGION_STATE(0u, AIC_REGION_DEPTH_DEAD);
             continue;
         }
@@ -659,7 +659,7 @@ void *aic_deref_or_trap(void *p, const char *file, int line) {
 /* 报告 cause 链（**stderr**）：第一级 msg，其后逐级 "  caused by: msg"。
  * 深度上限 8：链是显式构造的，不可能是环；上限只为防御性确定性（H3）。
  * 流必须是 stderr —— 语言规范：main 逃逸的 Err = 退出码 1 + **stderr** 打印；
- * 此前走 aic_print_str（stdout）与规范不符。 */
+ * 故不能走 aic_print_str（stdout）——那与规范不符。 */
 static void err_put(aic_str s) {
     if (s.len != 0) {
         fwrite(s.p, 1, s.len, stderr);

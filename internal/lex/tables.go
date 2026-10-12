@@ -1,77 +1,74 @@
 package lex
 
 // ---------------------------------------------------------------------------
-// H7 frozen surface (核心设计 §一). These tables are the single source of
-// truth for the literal surface. TestFrozenSurface asserts them against the
-// frozen lists in both directions.
+// AIC v7 frozen surface (《AIC 语言规范》§1). These tables are the single
+// source of truth for the literal surface. TestFrozenSurface asserts them
+// against the frozen lists in both directions.
 //
-// v2 换基（2026-10-06）：23 关键字 + 5 注解；v1 的 implements/elseif/while/
-// errdefer/handle/await/del 全部退场（附录 A），region 入场。
-// R20（2026-10）：`@live` 注解退役为第 24 个关键字 `live`（注解恒在声明上方，
-// 不该与变量同行）→ 24 关键字 + 4 注解。
+// v7 换基：36 硬关键字，**0 个上下文关键字**，**0 个注解**。
+//   - 相对 v2 的 24 关键字，新增 struct/errdefer/select/case/use/implements/
+//     include/derive/comptime/assert/catch/into；
+//   - `@packed` 由 struct 取代，`@derive(A,B)` 成为声明修饰词，
+//     `@noblock`/`@blocking` 成为 extern 修饰词 —— 注解机制整体删除；
+//   - `catch` 从上下文词升为硬关键字（错误处理必经之路，不容猜测）；
+//   - `?` 与 `or` 从运算符表删除（同一语义两种拼写，P1 违反）。
 // ---------------------------------------------------------------------------
 
-// Keywords holds exactly the 24 frozen keywords — no more, no fewer.
+// Keywords holds exactly the 36 frozen keywords — no more, no fewer.
 var Keywords = map[string]bool{
-	"class": true, "interface": true, "enum": true, "var": true,
-	"const": true, "live": true, "func": true,
+	// 类型与声明
+	"class": true, "interface": true, "enum": true, "struct": true,
+	"var": true, "const": true, "live": true, "func": true,
+	// 控制流
 	"if": true, "else": true,
 	"for": true, "in": true,
 	"return": true, "break": true, "continue": true,
-	"match": true, "defer": true,
-	"check": true,
-	"spawn": true, "scope": true, "region": true, "this": true,
+	// 错误处理
+	"match": true, "defer": true, "errdefer": true, "check": true, "catch": true,
+	// 并发
+	"spawn": true, "scope": true, "region": true, "this": true, "into": true,
+	// 接口与派生
+	"select": true, "case": true, "use": true, "implements": true,
+	"include": true, "derive": true,
+	// 编译期
+	"comptime": true, "assert": true,
+	// 包与 ABI
 	"import": true, "export": true, "extern": true,
 }
 
-// KeywordNames lists the frozen spellings in the order of 核心设计 §一.
+// KeywordNames lists the frozen spellings in the order of 《AIC 语言规范》§1.3.
 var KeywordNames = []string{
-	"class", "interface", "enum", "var", "const", "live", "func",
+	"class", "interface", "enum", "struct", "var", "const", "live", "func",
 	"if", "else", "for", "in",
 	"return", "break", "continue",
-	"match", "defer", "check",
-	"spawn", "scope", "region", "this",
+	"match", "defer", "errdefer", "check", "catch",
+	"spawn", "scope", "region", "this", "into",
+	"select", "case", "use", "implements", "include", "derive",
+	"comptime", "assert",
 	"import", "export", "extern",
 }
 
-// RetiredNames are v1 keywords that are plain identifiers in v2. The parser
-// gives them a targeted retirement diagnostic at statement position (附录 A /
-// 防坑清单 1); the lexer stays neutral.
-//
-// 注意：`errdefer` **不在**此列 —— N8 已把它收回（核心设计 §16 N8），
-// 以**上下文关键字**身份在语句位识别（H7：关键字恒为 23 个）。
-var RetiredNames = []string{
-	"while", "elseif", "implements", "handle", "await", "del", "mut",
-}
-
-// ReservedNames: true / false / nil. "nil = 全类型零值" is a checker rule
-// (核心设计 §二.3), not a lexical one.
+// ReservedNames: true / false / nil.
 var ReservedNames = []string{"true", "false", "nil"}
 
-// Annotations is the complete frozen set (核心设计 §一: 4 注解 —— R20 起 @live
-// 退役为 live 关键字).
-var Annotations = map[string]bool{
-	"packed":   true,
-	"derive":   true,
-	"noblock":  true,
-	"blocking": true,
-}
-
-// AnnotationNames in the order they appear in the core design text.
-var AnnotationNames = []string{
-	"packed", "derive", "noblock", "blocking",
+// BasicTypeNames are the 15 reserved type names (《AIC 语言规范》§2.1).
+// They may not be used as identifiers (C2).
+var BasicTypeNames = []string{
+	"i8", "i16", "i32", "i64",
+	"u8", "u16", "u32", "u64", "usize",
+	"f32", "f64",
+	"bool", "str", "rune", "Err",
 }
 
 // isIdentStart: an identifier begins with an **ASCII letter or `_`**
-// (核心设计 §一，2026-10 收紧：Unicode 字母不再作首字符 —— 否则「首字符大写 =
-// 跨包可见」在 Unicode 上没有定义，`Ä`/`中` 这类字符的"大小写"不可判定)。
-// A leading '_' is routed here too: `_name` is a legal identifier
-// (包私有：首字符非 A-Z 即私有，核心设计 §四); the bare `_` alone is the blank
+// (《AIC 语言规范》§1.1 — Unicode 字母不作首字符，否则「首字符大写 =
+// 跨包可见」在 Unicode 上没有定义). A leading '_' is routed here too:
+// `_name` is a legal identifier (包私有); the bare `_` alone is the blank
 // token, not an identifier.
 func isIdentStart(r rune) bool { return isASCIILetter(r) || r == '_' }
 
-// isIdentCont: ASCII letters, ASCII digits, or a single underscore; "__" adjacent
-// is rejected while scanning (reserved for mangling).
+// isIdentCont: ASCII letters, ASCII digits, or a single underscore; "__"
+// adjacent is rejected while scanning (reserved for mangling).
 func isIdentCont(r rune) bool {
 	return isASCIILetter(r) || isASCIIDigit(r) || r == '_'
 }
@@ -94,8 +91,10 @@ func isBinDigit(r rune) bool { return r == '0' || r == '1' }
 
 // punct holds every frozen operator and delimiter. Two-character entries are
 // tried first (longest match); a byte sequence absent from this table is a
-// lexical error. `..` exists only in the for-in range and str-view positions
-// (parser-enforced, 核心设计 §一/§二.3).
+// lexical error.
+//
+// v7 删除：`?`（与 check 同语义）、`::`、`...`。
+// 未采用：复合位运算赋值（`&=` 等）—— 写 `x = x & m` 零歧义。
 var punct = map[string]bool{
 	"==": true, "!=": true, "<=": true, ">=": true,
 	"&&": true, "||": true, "<<": true, ">>": true,
@@ -105,6 +104,5 @@ var punct = map[string]bool{
 	",": true, ";": true, ".": true, ":": true, "_": true,
 	"+": true, "-": true, "*": true, "/": true, "%": true,
 	"=": true, "<": true, ">": true, "!": true,
-	"?": true, // E1 传播的后缀形 `expr?`（核心设计 §15.7）
 	"&": true, "|": true, "^": true, "~": true,
 }

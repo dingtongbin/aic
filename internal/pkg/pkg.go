@@ -23,15 +23,17 @@ import (
 // stdNames 是 std 包名（§十四）：import 这些名字不找目录，由检查器按 std 面定型。
 // 圆 1–4 的包名也先登记在此，避免被误当作用户目录（用到时检查器会报「包内无此函数」）。
 var stdNames = map[string]bool{
-	"print": true, "str": true, "os": true, "math": true, "option": true,
-	"testing": true, "sync": true, "net": true, "time": true, "sort": true,
-	"runtime": true,
-	// N12：Ctx 约定是**库级**的，包名先登记（类型面在 T-A，实现随标准库在 T-C）。
-	"ctx": true,
-	// T-C 的 24 包表（§15.3）先登记名字，避免被误当用户目录。
-	"json": true, "regex": true, "tls": true, "http": true,
-	"log": true, "crypto": true, "encoding": true, "compress": true, "csv": true,
-	"process": true,
+	// 《AIC 标准库规范》§0.1 的包名封闭表。**这是唯一一份 std 名单**——
+	// 类型检查器通过 pkg.IsStd 使用它，不得另有第二份（执行标准 §3.3）。
+	// v7 变更：print → fmt；math/sync/option 取消；新增 log / c / code。
+	"fmt": true, "str": true, "os": true, "time": true,
+	"log": true, "c": true, "code": true, "value": true,
+	"cli": true, "json": true, "url": true, "xml": true, "csv": true,
+	"regexp": true, "net": true, "http": true,
+	"mysql": true, "redis": true,
+	"auth": true, "rate": true, "ctx": true,
+	"zip": true, "office": true,
+	"tls": true, "ssh": true, "snmp": true, "grpc": true, "io": true,
 }
 
 // IsStd 报告 pkg 是否为 std 包名。
@@ -101,6 +103,9 @@ func Load(entry string) (*Unit, error) {
 	entryPos := parse.Pos{File: relPath(abs), Line: 1, Col: 1}
 	var entryPkg *Package
 	if filepath.Base(abs) == "main.aic" {
+		// 入口是 <root>/main.aic：包名取**模块名**（aic.mod 的 module 行），
+		// 取不到则用 "main"。包名若取入口目录名，路径导入后那会是 testdata/pkg
+		// 之类的构建目录名，对用户与缓存键都无意义。
 		entryPkg, err = loadPackage(root, entryPos)
 	} else {
 		entryPkg, err = loadSingleFile(abs)
@@ -184,10 +189,16 @@ func (l *loader) walk(p *Package) error {
 		if err != nil {
 			return err
 		}
-		if dep.Name != name {
-			return diag(at, "import name does not match the directory name",
+		// 路径导入：`import app/ui` 的限定名 = 末段 `ui`，必须等于目录名。
+		// 单段导入（`import fmt`）时末段就是它本身，规则统一（§10.1）。
+		qualifier := name
+		if i := strings.LastIndex(name, "/"); i >= 0 {
+			qualifier = name[i+1:]
+		}
+		if dep.Name != qualifier {
+			return diag(at, "import path does not match the directory name",
 				"import "+name+" resolved to directory "+filepath.ToSlash(dir)+" (directory name "+dep.Name+")",
-				"a directory is a package: the directory name must equal the import name (core design §4)")
+				"a directory is a package: the last path segment must equal the directory name (language spec §10.1)")
 		}
 		l.byDir[dir] = dep
 		if err := l.walk(dep); err != nil {
@@ -217,7 +228,34 @@ func (l *loader) cycleError(back string, at parse.Pos) error {
 
 // resolveImport 把 import 名解析为目录：先从导入者目录向下找 <dir>/<name>，
 // 再逐级向上找 <ancestor>/<name>（目录即包，§四）。
+// moduleRoot 从 startDir 向上找最近的含 aic.mod 的目录。
+// 找不到返回 ""（无模块：按"单文件程序 / 无依赖模块"处理，§10.2）。
+func moduleRoot(startDir string) string {
+	dir := startDir
+	for i := 0; i < 32; i++ {
+		if st, err := os.Stat(filepath.Join(dir, "aic.mod")); err == nil && !st.IsDir() {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+	return ""
+}
+
 func resolveImport(fromDir, name string) (string, error) {
+	// 规则 2：模块根相对路径（`import app/ui` → <root>/app/ui）。
+	// 判据：模块根是唯一的路径解释基准，否则同一 import 在不同目录下会解析到
+	// 不同包——那是不可复现的构建。
+	if root := moduleRoot(fromDir); root != "" {
+		cand := filepath.Join(root, filepath.FromSlash(name))
+		if st, err := os.Stat(cand); err == nil && st.IsDir() {
+			return cand, nil
+		}
+	}
+	// 回退：从导入者目录向上找（无 aic.mod 的单文件工程）。
 	dir := fromDir
 	for i := 0; i < 12; i++ {
 		cand := filepath.Join(dir, name)
@@ -230,11 +268,30 @@ func resolveImport(fromDir, name string) (string, error) {
 		}
 		dir = parent
 	}
-	return "", fmt.Errorf("searching upward from %s found no %s/ directory", filepath.ToSlash(fromDir), name)
+	return "", fmt.Errorf("searching upward from %s and its module root found no %s/ directory", filepath.ToSlash(fromDir), name)
 }
 
 // loadPackage 读入一个目录的全部 .aic（排序；*_test.aic 归 aic test，不入包）。
 // at = 引入该目录的那行 import（诊断位置；入口包用 entryPos）。
+// moduleName 读 <dir>/aic.mod 的 `module <name>` 行。文件不存在或格式不符
+// 返回 ("", false) —— 无模块是合法状态（单文件程序，§10.2）。
+func moduleName(dir string) (string, bool) {
+	raw, err := os.ReadFile(filepath.Join(dir, "aic.mod"))
+	if err != nil {
+		return "", false
+	}
+	for _, ln := range strings.Split(string(raw), "\n") {
+		ln = strings.TrimSpace(ln)
+		if ln == "" || strings.HasPrefix(ln, "#") {
+			continue
+		}
+		if f := strings.Fields(ln); len(f) >= 2 && f[0] == "module" {
+			return f[1], true
+		}
+	}
+	return "", false
+}
+
 func loadPackage(dir string, at parse.Pos) (*Package, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -254,7 +311,15 @@ func loadPackage(dir string, at parse.Pos) (*Package, error) {
 			"a directory is a package: at least one .aic file (*_test.aic belongs to aic test, not to the package)")
 	}
 	sort.Strings(names) // 收集顺序确定性（H2：两次构建逐字节一致）
-	p := &Package{Name: filepath.Base(dir), Dir: dir, ImportPos: map[string]parse.Pos{}}
+	// 包名 = 目录名；**模块根目录例外**：那里放的是 main.aic + aic.mod，
+	// 包名取 aic.mod 的 module 行（取不到用 "main"）。
+	// 判据：模块根不是"一个包目录"，把它按目录命名会得到 testdata/pkg 这类
+	// 构建路径碎片，进缓存键与诊断都对用户无意义（§10.2）。
+	pkgName := filepath.Base(dir)
+	if modName, ok := moduleName(dir); ok {
+		pkgName = modName
+	}
+	p := &Package{Name: pkgName, Dir: dir, ImportPos: map[string]parse.Pos{}}
 	seen := map[string]bool{}
 	for _, n := range names {
 		f, err := parseFileAt(dir, n, "")

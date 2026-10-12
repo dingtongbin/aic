@@ -24,6 +24,11 @@ type Symbol struct {
 	Type       Type
 	DeclOffset int // SymVar: region 偏移（@live 已减一）
 	Live       bool
+	// Used 由表达式读点置位（C22 未使用局部变量）。**只有读算使用**：写入点不置位，
+	// 否则 `var x i32 = 0; x = 1` 这种纯死存储会被判成"用过了"，检查形同虚设。
+	Used bool
+	// DeclPos 是声明位置：C22 的诊断要指回 `var` 那一行，而不是函数头。
+	DeclPos parse.Pos
 	// Param = 形参（含 this、闭包形参）：其界只是"绝对深度 ≤ 入口"，与另一个形参
 	// 之间没有顺序 —— 存储点判定靠它（见 bound.param / markStoreGuard）。
 	Param   bool

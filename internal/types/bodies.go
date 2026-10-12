@@ -22,6 +22,9 @@ func (c *Checker) checkFuncBodies(files []*parse.File) {
 				c.checkOneFunc(v, c.funcs[v.Name])
 			case *parse.ClassDecl:
 				cl := c.classes[v.Name]
+				if cl == nil {
+					continue // 声明处已被拒（重名 / 保留类型名 C2）：无方法可查
+				}
 				for _, m := range v.Methods {
 					c.checkOneFunc(m, cl.Methods[m.Name])
 				}
@@ -39,6 +42,13 @@ func (c *Checker) checkOneFunc(v *parse.FuncDecl, sig *FuncSig) {
 		c.fn, c.thisClass, c.scope, c.nilState, c.regionOff
 	savedKey := c.fnKey
 	savedTP := c.typeParams
+	// C22：本函数的待结算局部变量池（读点置 Used，体走完统一结算）。
+	savedVars := c.unusedVars
+	c.unusedVars = nil
+	// 体检查前的诊断数：C22 是**静默漂移**的检查，不是级联放大器 —— 一旦本函数
+	// 已经报过错（init 没类型、读点类型错…），后续的"没读到"很可能只是那个错的
+	// 下游产物，再报一条只会把真正那条埋掉（005/012/020 实测）。
+	errBeforeBody := len(c.errors)
 	c.fn = sig
 	c.fnKey = FuncKey(sig.Recv, sig.Name)
 	c.thisClass = nil
@@ -46,8 +56,8 @@ func (c *Checker) checkOneFunc(v *parse.FuncDecl, sig *FuncSig) {
 		c.thisClass = c.classes[sig.Recv]
 	}
 	// **类型参数在函数/方法体内有效**（核心设计 §四 泛型）：`func dup[T](x T) -> T { var y T = x }`
-	// 里的 T 必须解析成类型参数 —— 此前只在**签名**解析时安装（checker.go），
-	// 于是泛型函数体里任何 `T` 都报"未知类型名"，泛型基本写不出可用代码。
+	// 里的 T 必须解析成类型参数 —— 只在**签名**解析时安装（checker.go）会让
+	// 泛型函数体里任何 `T` 都报"未知类型名"，泛型基本写不出可用代码。
 	// 方法体继承接收类的类型参数（方法不得自带类型参数，§四）。
 	c.typeParams = typeParamSet(v.TypeParams)
 	if c.typeParams == nil {
@@ -102,9 +112,31 @@ func (c *Checker) checkOneFunc(v *parse.FuncDecl, sig *FuncSig) {
 			"write func main() -> Err or func main() (core design §4)")
 	}
 
+	// C22：结算本函数的未使用局部变量（体已走完，读点全部置位）。
+	// 本函数已有诊断 ⇒ 跳过（见 errBeforeBody：这时的"未使用"是下游产物）。
+	if len(c.errors) == errBeforeBody {
+		c.checkUnusedLocals()
+	}
+	c.unusedVars = savedVars
+
 	c.fn, c.thisClass, c.scope, c.nilState, c.regionOff =
 		savedFn, savedThis, savedScope, savedNil, savedOff
 	c.fnKey = savedKey
+}
+
+// checkUnusedLocals 报告本函数里"声明了但从未被读"的局部变量（C22）。
+// 诊断按**声明序**（池的追加序），与 H2 的确定性同源。
+//
+// 为什么这条检查是协作地基：一个没人读的局部变量要么是被删了一半的代码，
+// 要么是想写却写错了名字 —— 两种都是静默的，多人/多 agent 并行时最藏得住。
+func (c *Checker) checkUnusedLocals() {
+	for _, sym := range c.unusedVars {
+		if sym == nil || sym.Used || sym.Param {
+			continue
+		}
+		c.errorAt(sym.DeclPos, "unused local variable", sym.Name,
+			"delete it; a local that is never read is either dead code or a typo in the read site (AIC language spec §4.1 / §12, C22)")
+	}
 }
 
 // sortedConstNames 是包级常量名的确定序遍历（登记顺序不能依赖 map 序）。

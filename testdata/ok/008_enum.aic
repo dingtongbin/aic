@@ -1,0 +1,27 @@
+import fmt
+import str
+
+// enum：变体至多一载荷；构造与匹配一律限定；无载荷变体内建 ==
+enum Color { Red, Green, Blue }
+enum Wrap { Bare, One(i64), Two(str) }
+
+func describe(c Color) -> str {
+    match c {
+        Color.Red => { return "red" },
+        Color.Green => { return "green" },
+        Color.Blue => { return "blue" },
+    }
+}
+
+func main() {
+    fmt.println(describe(Color.Red))
+    fmt.println("{Color.Red == Color.Red}")
+    fmt.println("{Color.Red == Color.Blue}")
+    // 带载荷：限定构造 + match 绑定
+    var w Wrap = Wrap.One(7)
+    match w {
+        Wrap.Bare => { fmt.println("bare") },
+        Wrap.One(n) => { fmt.println("{n}") },
+        Wrap.Two(s) => { fmt.println(s) },
+    }
+}

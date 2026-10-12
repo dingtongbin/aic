@@ -1,0 +1,4 @@
+import fmt
+
+// C2：15 个基本类型名禁作用户标识符
+class i32 { var x i32 }

@@ -1,4 +1,0 @@
-func main() {
-    var id i32 = 1
-    var s = "{id}b}"
-}

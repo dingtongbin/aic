@@ -557,8 +557,6 @@ func exprText(e parse.Expr) string {
 		return "check " + exprText(v.X)
 	case *parse.AssertExpr:
 		return exprText(v.X) + "!"
-	case *parse.OrExpr:
-		return exprText(v.X) + " or " + exprText(v.Default)
 	case *parse.CatchExpr:
 		return exprText(v.X) + " catch " + v.Name + " { … }"
 	}

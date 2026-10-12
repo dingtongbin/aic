@@ -1,0 +1,4 @@
+import fmt
+
+// C21：含 f64 禁 derive Compare
+struct Meters derive Compare { var v f64 }

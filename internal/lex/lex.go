@@ -182,6 +182,29 @@ func (s *Scanner) scanNumber(at Pos) {
 			}
 			return
 		}
+		// C99 hex float（§1.4）：0x1.8p3 / 0xA.BCp-2。
+		// 判据：`.` 后必须是 hex 数字才算浮点（`0x1..` 是整数 + 范围运算符），
+		// `p` 二进指数是 hex float 的组成部分（无 p 的 0x1.8 不是本语言表面）。
+		if radix == 16 && s.peek() == '.' && isHexDigit(s.peekAt(1)) {
+			b.WriteString(".")
+			s.advance()
+			if _, ok := s.eatDigits(at, 16, &b); !ok {
+				return
+			}
+			if r := s.peek(); r == 'p' || r == 'P' {
+				b.WriteRune(r)
+				s.advance()
+				if sg := s.peek(); sg == '+' || sg == '-' {
+					b.WriteRune(sg)
+					s.advance()
+				}
+				if _, ok := s.eatDigits(at, 10, &b); !ok {
+					return
+				}
+			}
+			s.emit(FLOAT, b.String(), at)
+			return
+		}
 		s.emit(INT, b.String(), at)
 		return
 	}
@@ -260,32 +283,6 @@ func (s *Scanner) scanIdent(at Pos, first rune) {
 	}
 }
 
-// --- annotations -------------------------------------------------------------
-
-func (s *Scanner) scanAnnotation(at Pos) {
-	var b strings.Builder
-	b.WriteRune('@')
-	s.advance()
-	for !s.atEOF() && isIdentCont(s.peek()) {
-		b.WriteRune(s.peek())
-		s.advance()
-	}
-	name := b.String()[1:]
-	if !Annotations[name] {
-		// R20：`@live` 已退役为 `live` 关键字 —— 旧形态给定向迁移提示，
-		// 不是干巴巴的"未知注解"。
-		if name == "live" {
-			s.fail(at, "unknown annotation @live", b.String(),
-				"live is a keyword now (R20): write `var live x = C{...}` (core design §5 R4)")
-			return
-		}
-		s.fail(at, "unknown annotation @"+name, b.String(),
-			"use one of the four annotations: @packed @derive @noblock @blocking")
-		return
-	}
-	s.emit(ANNOT, b.String(), at)
-}
-
 // --- strings (D10) -----------------------------------------------------------
 
 // scanString consumes a double-quoted string. On an invalid escape it records
@@ -295,9 +292,47 @@ func (s *Scanner) scanString(at Pos) {
 	var b strings.Builder
 	b.WriteRune('"')
 	s.advance()
+	// 插值槽深度（《AIC 语言规范》§1.4）：占位符内允许**字符串字面量**，
+	// 其引号不结束外层字符串。判据：插值是唯一格式化路径，禁止槽内写字符串
+	// 会把 contains("x") 这类最常见判断逼成临时变量（纯噪声）。
+	braceDepth := 0
 	for !s.atEOF() {
 		r := s.peek()
 		switch {
+		case r == '{':
+			braceDepth++
+			b.WriteRune(r)
+			s.advance()
+		case r == '}':
+			if braceDepth > 0 {
+				braceDepth--
+			}
+			b.WriteRune(r)
+			s.advance()
+		case r == '"' && braceDepth > 0:
+			// 嵌套字符串：整段吃掉（含转义），不当成外层结束符
+			b.WriteRune('"')
+			s.advance()
+			for !s.atEOF() && s.peek() != '"' {
+				if s.peek() == '\\' {
+					b.WriteRune(s.peek())
+					s.advance()
+					if !s.atEOF() {
+						b.WriteRune(s.peek())
+						s.advance()
+					}
+					continue
+				}
+				if s.peek() == '\n' {
+					break
+				}
+				b.WriteRune(s.peek())
+				s.advance()
+			}
+			if !s.atEOF() && s.peek() == '"' {
+				b.WriteRune('"')
+				s.advance()
+			}
 		case r == '"':
 			b.WriteRune('"')
 			s.advance()
@@ -411,8 +446,6 @@ func (s *Scanner) run() {
 			s.advance()
 		case r == '"':
 			s.scanString(at)
-		case r == '@':
-			s.scanAnnotation(at)
 		case r > 0x7f && (unicode.IsLetter(r) || unicode.IsDigit(r)):
 			// 标识符字符集是 ASCII（核心设计 §一，2026-10 收紧）：非 ASCII 的字母/数字
 			// 不进标识符 —— 否则「首字符大写 = 跨包可见」在 Unicode 上没有定义。

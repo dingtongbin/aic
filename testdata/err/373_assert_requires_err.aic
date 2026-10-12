@@ -1,5 +1,0 @@
-func plain(x i32) -> i32 { return x }
-
-func main() {
-    var v = plain(1)!
-}

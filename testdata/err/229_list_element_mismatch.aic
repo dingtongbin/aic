@@ -1,3 +1,0 @@
-func f() {
-    var xs i32[] = [1, "two"]
-}

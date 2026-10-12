@@ -1,0 +1,9 @@
+testdata/err/004_arrow_lambda.aic:4:16: error: missing `)`
+    got IDENT i32
+    fix: parenthesised expression is missing the closing `)`
+testdata/err/004_arrow_lambda.aic:4:19: error: expression is missing or incomplete
+    got PUNCT )
+    fix: add an expression: a name, a literal, or a call; keep `()` and `[]` balanced
+testdata/err/004_arrow_lambda.aic:6:1: error: missing `}`
+    got end of file (EOF)
+    fix: statement block is missing the closing `}`

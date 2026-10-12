@@ -157,13 +157,16 @@ func (c *Checker) declareVar(tgt parse.VarTarget, ty Type, init parse.Expr) {
 			off = 0
 		}
 	}
-	sym := &Symbol{Kind: SymVar, Name: tgt.Name, Type: ty, DeclOffset: off, Live: tgt.Live}
+	sym := &Symbol{Kind: SymVar, Name: tgt.Name, Type: ty, DeclOffset: off, Live: tgt.Live, DeclPos: tgt.Pos}
 	if !c.scope.Declare(sym) {
 		c.errorAt(tgt.Pos, "duplicate declaration in the same scope", tgt.Name,
 			"an inner block may shadow an outer one; a duplicate declaration in the same block is a compile error (core design §3)")
 		return
 	}
 	c.NoteLocal(c.fnKey, tgt.Name)
+	// C22：登记进当前函数的待结算池（读点置 Used，体走完统一结算）。
+	// 形参不入池 —— C22 管的是局部变量，参数未用是合法的。
+	c.unusedVars = append(c.unusedVars, sym)
 	// nil 流证明初始化（§九）
 	st := &nilState{}
 	if init != nil {
@@ -262,19 +265,37 @@ func (c *Checker) checkExprStmt(v *parse.ExprStmt) {
 		// 独立 check 语句（§六）：传播即可
 		c.checkCheckExpr(x, nil)
 	default:
-		// 裸调用语句：吞 Err 检查（红线 2 + §15.7 规则③：有 Err 位的调用结果必须被消费）
+		// 裸调用语句。
 		ty, _, _ := c.checkExprFull(v.X, nil)
-		if mt, ok := ty.(*MultiType); ok && len(mt.Elems) > 0 && isErr(mt.Elems[len(mt.Elems)-1]) {
-			c.errorAt(v.Pos, "a call returning Err must bind every result", exprText(v.X),
-				"write var r, err = f() or var r = check f(); to discard write var _, err = f() (red line 2)")
+		// **语句位自动传播**（《AIC 语言规范》§5.6）：单返回值（Err）的 fallible
+		// 调用在语句位 = 自动传播，无需写 check。判据：语句位拿不到值，唯一合理
+		// 的语义就是"失败即上抛"——显式写 check 是纯冗余，而报错逼用户写它
+		// 会把最热的错误路径变成最噪声的路径。
+		if isErr(ty) {
+			if c.fnFallible() {
+				return // 自动传播（AIR 侧降低为 checkfail）
+			}
+			c.errorAt(v.Pos, "a call returning Err must be consumed", exprText(v.X),
+				"the enclosing function is not fallible: propagate with check, bind and test it, or make the function return Err (AIC language spec §5.6)")
 			return
 		}
-		// **只返回 Err** 的调用（类型表里是 Err 本身，不是多返回）：同样是吞错。
-		if isErr(ty) {
-			c.errorAt(v.Pos, "a call returning Err must be consumed", exprText(v.X),
-				"write var err = f() and test it, or propagate with f()? / f()! (core design §15.7 rule 3)")
+		// 多返回值 fallible 在语句位 = 编译错误（拿不到值也无法只传播 Err）
+		if mt, ok := ty.(*MultiType); ok && len(mt.Elems) > 0 && isErr(mt.Elems[len(mt.Elems)-1]) {
+			c.errorAt(v.Pos, "a call returning Err must bind every result", exprText(v.X),
+				"write var r, err = f() or var r = check f(); to discard write var _, err = f() (AIC language spec §5.6)")
+			return
 		}
 	}
+}
+
+// fnFallible 报告当前函数是否 fallible（返回位末位是 Err）。
+// 语句位 / return 位自动传播的前提（§5.6）。
+func (c *Checker) fnFallible() bool {
+	if c.fn == nil {
+		return false
+	}
+	n := len(c.fn.Results)
+	return n > 0 && isErr(c.fn.Results[n-1])
 }
 
 // checkAssign: x = e / 复合赋值（数值 only）。目标 = 变量/字段/下标。
@@ -294,6 +315,7 @@ func (c *Checker) checkAssign(v *parse.Assign) {
 			return
 		}
 		if v.Op != "=" {
+			sym.Used = true // C22：复合赋值 `x += 1` 读了旧值 = 一次使用
 			c.checkCompound(v, rhs, sym.Type, rinfo, lhs.Name)
 			return
 		}
@@ -401,6 +423,7 @@ func (c *Checker) checkFieldStore(v *parse.Assign, lhs *parse.Field, rhs Type, r
 		ownerBound = bound{off: 0} // this 的槽位在入口层
 	} else if id, isId := lhs.X.(*parse.Ident); isId {
 		if sym, found := c.scope.Lookup(id.Name); found {
+			sym.Used = true // C22：经该变量存字段 = 它被解引用了
 			// param 必须一起传：宿主是形参时它与值之间没有深度顺序（见 markStoreGuard）。
 			ownerBound = bound{off: sym.DeclOffset, param: sym.Param}
 		}
@@ -501,7 +524,7 @@ func (c *Checker) checkMultiAssign(v *parse.MultiAssign) {
 		}
 		c.requireAssignableAt(v.Right, mt.Elems[i], untyped{}, sym.Type, "assigned to "+id.Name)
 		// 存储点 ⑤（§五 R3）：多返回解构接收 —— 调用结果界 = 调用点偏移 + 被调返回摘要，
-		// 目标变量更浅时必须插守卫。此前**从未**插过 ⇒ `region { a, b = mk(1) }`
+		// 目标变量更浅时必须插守卫。不插守卫会让 `region { a, b = mk(1) }`
 		// （a/b 声明在块外）静默把块内对象写进更浅的槽，弹出后读到别的对象。
 		// 守卫标记挂在**目标名节点**上（每个目标一个键，互不覆盖），发射侧按名取用。
 		c.markVarStoreAt(v.Right, lhs, sym, "multi-target receiver "+id.Name)

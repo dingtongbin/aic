@@ -1,3 +1,0 @@
-func f() -> Option[str] {
-    return Some(1)
-}

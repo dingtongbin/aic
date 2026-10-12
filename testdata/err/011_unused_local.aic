@@ -1,0 +1,7 @@
+import fmt
+
+// C22：未使用局部变量 = 编译错误
+func main() {
+    var unused i64 = 42
+    fmt.println("hi")
+}

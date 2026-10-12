@@ -1,5 +1,0 @@
-import base
-
-func Bump(p base.Point) -> base.Point {
-    return base.Scale(p, 2)
-}

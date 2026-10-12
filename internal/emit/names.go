@@ -402,29 +402,6 @@ func resultsType(results []types.Type) types.Type {
 	}
 }
 
-// containerCtor 识别 set.new() / map.new() 这类容器构造（类型来自声明处, §二.2）。
-func (c *Ctx) containerCtor(call *parse.Call, want types.Type) (types.Type, bool) {
-	field, ok := call.Fn.(*parse.Field)
-	if !ok || field.Name != "new" {
-		return nil, false
-	}
-	id, ok := field.X.(*parse.Ident)
-	if !ok {
-		return nil, false
-	}
-	switch id.Name {
-	case "set":
-		if types.IsSet(want) {
-			return want, true
-		}
-	case "map":
-		if types.IsMap(want) {
-			return want, true
-		}
-	}
-	return nil, false
-}
-
 // nameType 查名字的语义类型 (局部/参数/const/包级类型)。
 func (c *Ctx) nameType(name string) types.Type {
 	if c.names != nil {

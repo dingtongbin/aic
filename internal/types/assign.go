@@ -34,6 +34,12 @@ func (c *Checker) requireAssignableAt(value parse.Expr, vt Type, vinfo untyped, 
 	if identical(vt, target) {
 		return
 	}
+	// ErrCode 枚举 → Err：`e.is(HttpErr.Timeout)` 的形参位（§7.1）。
+	// 判据：is() 的语义是"沿 cause 链比较**错误码**"，所以它自然接受码枚举；
+	// 这不是隐式转换泛滥，而是这一个方法的契约为 enum 参数（封闭集之一）。
+	if en, isEn := vt.(*Enum); isEn && en.ErrCode && isErr(target) {
+		return
+	}
 	// interface 装箱（§四 结构化满足）：类 → 接口，方法签名集完全匹配即可赋值。
 	// 无 implements 关键字：满足关系完全由方法签名决定（红线 1 的又一处例外位，
 	// 但它是**装箱**不是隐式数值转换，与 §二.4 不冲突）。
@@ -86,7 +92,7 @@ func ifaceSubset(src, ifc *Interface) (string, bool) {
 }
 
 // conversionFix 给出**可照做**的修复：只有标量/str/bytes 这类真的有转换语法的目标
-// 才能建议 `T(x)`；接口/类/枚举没有转换调用（此前一律建议 `A(big)` ⇒ 指向不存在的函数）。
+// 才能建议 `T(x)`；接口/类/枚举没有转换调用（一律建议 `A(big)` 会指向不存在的函数）。
 func conversionFix(target Type, value parse.Expr) string {
 	switch t := target.(type) {
 	case *Basic:
@@ -95,9 +101,6 @@ func conversionFix(target Type, value parse.Expr) string {
 		}
 		return "convert explicitly first: " + target.String() + "(" + exprText(value) + ") (red line 1)"
 	case *Slice, *MapT, *SetT, *ArrayT, *Instance, *FuncT:
-		if IsBytes(target) {
-			return "convert explicitly first: bytes.fromStr(...) (core design §16 N7)"
-		}
 	}
 	return "no conversion exists for " + target.String() + ": build the value explicitly (a composite literal, a constructor, or a field-by-field copy) (red line 1)"
 }

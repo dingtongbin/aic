@@ -1,0 +1,20 @@
+import fmt
+
+// 路径导入：import app/core/store → 限定名 store
+// 目录 = 包；包名 = 目录名；首字母大写 = 公开
+class Store {
+    var n i64
+
+    func init() -> Store {
+        return Store{n: 0}
+    }
+
+    func Put() -> Err {
+        this.n = this.n + 1
+        return nil
+    }
+
+    func Len() -> i64 {
+        return this.n
+    }
+}

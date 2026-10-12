@@ -1,0 +1,11 @@
+import fmt
+
+// C19：确定赋值——覆盖循环体全部路径与 break/continue 边界
+func main() {
+    var x i64
+    for i in 0..3 {
+        if i == 1 { continue }
+        x = i
+    }
+    fmt.println(str.fromI64(x))
+}

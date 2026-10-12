@@ -8,7 +8,14 @@ import "aic/internal/parse"
 // ---------------------------------------------------------------------------
 
 // resolvePattern 把一个模式对准主体枚举，返回命中的变体。
+// subject 为 nil（主体类型不是枚举、或类型解析失败）时必须给定向诊断——
+// 编译器永远不得 panic。
 func (c *Checker) resolvePattern(p parse.MatchPattern, subject *Enum, targs []Type) (*Variant, bool) {
+	if subject == nil {
+		c.errorAt(p.Pos, "match needs an enum subject", p.Name,
+			"match only works on enum values; if the subject type failed to resolve, fix that error first")
+		return nil, false
+	}
 	name := p.Name
 	if dot := lastIndexDot(name); dot >= 0 {
 		pkgOrEnum, variant := name[:dot], name[dot+1:]
@@ -41,8 +48,8 @@ func (c *Checker) resolvePattern(p parse.MatchPattern, subject *Enum, targs []Ty
 
 // UnqualifiedVariant 去掉变体名里的 `Enum.` 限定前缀（`Shape.Circle` → `Circle`）。
 // **唯一实现**：检查器（resolvePattern）与 AIR 降级（match 臂的负载绑定）必须用同一套
-// 规则 —— AIR 侧曾经直接用原始 `p.Name` 去查变体表，带限定的模式查不到就**静默跳过绑定**，
-// 于是 arm 里引用绑定的名字成了"先用后定"（verifier V2.4 报编译器缺陷）。
+// 规则 —— AIR 侧直接用原始 `p.Name` 去查变体表，带限定的模式查不到就**静默跳过绑定**，
+// arm 里引用绑定的名字就成了"先用后定"（verifier V2.4 报编译器缺陷）。
 func UnqualifiedVariant(name string) string {
 	if dot := lastIndexDot(name); dot >= 0 {
 		return name[dot+1:]
@@ -74,6 +81,10 @@ func lastIndexDot(s string) int {
 // checkArms 校验全部模式并返回覆盖的变体索引集合（穷尽性判定用）。
 func (c *Checker) checkArms(arms []parse.MatchArm, subject *Enum, targs []Type, at parse.Pos, inExpr bool) map[int]bool {
 	covered := map[int]bool{}
+	if subject == nil {
+		// 主体不是枚举：resolvePattern 已报错，这里不再逐臂报（避免错误风暴）。
+		return covered
+	}
 	for _, arm := range arms {
 		if inExpr && arm.Block != nil {
 			// parse 层已拒绝表达式形的块分支；防御性跳过
@@ -146,7 +157,7 @@ func (c *Checker) checkMatchExpr(v *parse.MatchExpr, expect Type) (Type, bound, 
 
 	// 全分支表达式类型一致（并与期望一致）。
 	// **必须在 armScope 仍生效时检查分支值**：负载绑定（`Some(x) => x`）由 checkArms
-	// 声明进 armScope，此前这里先 `c.scope = saved` 再检查 ⇒ 分支体里的 x 报"未声明的名字 x"
+	// 声明进 armScope，先 `c.scope = saved` 再检查会让分支体里的 x 报"未声明的名字 x"
 	// （表达式位 match 的负载绑定根本用不了；语句位 match 正常，因为它在自己的块里）。
 	var unified Type
 	for _, arm := range v.Arms {

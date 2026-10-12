@@ -80,12 +80,6 @@ type Ctx struct {
 	warnings []string
 	// needed 记录本翻译单元需要的运行时能力 (L2 按需链接的判据, 红线 16)。
 	needed map[string]bool
-	// deferCur 是当前函数的 defer 发射状态 (每函数重建; nil = 未在函数内)。
-	deferCur *deferState
-	// subst 是"node -> captured expression"的替换表 (defer trampoline 回放实参用)。
-	subst map[parse.Expr]string
-	// deferSeq 是全文件 defer 站点编号 (trampoline/上下文结构名唯一且确定)。
-	deferSeq int
 	// insts/instSeen 是泛型实例登记 (确定性顺序 + 实例缓存, 红线 11)。
 	insts    []instEntry
 	instSeen map[string]bool
@@ -114,20 +108,10 @@ type Ctx struct {
 	funcInstSeen map[string]bool
 	// lenFacts 是「容器长度 = 常量」的事实（仅对字面量初始化且无变更点的容器成立）。
 	lenFacts map[string]int
-	// loopInduct 是当前循环的归纳变量与**字面量**上界（栈式：嵌套循环取最内层）。
-	loopInduct *inductFact
-	// probe 为真时 line() 不产文本（用于「探测遍」收集事实，见 emitForRange 的 F3）。
+	// probe 为真时 line() 不产文本（用于「探测遍」收集事实）。
 	probe bool
 	// lenMutated 记录探测遍里「可能改变长度/数据指针」的容器（键 = 变量名）。
 	lenMutated map[string]bool
-	// lenSym 是容器的**符号长度式**（F4：填满再用形态，见 proofsym.go）。
-	lenSym map[string]lin
-	// appendFacts 是探测遍里对每个容器的 append 次数与「是否有其他变更」。
-	appendFacts map[string]*appendCountFact
-	// loopCondBound 是当前循环条件给出的上界事实（`for m <= limit`，栈式）。
-	loopCondBound *condBound
-	// loopLenBound 是 F3 事实：上界 = container.len() 的循环（栈式）。
-	loopLenBound *lenBoundFact
 	// unchecked 是本产物发出的 unchecked 访问次数（--report-guards 报告用）。
 	unchecked int
 	// declaredVars 是本函数**已声明**的变量（F5 只能缓存循环前已可见的容器）。
@@ -142,19 +126,10 @@ type Ctx struct {
 	cacheSeq int
 	// guards 是守卫点计数（--report-guards / H9③：无 region 块的语料 kept 必须为 0）。
 	guards GuardCounts
-	// liveNext 为真时，紧随其后的创建表达式用 aic_alloc_live（@live，§五 R4）。
+	// liveNext 为真时，紧随其后的创建表达式用 aic_alloc_live（live 存储层级，§五 R4）。
 	liveNext bool
-	// scopeCur 是当前 scope 的发射状态（spawn 需要它来登记任务，§七）。
-	scopeCur *scopeState
-	// spawnThunks/spawnSeen 是 spawn 薄 thunk 登记（每被调函数一份）。
-	spawnThunks []*spawnThunk
-	spawnSeen   map[string]bool
-	// lamSeq/lamSites/lams 是 lambda 字面量登记 (提升为静态函数, §三)。
-	lamSeq   int
-	lamSites map[*parse.LambdaExpr]*lamSite
-	lams     []*lamSite
 
-	// --- IR 路径（L5d：体从 IR 取，不再走 AST）-----------------------------
+	// --- IR 路径（体从 IR 取，不走 AST）------------------------------------
 	// ir 非空 = 本次发射走 IR 路径（见 irbody.go）。
 	ir *IRProg
 	// irTab 是「AIR 类型文本 → 语义类型」表（从检查产物重建，见 buildIRTypeTab）。
@@ -224,32 +199,6 @@ func (c *Ctx) withSubst(params []string, args []types.Type, f func() error) erro
 	return f()
 }
 
-// Emit 是单文件入口: 纯函数, 同一 (f, path, info) 两次调用产出相同文本。
-//
-// **两遍**：第一遍只为发现泛型实例（实例定义必须在任何使用点之前发射，而某个实例
-// 可能直到函数体里才第一次出现——例如 `match Some(v)` 的 T 由实参决定），第二遍
-// 带着实例表正式发射。emit 是纯函数且很快，两遍远比"deferring type definitions past their use sites"安全。
-func Emit(f *parse.File, path string, info *types.Info) (*Result, error) {
-	return EmitUnit(Single(f, path, info))
-}
-
-// EmitUnit 是整程序入口（多包一份 C 翻译单元；红线 23）。
-// 纯函数：同一 Unit 两次调用产出逐字节相同的文本（红线 12, H2）。
-func EmitUnit(u *Unit) (*Result, error) {
-	if u == nil || len(u.Files) == 0 {
-		return nil, fmt.Errorf("emit: empty emission unit")
-	}
-	_, pre, err := runEmit(u, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, _, err := runEmit(u, pre, nil)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
-}
-
 // seed 是第一遍的发现结果（泛型实例 + 合成打印函数 + 见证表），第二遍带着它正式发射。
 type seed struct {
 	insts      []instEntry
@@ -257,7 +206,6 @@ type seed struct {
 	witnesses  []witnessEntry
 	ifacePrint []string
 	needed     []string
-	spawn      []*spawnThunk
 	// irRets/irRetT 是 IR 路径的多返回结构体（第一遍发现，第二遍在类型段统一发）。
 	irRets []string
 	irRetT map[string][]types.Type
@@ -266,7 +214,7 @@ type seed struct {
 }
 
 // runEmit 跑一遍完整发射，返回产物与本次发现的实例/打印函数表。
-// ir 非空 = 走 IR 路径（函数体从 IR 取；见 irbody.go）。
+// 函数体一律从 IR 取（见 irbody.go）—— 不存在 AST 直译路径。
 func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	c := &Ctx{
 		cur:       u.Files[0],
@@ -275,7 +223,6 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		Info:      u.Files[0].Info,
 		declared:  map[string]string{},
 		needed:    map[string]bool{},
-		lamSites:  map[*parse.LambdaExpr]*lamSite{},
 		deps:      map[string]*types.Info{},
 		retSeen:   map[string]bool{},
 		entryPath: u.Entry,
@@ -285,17 +232,15 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 			c.deps[fu.Info.Pkg] = fu.Info
 		}
 	}
-	if ir != nil {
-		// IR 路径：类型文本 → 语义类型表与「IR 符号 → C 符号」表都从检查产物重建
-		// （跨包也在其中），于是后端不必解析类型文本、也不再写一份 mangling。
-		c.ir = ir
-		c.buildIRTypeTab()
-		c.buildIRCallMap()
-		// **used 表按遍重置**：它记的是"这一遍消费了哪些函数体"，两遍共用同一张表
-		// 会让第二遍把 lambda 提升体当成"已消费"而整个跳过（718 实测：引用在、
-		// 定义没了）。收口的 verifyAllUsed 在第二遍末尾跑，看到的仍是完整的第二遍。
-		ir.resetUsed()
-	}
+	// 类型文本 → 语义类型表与「IR 符号 → C 符号」表都从检查产物重建（跨包也在
+	// 其中），于是后端不必解析类型文本、也不再写一份 mangling。
+	c.ir = ir
+	c.buildIRTypeTab()
+	c.buildIRCallMap()
+	// **used 表按遍重置**：它记的是"这一遍消费了哪些函数体"，两遍共用同一张表
+	// 会让第二遍把 lambda 提升体当成"已消费"而整个跳过（718 实测：引用在、
+	// 定义没了）。收口的 verifyAllUsed 在第二遍末尾跑，看到的仍是完整的第二遍。
+	ir.resetUsed()
 	if pre != nil {
 		c.seeded = true
 		c.insts = append([]instEntry{}, pre.insts...)
@@ -330,30 +275,19 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		for _, k := range pre.needed {
 			c.needed[k] = true
 		}
-		if ir != nil {
-			// IR 路径的多返回结构体：第一遍发现，第二遍发 typedef。
-			c.irRetOrder = append([]string{}, pre.irRets...)
-			c.irRetTypes = map[string][]types.Type{}
-			for k, v := range pre.irRetT {
-				c.irRetTypes[k] = v
-			}
-			// spawn 站点表同理（原型段跑在函数体之前，只能吃第一遍的发现）。
-			c.irSpawns = append([]irSpawnSite{}, pre.irSpawns...)
+		// IR 的多返回结构体：第一遍发现，第二遍发 typedef。
+		c.irRetOrder = append([]string{}, pre.irRets...)
+		c.irRetTypes = map[string][]types.Type{}
+		for k, v := range pre.irRetT {
+			c.irRetTypes[k] = v
 		}
-		// spawn thunk：第一遍发现，第二遍 TU 末尾统一发（调用点只发块作用域原型）。
-		c.spawnThunks = append([]*spawnThunk{}, pre.spawn...)
-		c.spawnSeen = make(map[string]bool, len(pre.spawn))
-		for _, th := range pre.spawn {
-			c.spawnSeen[th.name] = true
-		}
+		// spawn 站点表同理（原型段跑在函数体之前，只能吃第一遍的发现）。
+		c.irSpawns = append([]irSpawnSite{}, pre.irSpawns...)
 	}
 	// pass 1 + 2：逐文件建名字表与收集泛型实例（实例定义必须在任何使用点之前）。
-	// IR 路径上实例由 IR 侧的 cTypeName 调用按需登记（两遍照旧：第一遍发现、第二遍带表）。
+	// 泛型实例由 IR 侧的 cTypeName 调用按需登记（两遍照旧：第一遍发现、第二遍带表）。
 	for _, fu := range u.Files {
 		c.use(fu)
-		if ir == nil {
-			c.collectInstances()
-		}
 	}
 	c.use(u.Files[0])
 	if err := c.prologue(); err != nil {
@@ -385,23 +319,17 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if err := c.emitFuncInsts(u); err != nil {
 		return nil, nil, err
 	}
-	if ir != nil {
-		// lambda 提升体的原型（签名表里没有它们，单独发；体在函数体段之后）。
-		if err := c.emitIRLambdaProtos(); err != nil {
-			return nil, nil, err
-		}
-		// spawn：上下文块定义（文件作用域）+ thunk 原型（站点表来自第一遍）。
-		if err := c.emitIRSpawnCtxStructs(); err != nil {
-			return nil, nil, err
-		}
-		c.emitIRSpawnProtos()
+	// lambda 提升体的原型（签名表里没有它们，单独发；体在函数体段之后）。
+	if err := c.emitIRLambdaProtos(); err != nil {
+		return nil, nil, err
 	}
-	if ir == nil {
-		c.emitSpawnThunkProtos()
+	// spawn：上下文块定义（文件作用域）+ thunk 原型（站点表来自第一遍）。
+	if err := c.emitIRSpawnCtxStructs(); err != nil {
+		return nil, nil, err
 	}
+	c.emitIRSpawnProtos()
 	c.emitPackedCmpProtos()
-	instMethods, err := c.emitInstMethodProtos(u)
-	if err != nil {
+	if _, err := c.emitInstMethodProtos(u); err != nil {
 		return nil, nil, err
 	}
 	// ③ 全部原型 → ④ 全部函数体（跨包调用与声明序无关）
@@ -415,37 +343,22 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if err := c.emitDelegatedProtos(); err != nil {
 		return nil, nil, err
 	}
-	if ir != nil {
-		// IR 路径发现的多返回结构体：在原型段之后、函数体之前发 typedef。
-		c.irEmitRetStructs()
-		// **站点表按遍重建**：seed 里的表只服务于原型段（它跑在函数体之前）；
-		// 函数体段会重新发现全部站点（编号规则与第一遍一致 ⇒ 同名）。两份叠加
-		// 会让 thunk 定义发两遍（773 实测：redefinition of aic_spth_0）。
-		c.irSpawns = nil
-		// IR 路径：体一律从 IR 取（含泛型实例与实例方法），不再走 AST。
-		if err := c.emitIRFuncs(u); err != nil {
-			return nil, nil, err
-		}
-		if err := c.emitIRInstFuncs(u); err != nil {
-			return nil, nil, err
-		}
-		// lambda 提升体（IR 体表里带 static 标记、签名表里没有的函数）。
-		if err := c.emitIRLambdaFuncs(); err != nil {
-			return nil, nil, err
-		}
-	} else {
-		for _, fu := range u.Files {
-			c.use(fu)
-			if err := c.emitFuncs(); err != nil {
-				return nil, nil, err
-			}
-		}
-		if err := c.emitFuncInstBodies(u); err != nil {
-			return nil, nil, err
-		}
-		if err := c.emitInstMethodBodies(instMethods); err != nil {
-			return nil, nil, err
-		}
+	// IR 发现的多返回结构体：在原型段之后、函数体之前发 typedef。
+	c.irEmitRetStructs()
+	// **站点表按遍重建**：seed 里的表只服务于原型段（它跑在函数体之前）；
+	// 函数体段会重新发现全部站点（编号规则与第一遍一致 ⇒ 同名）。两份叠加
+	// 会让 thunk 定义发两遍（773 实测：redefinition of aic_spth_0）。
+	c.irSpawns = nil
+	// 体一律从 IR 取（含泛型实例与实例方法）。
+	if err := c.emitIRFuncs(u); err != nil {
+		return nil, nil, err
+	}
+	if err := c.emitIRInstFuncs(u); err != nil {
+		return nil, nil, err
+	}
+	// lambda 提升体（IR 体表里带 static 标记、签名表里没有的函数）。
+	if err := c.emitIRLambdaFuncs(); err != nil {
+		return nil, nil, err
 	}
 	if eu := c.entryUnit(u); eu != nil {
 		c.use(eu)
@@ -453,28 +366,21 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 	if err := c.emitDelegatedBodies(); err != nil {
 		return nil, nil, err
 	}
-	if ir != nil {
-		// spawn thunk 的定义（取上下文块字段直调；原型已在原型段发过）。
-		c.emitIRSpawnBodies()
-	}
+	// spawn thunk 的定义（取上下文块字段直调；原型已在原型段发过）。
+	c.emitIRSpawnBodies()
 	c.emitEntry()
-	if ir == nil {
-		c.emitSpawnThunks() // spawn 薄 thunk 在 TU 末尾（调用点只发原型）
-	}
-	if err := c.emitPackedCmpBodies(); err != nil { // @packed 比较助手（同上：末尾定义）
+	if err := c.emitPackedCmpBodies(); err != nil { // struct 比较助手（同上：末尾定义）
 		return nil, nil, err
 	}
 	c.epilogue()
-	if ir != nil {
-		// 收口校验：IR 里不该有没人要的函数体（有 = 签名侧与 IR 侧的符号对不上，
-		// 是本类改动最容易犯的错，必须在编译期炸出来而不是静静丢掉一个函数）。
-		if err := ir.verifyAllUsed(); err != nil {
-			return nil, nil, err
-		}
+	// 收口校验：IR 里不该有没人要的函数体（有 = 签名侧与 IR 侧的符号对不上，
+	// 是本类改动最容易犯的错，必须在编译期炸出来而不是静静丢掉一个函数）。
+	if err := ir.verifyAllUsed(); err != nil {
+		return nil, nil, err
 	}
 	return &Result{C: c.buf.String(), Warnings: c.warnings, Needed: c.Needed(), Guards: c.guards},
 		&seed{insts: c.insts, printers: c.printers, witnesses: c.witnesses,
-			ifacePrint: c.sortedIfacePrint(), needed: c.Needed(), spawn: c.spawnThunks,
+			ifacePrint: c.sortedIfacePrint(), needed: c.Needed(),
 			irRets: c.irRetOrder, irRetT: c.irRetTypes,
 			irSpawns: c.irSpawns}, nil
 }

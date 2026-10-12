@@ -272,37 +272,8 @@ func TestUnterminatedBlockComment(t *testing.T) {
 
 // --- 用例 16：注解 -------------------------------------------------------------------------
 
-func TestAllFrozenAnnotations(t *testing.T) {
-	var sb strings.Builder
-	for i, a := range AnnotationNames {
-		if i > 0 {
-			sb.WriteByte(' ')
-		}
-		sb.WriteString("@" + a)
-	}
-	toks := lexAll(t, sb.String())
-	for i, a := range AnnotationNames {
-		if toks[i].Kind != ANNOT || toks[i].Text != "@"+a {
-			t.Errorf("注解 token[%d] = %v，期望 @%s", i, toks[i], a)
-		}
-	}
-	if toks[len(AnnotationNames)].Kind != EOF {
-		t.Errorf("注解流须以 EOF 收尾")
-	}
-}
-
-func TestUnknownAnnotationRejected(t *testing.T) {
-	_, errs := File("t.aic", "@inline\nclass X { }\n")
-	if len(errs) != 1 || !strings.Contains(errs[0].Desc, "unknown annotation @inline") {
-		t.Fatalf("未知注解须报错：%s", descs(errs))
-	}
-	if !strings.Contains(errs[0].Fix, "@packed") {
-		t.Errorf("修复建议须列出合法注解集：%q", errs[0].Fix)
-	}
-}
-
-// --- 用例 17：多错收集（红线#16） ----------------------------------------------------------------
-
+// 语言没有注解机制（《AIC 语言规范》§1.3）：`@` 不是词法可接受字符，
+// "出现即词法错误"由 frozen_test.go 的 no-annotations 子测试看住。
 func TestMultipleErrorsCollectedInOrder(t *testing.T) {
 	src := "var a__b = 1\n`tick`\n0x_\n\"unterminated\n"
 	_, errs := File("t.aic", src)

@@ -1,0 +1,30 @@
+import fmt
+import str
+
+// for-in 协议：实现 Iterator[T] 即可被遍历
+// bool=false = 终止；fallible 迭代器：T 为 Result
+class Range implements Iterator[i64] {
+    var i i64
+    var n i64
+
+    func init(n i64) -> Range {
+        return Range{i: 0, n: n}
+    }
+
+    func next() -> (i64, bool) {
+        if this.i >= this.n { return 0, false }
+        this.i = this.i + 1
+        return this.i, true
+    }
+}
+
+func main() {
+    var r Range = Range.init(3)
+    // 消费点用手写 next() 循环：这就是 §13.1 里 `for x in r` 去糖后的目标形态。
+    // for-in 直接吃 Iterator 实现者的去糖还没落地，所以这里明写循环，不假装已支持。
+    for {
+        var v, ok = r.next()
+        if !ok { break }
+        fmt.println(str.fromI64(v))
+    }
+}

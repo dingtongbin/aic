@@ -3,7 +3,7 @@
  * 冻结两件事：
  *   1. aic_err_wrap 把 cause **拷贝进当前区域**（栈上的临时 Err 也能安全上链）；
  *   2. aic_err_dump 的逐级文本（语言级契约：第一级 msg，其后 "  caused by: msg"）。
- * 判据在 scripts/runtime_smoke.py 里逐字节比对 stderr。 */
+ * 判据：stderr 逐字节等于期望文本（见下）。 */
 #include "aic_l0.h"
 
 static aic_Err inner(void) {

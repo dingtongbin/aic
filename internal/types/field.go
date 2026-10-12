@@ -8,8 +8,8 @@ import "aic/internal/parse"
 
 func (c *Checker) checkField(v *parse.Field, expect Type) (Type, bound, untyped) {
 	// 跨包**枚举变体**取值：pkg.Enum.Variant（三段名）。
-	// 此前只有本包的 `Enum.Variant` 能取值，跨包变体值不可达（`lib.Color.green` 报
-	// "a package member is not a value"）—— 跨包变体在模式位与构造位都可用，只有取值位漏了。
+	// 取值位若只认本包的 `Enum.Variant`，跨包变体值就不可达（`lib.Color.green` 报
+	// "a package member is not a value"）—— 跨包变体在模式位与构造位都可用，取值位会漏。
 	if inner, isField := v.X.(*parse.Field); isField {
 		if id, isID := inner.X.(*parse.Ident); isID {
 			if _, isPkg := c.imports[id.Name]; isPkg {
@@ -205,26 +205,104 @@ func (c *Checker) checkIndexInt(e parse.Expr, what string) {
 		"an index accepts any integer type (the H6 exception); floats and other types do not")
 }
 
-// checkStrMethod: str 包内建方法面（核心设计 §二.3/§十四）。
-// 内建方法表必须与发射表**同一套**（emit/builtin.go 的 str 方法）：曾经只有 emit 认
-// `isEmpty`，于是 `"abc".isEmpty()` 靠"字面量接收者静默通过"侥幸可用，而变量接收者被拒
+// checkArgStr 校验一个"必须是 str"的实参。
+func (c *Checker) checkArgStr(e parse.Expr, what string) {
+	at, _, ainfo := c.checkExprFull(e, TStr)
+	if at == nil {
+		return
+	}
+	c.requireAssignableAt(e, at, ainfo, TStr, what)
+}
+
+// checkIndexArg 校验一个"必须是整型"的实参（下标/长度位）。
+func (c *Checker) checkIndexArg(e parse.Expr, what string) {
+	c.checkIndexInt(e, what)
+}
+
+// checkStrMethod: str 包内建方法面（《AIC 标准库规范》§2.1 的封闭清单）。
+// 内建方法表必须与发射表**同一套**（emit/builtin.go 的 str 方法）：只有 emit 认
+// `isEmpty` 会让 `"abc".isEmpty()` 靠"字面量接收者静默通过"侥幸可用，而变量接收者被拒
 // —— 两张手工表分叉是系统性风险，这里补齐并加锚点。
 func (c *Checker) checkStrMethod(v *parse.Call, field *parse.Field, recvBound bound, expect Type) (Type, bound, untyped) {
+	noArgs := func() bool {
+		if len(v.Args) != 0 {
+			c.errorAt(v.Pos, field.Name+"() takes no arguments", "s."+field.Name+"()", "remove the parenthesised content")
+			return false
+		}
+		return true
+	}
+	oneStr := func() bool {
+		if len(v.Args) != 1 {
+			c.errorAt(v.Pos, field.Name+"() takes one str argument", "s."+field.Name+"(x)", "write s."+field.Name+"(x)")
+			return false
+		}
+		c.checkArgStr(v.Args[0], field.Name)
+		return true
+	}
 	switch field.Name {
 	case "len":
-		if len(v.Args) != 0 {
-			c.errorAt(v.Pos, "len() takes no arguments", "s.len()", "remove the parenthesised content")
+		if !noArgs() {
 			return nil, nilBound, untyped{}
 		}
 		return TUsize, nilBound, untyped{}
 	case "isEmpty":
-		if len(v.Args) != 0 {
-			c.errorAt(v.Pos, "isEmpty() takes no arguments", "s.isEmpty()", "remove the parenthesised content")
+		if !noArgs() {
 			return nil, nilBound, untyped{}
 		}
 		return TBool, nilBound, untyped{}
+	case "trim", "toUpper", "toLower":
+		if !noArgs() {
+			return nil, nilBound, untyped{}
+		}
+		return TStr, nilBound, untyped{}
+	case "slice":
+		if len(v.Args) != 2 {
+			c.errorAt(v.Pos, "slice() takes (a, n)", "s.slice(a, n)",
+				"write s.slice(a, n) for the half-open view [a, a+n); out of range traps (AIC standard library spec §2.1)")
+			return nil, nilBound, untyped{}
+		}
+		c.checkIndexArg(v.Args[0], "slice start")
+		c.checkIndexArg(v.Args[1], "slice length")
+		return TStr, nilBound, untyped{}
+	case "indexOf":
+		if len(v.Args) != 1 {
+			c.errorAt(v.Pos, "indexOf() takes one argument", "s.indexOf(sub)",
+				"write s.indexOf(sub); a miss returns Option.None, never -1 (AIC standard library spec §2.1)")
+			return nil, nilBound, untyped{}
+		}
+		c.checkArgStr(v.Args[0], "indexOf")
+		return optionInstance(TI64), nilBound, untyped{}
+	case "contains", "startsWith", "endsWith":
+		if !oneStr() {
+			return nil, nilBound, untyped{}
+		}
+		return TBool, nilBound, untyped{}
+	case "split":
+		if !oneStr() {
+			return nil, nilBound, untyped{}
+		}
+		return &Slice{Elem: TStr}, nilBound, untyped{}
+	case "append":
+		if !oneStr() {
+			return nil, nilBound, untyped{}
+		}
+		return TStr, nilBound, untyped{}
+	case "codepoints":
+		if !noArgs() {
+			return nil, nilBound, untyped{}
+		}
+		// rune[]，不是 u32[]（§2.1：能装非标量值是设计漏洞）
+		return &Slice{Elem: TRune}, nilBound, untyped{}
+	case "utf8At":
+		if len(v.Args) != 1 {
+			c.errorAt(v.Pos, "utf8At() takes one index", "s.utf8At(i)",
+				"write s.utf8At(i); it returns (rune, nextByteOffset) and traps on invalid UTF-8 (AIC standard library spec §2.1)")
+			return nil, nilBound, untyped{}
+		}
+		c.checkIndexArg(v.Args[0], "utf8At index")
+		return &MultiType{Elems: []Type{TRune, TUsize}}, nilBound, untyped{}
 	}
 	c.errorAt(v.Pos, "str has no such method", "str."+field.Name,
-		"str has the methods len() and isEmpty() only; everything else lives in the str package (concat/sub/trim/..., core design §14)")
+		"the str method set is frozen: len / isEmpty / trim / toUpper / toLower / slice / indexOf / contains / startsWith / endsWith / split / append / codepoints / utf8At (AIC standard library spec §2.1)")
 	return nil, nilBound, untyped{}
 }

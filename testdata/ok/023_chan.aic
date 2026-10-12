@@ -1,0 +1,26 @@
+import fmt
+import str
+
+// chan：MPMC；send 满则阻塞（背压）；recv fallible 返回 (T, Err)
+// 无 close；tryRecv / drain 为非阻塞取
+func main() {
+    var ch chan[i64] = chan[i64].new(4)
+    ch.send(1)
+    ch.send(2)
+    ch.send(3)
+    fmt.println("{ch.len()}")
+    var v, e = ch.recv()
+    if e.code != 0 { return }
+    fmt.println("{v}")
+    // tryRecv：Option
+    var o Option[i64] = ch.tryRecv()
+    match o {
+        Option.Some(x) => { fmt.println("{x}") },
+        Option.None => { fmt.println("empty") },
+    }
+    // drain：非阻塞取至多 n 个
+    var rest i64[] = ch.drain(8)
+    for r in rest {
+        fmt.println("{r}")
+    }
+}

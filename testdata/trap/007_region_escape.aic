@@ -1,0 +1,13 @@
+import fmt
+
+class Node { var v i32 }
+
+// M-2：引用存入更浅区域 = 确定性 trap（对象头代龄比对）
+var outer Node
+
+func main() {
+    region {
+        var inner Node = Node{v: 1}
+        outer = inner
+    }
+}

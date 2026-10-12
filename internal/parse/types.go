@@ -6,7 +6,7 @@ import "strings"
 // Type syntax (核心设计 §二). Type checking proper lives at R2; the parser only
 // enforces the shape and records position for diagnostics.
 //
-// v2：`(A, B)` 不再是元组类型——多返回值只存在于返回位（parseFunc 展开为多个
+// `(A, B)` 不是元组类型——多返回值只存在于返回位（parseFunc 展开为多个
 // Result）；类型位的 `(A, B) -> R` 是函数类型（lambda 的类型，§三）。
 // ---------------------------------------------------------------------------
 
@@ -55,6 +55,9 @@ type (
 	FuncType struct {
 		Params []TypeExpr
 		Result TypeExpr // nil for `-> ()`-free form: 参数表后无箭头时不存在
+		// Results 非空 = 这是**结果位**的多返回值列表 `(A, B, Err)`。
+		// 单一 Result 保留给普通函数类型，避免为同一语义引入两种 AST（P1）。
+		Results []TypeExpr
 		Pos
 	}
 )
@@ -79,17 +82,51 @@ func IsErrType(t TypeExpr) bool {
 	return false
 }
 
+// parseTypeNoDot 解析一个**不含包限定名**的类型（`i64` / `i32[]` / `Box[T]` 等）。
+// 用途：表达式位 `map[K]V.new()` 的值类型 V —— `parseType` 会把 `.` 当作
+// `pkg.Type` 的前缀从而吞掉 `.new`，这里明确不跨 `.`。
+func (p *Parser) parseTypeNoDot() TypeExpr {
+	at := p.pos()
+	if !p.atKind(IDENT) {
+		p.errorHere(at, "the value type of a map constructor is missing", "got "+describe(p.cur()),
+			"write map[K]V.new() with a concrete value type V (AIC language spec §4)")
+		return &BasicType{Name: "?", Pos: at}
+	}
+	name := p.next().Text
+	nt := &NamedType{Name: name, Pos: at}
+	// 泛型实参 Box[T]（可多层）
+	for p.at(PUNCT, "[") {
+		p.next()
+		nt.Args = append(nt.Args, p.parseTypeNoDot())
+		p.expect(PUNCT, "]", "type argument is missing the closing `]`")
+	}
+	// 切片后缀
+	for p.at(PUNCT, "[") && p.peekIs(PUNCT, "]") {
+		p.next()
+		p.next()
+		nt = &NamedType{Name: name, Pos: at}
+		return &SliceType{Elem: nt, Pos: at}
+	}
+	return nt
+}
+
 // parseType reads a type expression starting at the current token.
+// inResult = true 表示这是函数结果的**结果位**，此时 `(A, B, Err)` 是多结果
+// 列表而非 tuple（《AIC 语言规范》S-1：Err 仅末位）。
 func (p *Parser) parseType() TypeExpr {
+	return p.parseTypeIn(false)
+}
+
+func (p *Parser) parseTypeIn(inResult bool) TypeExpr {
 	at := p.pos()
 
 	// `(T)` grouping or the function type `(P1, P2) -> R`.
 	if p.at(PUNCT, "(") {
-		grouped := p.parseParenType(at)
+		grouped := p.parseParenTypeIn(at, inResult)
 		// 分组的**后缀**必须接在这里：`(map[str]i64)[]` = map 的列表
 		//（R21 审计 ④：`map[str]i64[]` 的 `[]` 天然绑给 map 的值类型
-		//⇒ 没有分组就写不出 ”map 的列表“）。此前直接 return
-		//⇒ `[]` 沦为表达式，报”赋值左侧必须是变量”。
+		//⇒ 没有分组就写不出 ”map 的列表“，分组后缀必须在这里接）。直接 return
+		//会让 `[]` 沦为表达式，报”赋值左侧必须是变量”。
 		if _, isFunc := grouped.(*FuncType); !isFunc {
 			for p.at(PUNCT, "[") && p.peekIs(PUNCT, "]") {
 				p.next()
@@ -176,7 +213,7 @@ func (p *Parser) parseType() TypeExpr {
 		}
 		p.expect(PUNCT, "]", "generic instantiation is missing the closing `]`")
 		// **实例化之后的切片后缀**：`Box[i32][]` / `Box[Box[i32]][]`。
-		// 此前后缀循环排在实例化之前 ⇒ 泛型实例的列表类型根本写不出来
+		// 后缀循环必须排在实例化之后 —— 若排在实例化之前 ⇒ 泛型实例的列表类型根本写不出来
 		// （`var xs Box[i32][] = []` 报"赋值左侧必须是变量"）。
 		for p.at(PUNCT, "[") && p.peekIs(PUNCT, "]") {
 			p.next()
@@ -191,28 +228,52 @@ func (p *Parser) parseType() TypeExpr {
 // A parenthesised type list without an arrow is a tuple type — 元组非一等类型
 // (核心设计 §二.2), so it is rejected with the mechanical fix.
 func (p *Parser) parseParenType(at Pos) TypeExpr {
+	return p.parseParenTypeIn(at, false)
+}
+
+func (p *Parser) parseParenTypeIn(at Pos, inResult bool) TypeExpr {
 	p.next() // (
 	var elems []TypeExpr
-	for {
-		elems = append(elems, p.parseType())
-		if p.at(PUNCT, ",") {
-			p.next()
-			continue
+	// 空形参表 `()` = 零参函数类型（《AIC 语言规范》§5.3：`func() { }` 与
+	// `() -> R`）。无条件 parseType() 会把 `)` 当类型起点，报
+	// "parenthesised type is missing the closing `)`"——必须先识别空形参表，
+	// `g () -> (str, Err)` 才能作参数类型。
+	if !p.at(PUNCT, ")") {
+		for {
+			elems = append(elems, p.parseType())
+			if p.at(PUNCT, ",") {
+				p.next()
+				continue
+			}
+			break
 		}
-		break
 	}
 	p.expect(PUNCT, ")", "parenthesised type is missing the closing `)`")
 	if !p.at(PUNCT, "->") {
 		if len(elems) == 1 {
 			return elems[0]
 		}
+		if inResult {
+			// 结果位的多返回值：由调用方（func 声明/字面量）按列表收集。
+			return multiResultType(elems, at)
+		}
 		p.errorHere(at, "there is no tuple type (a tuple is not a first-class type)", "got "+parenTypeText(elems),
 			"multiple results appear only in the function result position: -> (A, B, Err); to store values use a class or a container")
 		return elems[0]
 	}
 	p.next() // ->
-	result := p.parseType()
+	// 结果位：`-> (A, B, Err)` 的括号是多结果列表，不是 tuple。
+	result := p.parseTypeIn(true)
 	return &FuncType{Params: elems, Result: result, Pos: at}
+}
+
+// multiResultType 把 `(A, B, Err)` 包成一个 FuncType 变体：Params 为空、
+// Result 为首元素、Results 携带全表。这样结果位与普通类型位共用一套 AST，
+// 不需要第二种类（P1：不为同一语义引入两种形态）。
+func multiResultType(elems []TypeExpr, at Pos) TypeExpr {
+	ft := &FuncType{Result: elems[0], Pos: at}
+	ft.Results = elems
+	return ft
 }
 
 func parenTypeText(elems []TypeExpr) string {

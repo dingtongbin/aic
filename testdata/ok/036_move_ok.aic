@@ -1,0 +1,25 @@
+import fmt
+import str
+
+// R-Move 正例：slice 允许入 chan（chan 的 send 本来就深拷贝进通道区域）
+// 禁的是 class 共享引用——两个任务同持一个可变对象 = 共享可变第三形态
+class Pkt derive Clone { var src str    var body u8[] }
+struct Pair { var a i64    var b str }
+
+func echo(p Pkt) -> i64 {
+    return i64(p.body.len())
+}
+
+func main() {
+    var ch chan[Pkt] = chan[Pkt].new(8)
+    ch.send(Pkt{src: "a", body: [1, 2, 3]})
+    var p, e = ch.recv()
+    if e.code != 0 { return }
+    fmt.println("{p.body.len()}")
+    // 全字段 Move 的 struct 也可入边界
+    var ps chan[Pair] = chan[Pair].new(2)
+    ps.send(Pair{a: 1, b: "x"})
+    var q, e2 = ps.recv()
+    if e2.code != 0 { return }
+    fmt.println("{q.a}")
+}

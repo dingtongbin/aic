@@ -1,0 +1,8 @@
+import fmt
+
+// E-5：Err 槽禁 _
+func f() -> (str, Err) { return "x", nil }
+
+func main() {
+    var v, _ = f()
+}

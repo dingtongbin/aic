@@ -1,0 +1,25 @@
+import fmt
+import log
+
+// fmt = 程序数据（stdout，原样）；log = 运维遥测（stderr，带级别时间戳）
+// 两者不许混用：stdout 可能被管道消费，不能带时间戳
+func main() {
+    // fmt：四件套，e 前缀一律表示 stderr
+    fmt.print("no newline")
+    fmt.print("\n")
+    fmt.println("line")
+    fmt.eprint("err no newline")
+    fmt.eprint("\n")
+    fmt.eprintln("err line")
+    // log：零成本守卫——关级时不构造参数字符串
+    if log.enabled(LogLevel.Debug) {
+        log.debug("expensive={1 + 2}")
+    }
+    log.info("started")
+    log.warn("careful")
+    log.error("bad")
+    // 结构化日志唯一入口 = derive Json
+    log.infoJson(Event{name: "boot", ok: true})
+}
+
+struct Event derive Json { var name str    var ok bool }

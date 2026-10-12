@@ -1,0 +1,36 @@
+import fmt
+import str
+import value
+
+// Value：动态值枚举，替代运行期反射的"未知结构"场景
+// match 是穷尽的，as* 只是便捷入口
+func summarize(v Value) -> str {
+    match v {
+        Value.Null => { return "null" },
+        Value.Bool(b) => { return str.fromBool(b) },
+        Value.I64(n) => { return str.fromI64(n) },
+        Value.F64(x) => { return str.fromF64(x) },
+        Value.Str(s) => { return s },
+        Value.List(xs) => { return "list[{xs.len()}]" },
+        Value.Obj(m) => { return "obj[{m.len()}]" },
+    }
+}
+
+func main() {
+    var doc Value = Value.Obj(map[str]Value.new())
+    // doc 必须被读：C22 未使用局部变量是编译错，语料自己不能踩
+    fmt.println(summarize(doc))
+    fmt.println(summarize(Value.Null))
+    fmt.println(summarize(Value.I64(42)))
+    fmt.println(summarize(Value.Str("hi")))
+    fmt.println(summarize(Value.Bool(true)))
+    // 取值：Option，不是 Err
+    // value.get(v Value, k str)（标准库规范 §1）：首参是 Value，故先把
+    // map 包成 Value.Obj —— 传裸 map 会被判成 map[str]Value 写不进 Value。
+    var m map[str]Value = map[str]Value.new()
+    m.put("k", Value.I64(1))
+    match value.get(Value.Obj(m), "k") {
+        Option.Some(x) => { fmt.println(summarize(x)) },
+        Option.None => { fmt.println("absent") },
+    }
+}

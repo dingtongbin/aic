@@ -1,3 +1,0 @@
-testdata/err/314_match_missing_arm.aic:8:5: error: match is not exhaustive: missing variant
-    Color.Blue
-    fix: add Blue arms (exhaustiveness is the point; no wildcards)

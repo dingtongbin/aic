@@ -1,0 +1,39 @@
+// head — 输出前 n 行
+// 用法：head [-n N] [文件]
+import fmt
+import str
+import os
+import cli
+
+func main() -> Err {
+    var p = cli.newParser("head", "output the first part of files")
+    cli.flag(p, "lines", "n", cli.CliKind.Int, "10", "number of lines")
+    var vals, e = cli.parse(p, os.args())
+    if e.code != 0 {
+        fmt.eprintln(e.msg)
+        return e
+    }
+    var nOpt = cli.getInt(vals, "lines")
+    var n i64 = 10
+    match nOpt {
+        Option.Some(v) => { n = v },
+        Option.None => { },
+    }
+    var rest = vals.rest
+    if rest.len() == 0 {
+        fmt.eprintln("head: need a file")
+        return Err(OsErr.NotExist, "no input file")
+    }
+    var text, e2 = os.readFile(rest[0])
+    if e2.code != 0 {
+        fmt.eprintln("head: {e2.msg}")
+        return e2
+    }
+    var lines = text.split("\n")
+    var i i64 = 0
+    for i < n && i < lines.len() {
+        fmt.println(lines[i])
+        i += 1
+    }
+    return nil
+}

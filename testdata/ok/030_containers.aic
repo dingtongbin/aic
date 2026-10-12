@@ -1,0 +1,30 @@
+import fmt
+import str
+
+// map / set 无字面量，唯一构造 = .new()；保插入序
+// map 键资格：str / 整型 / bool / enum / derive Hash 的 struct；f64 禁作键
+func main() {
+    var m map[str]i64 = map[str]i64.new()
+    m.put("b", 2)
+    m.put("a", 1)
+    m.put("c", 3)
+    fmt.println("{m.len()}")
+    var va Option[i64] = m.get("a")
+    match va {
+        Option.Some(v) => { fmt.println("{v}") },
+        Option.None => { fmt.println("missing") },
+    }
+    // keys() 保插入序
+    for k in m.keys() {
+        fmt.println(k)
+    }
+    var s set[str] = set[str].new()
+    s.put("y")
+    s.put("x")
+    s.put("y")
+    fmt.println("{s.len()}")
+    fmt.println("{s.contains("x")}")
+    for v in s.items() {
+        fmt.println(v)
+    }
+}

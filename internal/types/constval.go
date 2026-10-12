@@ -194,7 +194,7 @@ func staticSize(t Type) (int64, bool) {
 		}
 	case *Interface:
 		return 16, true // {data, vt}
-	case *Slice, *MapT, *SetT, *BytesT, *ChanT:
+	case *Slice, *MapT, *SetT, *ChanT:
 		return 8, true // 容器/通道句柄 = 指针
 	case *Enum:
 		if !v.HasData {
@@ -425,7 +425,7 @@ func foldInt(op string, a, b int64) (ConstVal, string) {
 	switch op {
 	case "+":
 		// 编译期算术**溢出 = 编译错**（§二.4/§九：可证必错 = 编译错；运行期才是 trap）。
-		// 此前直接 `a + b` ⇒ Go 的 int64 回绕被静默接受
+		// 直接 `a + b` 会让 Go 的 int64 回绕被静默接受
 		// （`const Y = 9223372036854775807 + 1` 编译通过并打印负数）。
 		if (b > 0 && a > math.MaxInt64-b) || (b < 0 && a < math.MinInt64-b) {
 			return ConstVal{}, "constant addition overflows i64"

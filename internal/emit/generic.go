@@ -1,7 +1,6 @@
 package emit
 
 import (
-	"fmt"
 	"sort"
 
 	"aic/internal/parse"
@@ -98,71 +97,6 @@ func (c *Ctx) emitFuncInsts(u *Unit) error {
 	return nil
 }
 
-// emitFuncInstBodies 发射实例的函数体（在全部普通函数体之后、入口之前）。
-func (c *Ctx) emitFuncInstBodies(u *Unit) error {
-	for _, e := range c.funcInsts {
-		if err := c.emitOneFuncInst(u, e); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// emitOneFuncInst 发射一个实例的函数体：签名代换 + 体在代换上下文里发射。
-func (c *Ctx) emitOneFuncInst(u *Unit, e funcInstEntry) error {
-	recv := ""
-	if e.sig != nil {
-		recv = e.sig.Recv
-	}
-	decl := findFuncDecl(u, e.pkg, e.fn, recv)
-	if decl == nil || decl.Body == nil {
-		return fmt.Errorf("emit: generic instance %s has no body to specialise", e.name)
-	}
-	inst := types.SubstSig(e.sig, paramMapOf(e.params, e.args))
-	fu := fileUnitOf(u, e.pkg, e.fn, recv)
-	if fu == nil {
-		return fmt.Errorf("emit: generic instance %s: declaring file not found", e.name)
-	}
-	c.use(fu)
-	return c.withSubst(e.params, e.args, func() error {
-		savedName, savedFn, savedRet, savedLoop := c.curFuncName, c.curFunc, c.retVar, c.loopDepth
-		savedDefers, savedSubst := c.deferCur, c.subst
-		c.curFuncName, c.curFunc, c.retVar, c.loopDepth = types.FuncKey(inst.Recv, inst.Name), inst, "", 0
-		c.subst = nil
-		st, err := c.collectDeferSites(inst, decl.Body)
-		if err != nil {
-			return err
-		}
-		c.deferCur = st
-		c.collectLambdas(decl.Body)
-		if err := c.emitLambdaDefs(); err != nil {
-			return err
-		}
-		if err := c.emitDeferTrampolines(st); err != nil {
-			return err
-		}
-		c.srcLine(decl.Pos)
-		c.line("static %s %s(%s) {", c.retCT(inst), e.name, c.paramList(inst))
-		if st.stack != "" {
-			c.line("    aic_defer_stack %s = AIC_DEFER_STACK_EMPTY;", st.stack)
-		}
-		if len(inst.Results) > 1 {
-			c.retVar = c.tmp("ret")
-			c.line("    %s %s;", c.retStructName(inst), c.retVar)
-			c.line("    memset(&%s, 0, sizeof(%s));", c.retVar, c.retVar)
-		}
-		if err := c.emitBody(decl.Body, inst.HasErrResult()); err != nil {
-			return err
-		}
-		c.emitDeferRun()
-		c.line("}")
-		c.line("")
-		c.curFuncName, c.curFunc, c.retVar, c.loopDepth = savedName, savedFn, savedRet, savedLoop
-		c.deferCur, c.subst = savedDefers, savedSubst
-		return nil
-	})
-}
-
 // paramMap 把实例实参表还原成类型形参映射（SubstSig 的输入形态）。
 // paramMapOf 按给定的形参名表建代换映射（泛型类方法的实例用**类的**形参名表）。
 func paramMapOf(params []string, args []types.Type) map[string]types.Type {
@@ -173,57 +107,6 @@ func paramMapOf(params []string, args []types.Type) map[string]types.Type {
 		}
 	}
 	return m
-}
-
-// findFuncDecl 在整程序里找某个包的自由函数声明（实例体发射的源码来源）。
-func findFuncDecl(u *Unit, pkg, name, recv string) *parse.FuncDecl {
-	for _, fu := range u.Files {
-		if fu.Info == nil || fu.Info.Pkg != pkg {
-			continue
-		}
-		for _, d := range fu.File.Decls {
-			if recv == "" {
-				if fd, ok := d.(*parse.FuncDecl); ok && fd.Name == name && fd.Recv == "" {
-					return fd
-				}
-				continue
-			}
-			// 泛型**类方法**实例：体在 ClassDecl 里（方法不得自带类型形参，§四）。
-			if cd, ok := d.(*parse.ClassDecl); ok && cd.Name == recv {
-				for _, m := range cd.Methods {
-					if m.Name == name {
-						return m
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// fileUnitOf 找某个包的文件单元（切换发射上下文用）。
-func fileUnitOf(u *Unit, pkg, name, recv string) *FileUnit {
-	for _, fu := range u.Files {
-		if fu.Info == nil || fu.Info.Pkg != pkg {
-			continue
-		}
-		for _, d := range fu.File.Decls {
-			if recv == "" {
-				if fd, ok := d.(*parse.FuncDecl); ok && fd.Name == name && fd.Recv == "" {
-					return fu
-				}
-				continue
-			}
-			if cd, ok := d.(*parse.ClassDecl); ok && cd.Name == recv {
-				for _, m := range cd.Methods {
-					if m.Name == name {
-						return fu
-					}
-				}
-			}
-		}
-	}
-	return nil
 }
 
 // genericHead 报告 `Name[...]` 是否是泛型实例化的头部（头部名字是带 [T] 的类）。

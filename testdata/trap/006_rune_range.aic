@@ -1,0 +1,7 @@
+import fmt
+
+// C24：rune 构造越界（> U+10FFFF）= trap
+func main() {
+    var r rune = rune(0x110000)
+    fmt.println(str.fromRune(r))
+}

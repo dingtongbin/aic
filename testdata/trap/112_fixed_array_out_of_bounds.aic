@@ -1,6 +1,0 @@
-import print
-
-func main() {
-    var a [i32; 2] = [1, 2]
-    print.println(a[7])
-}

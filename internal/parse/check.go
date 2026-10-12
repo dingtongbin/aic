@@ -3,11 +3,11 @@ package parse
 // match 模式与 check 位置规则（核心设计 §三/§六）。
 
 // parsePatterns reads the single pattern of a match arm. 模式一层、无通配符
-// (核心设计 §三)；`|` 或模式不在 v2 表面，遇到即定向报错（更严方向）。
+// (核心设计 §三)；或模式不存在，遇到即定向报错（更严方向）。
 func (p *Parser) parsePatterns() []MatchPattern {
 	pat := p.parsePattern()
 	if p.at(PUNCT, "|") {
-		p.errorHere(p.pos(), "`|` and or-patterns are not part of the v2 surface", "`|` after a pattern",
+		p.errorHere(p.pos(), "there are no or-patterns in AIC", "`|` after a pattern",
 			"give every pattern its own arm: A => ..., B => ... (exhaustiveness already requires one arm per variant)")
 		for p.at(PUNCT, "|") {
 			p.next()
@@ -71,9 +71,7 @@ func walkCheckCollect(e Expr, found *bool) {
 	switch v := e.(type) {
 	case *CheckExpr:
 		*found = true
-	case *OrExpr:
 		walkCheckCollect(v.X, found)
-		walkCheckCollect(v.Default, found)
 	case *CatchExpr:
 		walkCheckCollect(v.X, found)
 	case *AssertExpr:
@@ -168,9 +166,7 @@ func (p *Parser) validateBlankValues(e Expr, inTarget bool) {
 		}
 	case *CheckExpr:
 		p.validateBlankValues(v.X, false)
-	case *OrExpr:
 		p.validateBlankValues(v.X, false)
-		p.validateBlankValues(v.Default, false)
 	case *CatchExpr:
 		p.validateBlankValues(v.X, false)
 		if v.Block != nil {
@@ -214,9 +210,7 @@ func (p *Parser) walkCheck(e Expr, depth int, inLambda bool, declAt Pos) {
 				"check nested inside an expression", "bind the result first: var x = check f(), then use x in the expression; or use the postfix form f()?, which is position independent")
 		}
 		p.walkCheck(v.X, depth, inLambda, declAt)
-	case *OrExpr:
 		p.walkCheck(v.X, depth, inLambda, declAt)
-		p.walkCheck(v.Default, depth, inLambda, declAt)
 	case *CatchExpr:
 		p.walkCheck(v.X, depth, inLambda, declAt)
 		if v.Block != nil {

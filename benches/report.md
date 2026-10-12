@@ -1,15 +1,15 @@
 # AIC 基准与内存报告（ benches/report.md ）
 
-> 数据由 `scripts/bench_full.py`（时间）+ `scripts/bench_mem.py`（内存 + UBSan）
-> 实测产出，可复跑：`python -X utf8 scripts/bench_full.py` / `scripts/bench_mem.py`
+> 数据由基准计时脚本与内存 + UBSan 采样实测产出；脚本将按阶段 8 以 Go 重写，
+> 在那之前本文即数据的权威记录。
 > **方法论**：同算法、同输出（数值等价），AIC/C/Rust **严格交替** 9 次取样本；
 > C = 标准 C（gcc 16.2 `-std=c11 -O2`）= **1.00× 基线**；Rust = `rustc -O`。
 > min 是性能的稳健估计（噪声只会让时间变长）；mean/stdev 描述稳定性。
 >
-> **两条测量口径纪律（2026-10 发现并修正，此前报告数字虚高，是假差距）**：
-> 1. **AIC 侧必须与 C/Rust 同优化档**。CLI 原来没有透传 flag 的入口，`aic build`
+> **两条测量口径纪律（2026-10 发现并修正；修正前报告数字虚高，是假差距）**：
+> 1. **AIC 侧必须与 C/Rust 同优化档**。CLI 没有透传 flag 的入口时，`aic build`
 >    产的是 `-O0`，而 C 基线是 `-O2` —— 于是 B6-fib 账面 **3.20×**，同档后 **1.11×**。
->    现在 `AIC_CFLAGS="-O2"` 可传 flag；`bench_full.py` / `bench_mem.py` 已内置同档
+>    现在 `AIC_CFLAGS="-O2"` 可传 flag，基准侧已内置同档
 >    （门禁走自己的四配置，不经这条路径，H2/H3 判据不受影响）。
 > 2. **C 基线不许被编译器折叠掉**。B9-dispatch 的 C 基线里 `drive()` 被 gcc -O2
 >    经 IPA 常量传播 + 投机内联后**整个循环被消掉**（循环一次都不执行，基线只剩
@@ -58,20 +58,20 @@ Rust 在 B8-mapset 上仍快 2.62×（标准库哈希容器），其余 7 项 AI
 
 两侧爬坡与峰值**逐点重合**（371MB = 同一批 12M Node）；差异只在卸载之后：
 AIC 回落到 6.0MB，C 因 glibc 堆碎片只回到 35.4MB（**AIC 归还率高 5.9×**）。
-所以 `bench_mem.py` 里"B4 尾半 +19MB"是脚本把**构建期爬坡**当作了增长（短跑程的
+所以早先的内存采样里"B4 尾半 +19MB"是**采样切法**把构建期爬坡当作了增长（短跑程的
 首半/尾半切法失真），**不是高水位缓存、更不是泄漏**；真泄漏判据是 B5/B10 两个循环型
 bench 的尾半是否变平 —— 两者 +0.3/+0.5MB（C 分别 +1.4/+1.5MB，AIC 反而更平）。
 
 ## 三、分代区域（R19）与空转成本
 
-**R19 分代区域**：区域实例身份从"全局单调 id（2B/实例、永不回收）"换成
-**（槽号, 代龄）** —— 对象头不变（8B）：`reg = slot:12 | gen:20`。区域槽 =
-4096 个固定槽 + Treiber 无锁空闲链；push 取槽后 `gen++`，用一次 `u32` 存储
-换发整槽状态（守卫无锁读因此相干：一次加载同时看 gen/depth/dead）；pop 回滚
-bump 后把槽标 DEAD 归还。陈旧引用 = 头里 gen 与槽位 gen 不符 ⇒ 与旧形态
-`depth = 0` 同义 trap（`runtime/smoke/smoke_recycle.c` 是判别性锚点：内存未被
-覆写的旧一代对象必 trap，只看 depth 会放过）。容量 4096 × 2^20 ≈ **4.3G 实例**
-（旧上限 16M）；记账 = 32B ×（存活 + 已退役）⇒ B5 2M 轮只退役 2 个槽 = 64B。
+**R19 分代区域**：区域实例身份 = **（槽号, 代龄）**，对象头 8B：
+`reg = slot:12 | gen:20`。区域槽 = 4096 个固定槽 + Treiber 无锁空闲链；
+push 取槽后 `gen++`，用一次 `u32` 存储换发整槽状态（守卫无锁读因此相干：
+一次加载同时看 gen/depth/dead）；pop 回滚 bump 后把槽标 DEAD 归还。
+陈旧引用 = 头里 gen 与槽位 gen 不符 ⇒ trap（`runtime/smoke/smoke_recycle.c`
+是判别性锚点：内存未被覆写的上一代对象必 trap，只看 depth 会放过它）。
+容量 4096 × 2^20 ≈ **4.3G 实例**；记账 = 32B ×（存活 + 已失效）⇒ B5 2M 轮
+只失效 2 个槽 = 64B。
 region 空转：单对 push+pop 62.4ns → **28.1ns**（`runtime/smoke/smoke_threads.c`
 四线程 × 2 万轮压力锚点，stdout 逐位确定）。
 
@@ -95,7 +95,7 @@ stdout 逐位一致。**T2（chan/Mutex/sleep 协程化，阻塞点让出）与 
 
 ## 五、结论与优先级
 
-1. **性能已经不是缺口**：8 项全部与 C 同档（0.43×–1.19×）。曾经的"B6-fib 3.2× /
+1. **性能已经不是缺口**：8 项全部与 C 同档（0.43×–1.19×）。修正前账面的"B6-fib 3.2× /
    B9-dispatch 3.0× / B1-matmul 6.3×"三条记录**全部是测量口径错误**（§开篇两条纪律），
    正确修法是修 CLI 的 flag 透传 + 修 C 基线，**不是**在编译器里加内联/去虚拟化。
 2. **仍真实落后的三项**：B1-matmul 1.19×、B1-sieve 1.15×、B8-mapset 1.12×。
@@ -105,13 +105,13 @@ stdout 逐位一致。**T2（chan/Mutex/sleep 协程化，阻塞点让出）与 
 3. **内存已与 C 持平且归还更好**：三项峰值全 1.00×；B4 卸载后回落到基线的能力
    AIC 5.9× 优于 C；B5/B10 长跑零泄漏且比 C 更平。
 4. **真正的缺口在语义不在数字**：T2/T3（阻塞原语协程化 + M:N 工作窃取）未做；
-   E1–E4 文档脱节未修；`src/` 根目录残留 shell 脚本未迁 Go；ci.py 未接 GitHub CI
-   （win/mac/linux/安卓/iOS 五平台）。
+   E1–E4 文档脱节未修；`src/` 根目录残留 shell 脚本未迁 Go；CI 门禁未迁 Go、
+   未接 GitHub CI（win/mac/linux/安卓/iOS 五平台）。
 
 ## 六、复现与扩展
 
 - 新增 case：`benches/b<N>_<name>.aic` + `benches/c/` 同构 C 基线 +
-  `scripts/bench_full.py` 的 `CASES`/`RUST_SRC` 两张表注册；
+  基准脚本的 `CASES`/`RUST_SRC` 两张表注册；
   判据 = 输出数值等价（浮点 1e-6 相对误差）。
 - **基线必须防折叠**：C 基线的被测函数加 `__attribute__((noinline, noclone))`，
   且经 volatile 装载函数指针（否则 gcc -O2 会把循环消掉，测到的是启动时间）。

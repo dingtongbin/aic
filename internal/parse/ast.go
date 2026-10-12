@@ -1,12 +1,11 @@
 package parse
 
 // ---------------------------------------------------------------------------
-// AST for the v2 grammar (核心设计 §〇–§九: 23 关键字 + 5 注解).
+// AST for the grammar (核心设计 §〇–§九: 36 关键字, 无注解).
 // Parsing accepts the whole surface from day one; type checking opens at R2
 // (黄金执行规划 §七).
 //
-// v2 换基：v1 的 WhileStmt/HandleStmt/AwaitStmt/DelStmt/AssertStmt/LiveStmt/
-// TupleLit/MapLit 退役；新增 RegionStmt（区域块）、CompositeLit（C{f: v}）、
+// 语句/表达式节点：RegionStmt（区域块）、CompositeLit（C{f: v}）、
 // LambdaExpr（纯 lambda）、MatchExpr（match 表达式形）、Index 的 i..j 视图形。
 // ---------------------------------------------------------------------------
 
@@ -146,14 +145,6 @@ type (
 		Postfix bool
 		Pos
 	}
-	// OrExpr is `expr or <默认值>` (E2 降级, 核心设计 §15.7): 末位 Err 非 nil
-	// 时取默认值并继续, 不中断控制流。
-	OrExpr struct {
-		Ann
-		X       Expr
-		Default Expr
-		Pos
-	}
 	// CatchExpr is `expr catch e { … }` (E3 就地处理): 末位 Err 非 nil 时把该
 	// Err 绑定到 e 并执行块。块要么**总是退出**（return 等），要么以一条表达式
 	// 语句结尾 —— 那条表达式的值就是整个 catch 表达式的值（负载类型）。
@@ -241,9 +232,9 @@ func (*Assign) exprNode()       {}
 func (*MultiAssign) exprNode()  {}
 func (*Call) exprNode()         {}
 func (*Index) exprNode()        {}
+func (*TypeExprNode) exprNode() {}
 func (*Field) exprNode()        {}
 func (*CheckExpr) exprNode()    {}
-func (*OrExpr) exprNode()       {}
 func (*CatchExpr) exprNode()    {}
 func (*AssertExpr) exprNode()   {}
 func (*ArrayLit) exprNode()     {}
@@ -361,6 +352,9 @@ type (
 	// 文法形态详见开放点 O1。
 	SpawnStmt struct {
 		Call Expr
+		// Into 非空 = `spawn f(args) into ch`：任务返回值包装成 Result[T] 送进 ch。
+		// ch 的类型由检查器约束为 chan[Result[T]]（C34，《AIC 语言规范》§9.1）。
+		Into Expr
 		Pos
 	}
 	// ScopeStmt is `scope { }`: 退出 join 全部任务; IsTimeout = `scope.timeout(ms) { }`
@@ -465,7 +459,6 @@ type (
 		Export      bool
 		Extern      bool
 		IsInit      bool
-		Annotations []string
 		Pos
 	}
 	// TypeParamConstraint 是 `T: Ord` / `T: Hash + Eq` / `T: Shape` / `T: value`。
@@ -490,11 +483,35 @@ type (
 		Constraints []TypeParamConstraint
 		Fields      []*FieldDecl
 		Methods     []*FuncDecl
-		// Uses 是显式委托（N10，核心设计 §16）：`use b B` 把 B 的方法提升到本类
-		// （调用点 a.m() 转发到 a.b.m()）。字段仍在 A 内声明（局部性不破）；
-		// 同名方法冲突时必须在本类显式实现。
-		Uses        []UseDecl
-		Annotations []string
+		// Uses 是显式委托（《AIC 语言规范》S-7）：`use b Sink` 把**接口**方法
+		// 提升到本类（调用点 a.m() 转发到 a.b.m()）。字段仍在本类声明（局部性
+		// 不破）；同名方法冲突时必须在本类显式实现。委托目标必须是接口类型。
+		Uses []UseDecl
+		// Implements 是接口满足子句（《AIC 语言规范》C10）：`class C implements I, J`。
+		// v7 起这是接口满足的**唯一途径**——结构式满足退场，使"谁实现了这个
+		// 接口"可 grep。
+		// Implements 是接口满足子句（《AIC 语言规范》C10）：`implements I, J`。
+		// 存 TypeExpr：泛型接口实例 `implements Iterator[i64]` 必须可表达。
+		Implements  []TypeExpr
+		// Derives 是声明修饰词 `derive A, B` 的能力封闭集。
+		Derives   []string
+		Pos
+	}
+	// ExternFromDecl 是 `extern from "header.h"`（《AIC 语言规范》§11.2）：
+	// 把 C 头文件声明映射为本包的 extern 声明。Header 是头文件名（可含路径），
+	// Only 非空时只引入清单内的名字。
+	ExternFromDecl struct {
+		Header string
+		Only   []string
+		Pos
+	}
+	// TypeExprNode 是表达式位的**类型构造子**（`map[K]V` / `set[T]`）：
+	// 值类型 V 在 `]` 之外，普通 Index 表达不了，故设专用节点。
+	// 只应作为 `.new()` 的接收者出现（检查器拒绝其它用法）。
+	TypeExprNode struct {
+		Name string
+		Key  TypeExpr
+		Val  TypeExpr
 		Pos
 	}
 	// UseDecl 是一条 `use <字段> <类型>`。
@@ -503,15 +520,14 @@ type (
 		Type  TypeExpr
 		Pos
 	}
-	// InterfaceDecl: 结构化满足，无 implements 关键字.
+	// InterfaceDecl: 接口只含签名 + include 并集；满足途径是类的 implements 子句.
 	InterfaceDecl struct {
 		Name    string
 		Methods []*FuncDecl // signature-only (Body == nil)
 		// Embeds 是嵌入的接口（N9，核心设计 §16）：接口**并集**（槽位 = 嵌入接口
 		// 槽位 + 自身方法，按声明序）。AfterMethod = 它前面已有几个方法，用于
 		// 还原声明序（不是继承：无覆盖、无层次、无默认实现）。
-		Embeds      []IfaceEmbed
-		Annotations []string
+		Embeds []IfaceEmbed
 		Pos
 	}
 	// IfaceEmbed 是一条嵌入项：本包名 `Reader` 或跨包 `io.Reader`。
@@ -527,9 +543,11 @@ type (
 		Pos
 	}
 	EnumDecl struct {
-		Name        string
-		Variants    []*EnumVariant
-		Annotations []string
+		Name     string
+		Variants []*EnumVariant
+		// ErrCode = true 表示 `enum X: ErrCode { … }`：错误码约束枚举。
+		// 码由编译器按（模块路径哈希, 变体序号）分配，裸整数码 = 编译错误（E-8）。
+		ErrCode bool
 		Pos
 	}
 )
@@ -542,6 +560,7 @@ func (*InterfaceDecl) declNode() {}
 func (*EnumDecl) declNode()      {}
 func (*ComptimeBlock) declNode()  {}
 func (*ComptimeAssert) declNode() {}
+func (*ExternFromDecl) declNode() {}
 
 // File is a parsed translation unit.
 type File struct {

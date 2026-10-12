@@ -1,0 +1,7 @@
+import fmt
+
+// S-32：整型算术溢出 = 确定性 trap；回绕显式走 wrappingAdd
+func main() {
+    var m i64 = 9223372036854775807
+    fmt.println(str.fromI64(m + 1))
+}

@@ -1,0 +1,6 @@
+testdata/err/005_bytes_type.aic:4:11: error: unknown type name
+    bytes
+    fix: a type must be declared in this file or come from an imported package; write generics as Box[T]
+testdata/err/005_bytes_type.aic:4:19: error: a list literal takes no part in type inference
+    [] / [a, b]
+    fix: write the element type in the declaration: var xs i32[] = [] (core design §2.2)

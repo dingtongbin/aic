@@ -35,10 +35,10 @@ func (p *Parser) parseComptimeBlock() Decl {
 		}
 		switch {
 		case p.at(KW, "const"):
-			if d := p.parseConst(nil); d != nil {
+			if d := p.parseConst(); d != nil {
 				blk.Body = append(blk.Body, d)
 			}
-		case p.atIdent("assert"):
+		case p.at(KW, "assert"):
 			a := &ComptimeAssert{Pos: p.pos()}
 			p.next() // assert
 			a.Cond = p.parseExpr()

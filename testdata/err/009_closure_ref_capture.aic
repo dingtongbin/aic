@@ -1,0 +1,9 @@
+import fmt
+
+class Node { var v i32 }
+
+func main() {
+    var n Node = Node{v: 1}
+    // 捕获引用类型 = 编译错误（C11）
+    var f = func() -> i32 { return n.v }
+}

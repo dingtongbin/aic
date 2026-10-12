@@ -140,6 +140,16 @@ func InstLoc(in Inst) Loc {
 		return v.Loc
 	case *SelWait:
 		return v.Loc
+	case *Spawn:
+		return v.Loc
+	case *SelectInst:
+		return v.Loc
+	case *ForInInst:
+		return v.Loc
+	case *PropagateInst:
+		return v.Loc
+	case *ScopeInst:
+		return v.Loc
 	}
 	return Loc{}
 }
@@ -223,6 +233,26 @@ func printInst(in Inst) string {
 			out += " deadline " + v.Deadline
 		}
 		return out
+	case *ForInInst:
+		names := make([]string, 0, len(v.Names))
+		for i, n := range v.Names {
+			ty := ""
+			if i < len(v.NameTys) {
+				ty = " : " + v.NameTys[i]
+			}
+			names = append(names, n+ty)
+		}
+		return fmt.Sprintf("forin %s in %s : %s -> %s",
+			strings.Join(names, ", "), v.Subject, v.SubjTy, v.Body)
+	case *SelectInst:
+		return fmt.Sprintf("select arms=%d -> %s", len(v.Arms), v.After)
+	case *PropagateInst:
+		return fmt.Sprintf("propagate %s mode=%s -> %s (mt: %s)", v.Operand, v.Mode, v.After, strings.Join(v.Mt, ", "))
+	case *ScopeInst:
+		if v.IsTimeo {
+			return fmt.Sprintf("scope.timeout %s -> %s -> %s", v.Timeout, v.Body, v.After)
+		}
+		return fmt.Sprintf("scope -> %s -> %s", v.Body, v.After)
 	}
 	return fmt.Sprintf("<unknown inst %T>", in)
 }
@@ -284,8 +314,48 @@ func printRHS(r RHS) string {
 		return "var " + v.Name
 	case *Nil:
 		return "nil : " + v.Ty
+	case *MatchExprRHS:
+		out := "match " + v.Subject + " : " + v.SubjTy + " slot " + v.Slot + " : " + v.SlotTy + " -> " + v.After + " { "
+		for i := range v.Arms {
+			if i > 0 {
+				out += "; "
+			}
+			out += printMatchArm(v.Arms[i])
+		}
+		return out + " }"
+	case *CheckRHS:
+		return fmt.Sprintf("check %s -> %s -> %s (mt: %s)", v.Operand, v.Payload, v.After, strings.Join(v.Mt, ", "))
+	case *CatchRHS:
+		if v.Bind != "" {
+			return fmt.Sprintf("catch %s as %s -> %s -> %s (mt: %s)", v.Operand, v.Bind, v.Body, v.After, strings.Join(v.Mt, ", "))
+		}
+		return fmt.Sprintf("catch %s -> %s -> %s (mt: %s)", v.Operand, v.Body, v.After, strings.Join(v.Mt, ", "))
+	case *InterpRHS:
+		return fmt.Sprintf("interp parts=%d vals=%d", len(v.Parts), len(v.Values))
+	case *AssertRHS:
+		if v.Payload != "" {
+			return fmt.Sprintf("assert %s -> %s (mt: %s)", v.Operand, v.Payload, strings.Join(v.Mt, ", "))
+		}
+		return fmt.Sprintf("assert %s (mt: %s)", v.Operand, strings.Join(v.Mt, ", "))
 	}
 	return fmt.Sprintf("<unknown rhs %T>", r)
+}
+
+// printMatchArm 是 match 臂的文本投影（IR-1）：`Pat1 | Pat2 => body`。
+func printMatchArm(a MatchArm) string {
+	pats := make([]string, 0, len(a.Patterns))
+	for _, p := range a.Patterns {
+		s := p.Variant
+		if p.Binding != "" && p.Binding != "_" {
+			s += "(" + p.Binding
+			if p.BindTy != "" {
+				s += " : " + p.BindTy
+			}
+			s += ")"
+		}
+		pats = append(pats, s)
+	}
+	return strings.Join(pats, " | ") + " => " + a.Body
 }
 
 func printTerm(t Term) string {
@@ -300,6 +370,16 @@ func printTerm(t Term) string {
 		return fmt.Sprintf("checkfail %s, %s", v.Err, v.Tmp)
 	case *Ret:
 		return "ret " + strings.Join(v.Vals, ", ")
+	case *MatchTerm:
+		out := "match " + v.Subject + " : " + v.SubjTy + " { "
+		for i := range v.Arms {
+			a := v.Arms[i]
+			out += printMatchArm(a)
+			if i+1 < len(v.Arms) {
+				out += "; "
+			}
+		}
+		return out + " }"
 	}
 	return fmt.Sprintf("<unknown term %T>", t)
 }
@@ -320,35 +400,12 @@ func printPlace(p Place) string {
 
 // --- 位置访问（verifier 的 V7.1 覆盖检查与 printer 共用） ---------------------
 
-func inLoc(in Inst) Loc {
-	switch v := in.(type) {
-	case *Let:
-		return v.Loc
-	case *Var:
-		return v.Loc
-	case *Store:
-		return v.Loc
-	case *RegionEnter:
-		return v.Loc
-	case *RegionExit:
-		return v.Loc
-	case *DeferReg:
-		return v.Loc
-	case *DeferInit:
-		return v.Loc
-	case *DeferRun:
-		return v.Loc
-	case *TrapIfErr:
-		return v.Loc
-	case *Trap:
-		return v.Loc
-	case *SelWait:
-		return v.Loc
-	case *Spawn:
-		return v.Loc
-	}
-	return Loc{}
-}
+// inLoc 取一条指令的位置（verifier 的诊断锚点）。
+//
+// 这是 **InstLoc 的转发**，不是第二份 switch —— 各自维护两份时，加新节点
+// 时改一份漏一份的表现是"新节点的指令报 without loc"（本次 IR-1 原语落地时
+// 实测：verify 报 V7.1，根因就是这里漏登记）。单一来源见 InstLoc。
+func inLoc(in Inst) Loc { return InstLoc(in) }
 
 func termLoc(t Term) Loc {
 	switch v := t.(type) {
@@ -361,6 +418,10 @@ func termLoc(t Term) Loc {
 	case *CheckFail:
 		return v.Loc
 	case *Ret:
+		return v.Loc
+	case *MatchTerm:
+		// IR-1 原语终结符（§13.1）：也带 Loc，否则 verify 的 V7.1 会误报
+		// "terminator without loc" —— 实测正是这样。
 		return v.Loc
 	}
 	return Loc{}

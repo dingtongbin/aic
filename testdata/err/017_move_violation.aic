@@ -1,0 +1,13 @@
+import fmt
+
+// C11：class 引用禁入 spawn 实参（R-Move），错误列违规字段
+class Shared { var n i32 }
+
+func work(s Shared) -> i64 { return s.n }
+
+func main() {
+    var s Shared = Shared{n: 1}
+    scope {
+        spawn work(s)
+    }
+}

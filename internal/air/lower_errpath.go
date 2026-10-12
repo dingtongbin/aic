@@ -53,71 +53,6 @@ func (l *lowerer) errCodeIsSet(errVal string, at parse.Pos) string {
 	return bad
 }
 
-// orExpr：E2 降级 `expr or <默认值>`。
-func (l *lowerer) orExpr(v *parse.OrExpr) (string, error) {
-	_, payload, errVal, mt, err := l.errSplit(v.X, v.Pos)
-	if err != nil {
-		return "", err
-	}
-	slot := l.tmp("or")
-	l.cur.Insts = append(l.cur.Insts, &Var{Name: slot, Ty: l.ty(mt[0]), Loc: LocOf(v.Pos)})
-	bad := l.errCodeIsSet(errVal, v.Pos)
-
-	fb := l.newBlock("orfallback", v.Pos)
-	okB := l.newBlock("orok", v.Pos)
-	join := l.newBlock("orjoin", v.Pos)
-	l.cur.Term = &Cbr{Cond: bad, Then: fb.Label, Else: okB.Label, Loc: LocOf(v.Pos)}
-
-	l.cur = fb
-	d, err := l.value(v.Default)
-	if err != nil {
-		return "", err
-	}
-	l.cur.Insts = append(l.cur.Insts, &Store{Place: &VarPlace{Name: slot}, Val: d, Loc: LocOf(v.Pos)})
-	l.cur.Term = &Br{Label: join.Label, Loc: LocOf(v.Pos)}
-
-	l.cur = okB
-	l.cur.Insts = append(l.cur.Insts, &Store{Place: &VarPlace{Name: slot}, Val: payload, Loc: LocOf(v.Pos)})
-	l.cur.Term = &Br{Label: join.Label, Loc: LocOf(v.Pos)}
-
-	l.cur = join
-	return slot, nil
-}
-
-// catchExpr：E3 就地处理 `expr catch e { … }`。
-func (l *lowerer) catchExpr(v *parse.CatchExpr) (string, error) {
-	_, payload, errVal, mt, err := l.errSplit(v.X, v.Pos)
-	if err != nil {
-		return "", err
-	}
-	slot := l.tmp("catch")
-	l.cur.Insts = append(l.cur.Insts, &Var{Name: slot, Ty: l.ty(mt[0]), Loc: LocOf(v.Pos)})
-	bad := l.errCodeIsSet(errVal, v.Pos)
-
-	catchB := l.newBlock("catch", v.Pos)
-	okB := l.newBlock("catchok", v.Pos)
-	join := l.newBlock("catchjoin", v.Pos)
-	l.cur.Term = &Cbr{Cond: bad, Then: catchB.Label, Else: okB.Label, Loc: LocOf(v.Pos)}
-
-	l.cur = catchB
-	// 绑定：块内 e = 该 Err（检查器已在块作用域里声明 e: Err）。
-	l.cur.Insts = append(l.cur.Insts, &Var{Name: v.Name, Ty: l.ty(mt[len(mt)-1]), Init: errVal, Loc: LocOf(v.Pos)})
-	exits := types.BlockAlwaysExits(v.Block)
-	if err := l.catchBody(v.Block, slot, exits); err != nil {
-		return "", err
-	}
-	if l.cur.Term == nil {
-		l.cur.Term = &Br{Label: join.Label, Loc: LocOf(v.Pos)}
-	}
-
-	l.cur = okB
-	l.cur.Insts = append(l.cur.Insts, &Store{Place: &VarPlace{Name: slot}, Val: payload, Loc: LocOf(v.Pos)})
-	l.cur.Term = &Br{Label: join.Label, Loc: LocOf(v.Pos)}
-
-	l.cur = join
-	return slot, nil
-}
-
 // catchBody 发射 catch 块：有值形态（末条是表达式语句）把该表达式的值存进结果槽，
 // 必退出形态（结尾是 return 等）整块照发、不写槽。判定与检查器同源
 // （types.BlockAlwaysExits），禁第二份。
@@ -129,29 +64,22 @@ func (l *lowerer) catchBody(b *parse.Block, slot string, exits bool) error {
 		return l.block(b)
 	}
 	last := b.Stmts[len(b.Stmts)-1]
-	es, isExpr := last.(*parse.ExprStmt)
-	if !isExpr {
-		return l.block(b)
-	}
-	for _, s := range b.Stmts[:len(b.Stmts)-1] {
-		if err := l.stmt(s); err != nil {
-			return err
+	if es, isExprStmt := last.(*parse.ExprStmt); isExprStmt {
+		if _, isAssign := es.X.(*parse.Assign); !isAssign {
+			// 末条是表达式：先发前 n-1 条，再把末条的值存进槽。
+			for i := 0; i+1 < len(b.Stmts); i++ {
+				if err := l.stmt(b.Stmts[i]); err != nil {
+					return err
+				}
+			}
+			val, err := l.value(es.X)
+			if err != nil {
+				return err
+			}
+			l.cur.Insts = append(l.cur.Insts, &Store{
+				Place: &VarPlace{Name: slot}, Val: val, Loc: LocOf(es.Pos)})
+			return nil
 		}
 	}
-	val, err := l.value(es.X)
-	if err != nil {
-		return err
-	}
-	l.cur.Insts = append(l.cur.Insts, &Store{Place: &VarPlace{Name: slot}, Val: val, Loc: LocOf(es.Pos)})
-	return nil
-}
-
-// assertExpr：E4 断言 `expr!` —— 出错即 trap，值 = 负载。
-func (l *lowerer) assertExpr(v *parse.AssertExpr) (string, error) {
-	_, payload, errVal, _, err := l.errSplit(v.X, v.Pos)
-	if err != nil {
-		return "", err
-	}
-	l.cur.Insts = append(l.cur.Insts, &TrapIfErr{Err: errVal, Line: v.Pos.Line, Loc: LocOf(v.Pos)})
-	return payload, nil
+	return l.block(b)
 }

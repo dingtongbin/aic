@@ -1,0 +1,31 @@
+import fmt
+import str
+
+enum Shape { Circle(f64), Square(f64), Empty }
+
+// match：穷尽 + 无通配 + 同变体不重复；空臂合法（显式不作为）
+// match 也是表达式
+func area(s Shape) -> f64 {
+    return match s {
+        Shape.Circle(r) => 3.14 * r * r,
+        Shape.Square(a) => a * a,
+        Shape.Empty => 0.0,
+    }
+}
+
+func main() {
+    fmt.println("{area(Shape.Circle(2.0))}")
+    fmt.println("{area(Shape.Square(3.0))}")
+    fmt.println("{area(Shape.Empty)}")
+    // Option 匹配并绑定载荷
+    var o Option[i64] = Option.Some(42)
+    match o {
+        Option.Some(v) => { fmt.println("{v}") },
+        Option.None => { fmt.println("none") },
+    }
+    // 空臂：显式选择不作为
+    match o {
+        Option.Some(v) => { fmt.println("has") },
+        Option.None => { },
+    }
+}

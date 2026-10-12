@@ -1,0 +1,36 @@
+import fmt
+import str
+
+// include = 接口并集；同名同签名合一槽，同名不同签名 = 编译错误
+interface Reader {
+    func read(n i64) -> (u8[], Err)
+}
+
+interface Closer {
+    func close()
+}
+
+interface ReadCloser include Reader, Closer {
+    func size() -> i64
+}
+
+class MemFile implements ReadCloser {
+    var buf u8[]
+    var n i64
+
+    func read(k i64) -> (u8[], Err) {
+        return this.buf.slice(0, k), nil
+    }
+    func close() { this.n = 0 }
+    func size() -> i64 { return this.n }
+}
+
+func main() {
+    var f MemFile = MemFile{buf: [1, 2, 3], n: 3}
+    fmt.println("{f.size()}")
+    var rc ReadCloser = f
+    var b, e = rc.read(2)
+    if e.code != 0 { return }
+    fmt.println("{b.len()}")
+    rc.close()
+}

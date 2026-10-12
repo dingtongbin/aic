@@ -57,7 +57,7 @@ func isContainerTy(t Type) bool {
 	case *Slice, *MapT, *SetT, *ChanT:
 		return true
 	}
-	return IsBytes(t)
+	return false
 }
 
 // RuntimeMapKeySuffix：map[K]V 的键后缀 = runtime/aic_l1_map.h 实例表的**精确互射**
@@ -90,6 +90,15 @@ func RuntimeMapValueSuffix(t Type) (string, bool) {
 		return "", false
 	}
 	if cl, ok := t.(*Class); ok && !cl.Packed {
+		return "Box", true
+	}
+	// 泛型枚举实例（Option[T] / Result[T] / Value）作 map 值：走 Box 句柄槽。
+	// 判据：Value 动态值枚举的 Obj(map[str]Value) 需要它；否则"动态值"这类
+	// 最基本的数据形态写不出来（场景验证 §3）。
+	if _, ok := t.(*Instance); ok {
+		return "Box", true
+	}
+	if en, ok := t.(*Enum); ok && en.HasData {
 		return "Box", true
 	}
 	// 接口值槽：两机器字结构，专用实例（与列表的 iface 实例同款）。

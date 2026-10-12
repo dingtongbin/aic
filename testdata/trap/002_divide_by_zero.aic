@@ -1,0 +1,7 @@
+import fmt
+
+func main() {
+    var a i64 = 1
+    var b i64 = 0
+    fmt.println(str.fromI64(a / b))
+}

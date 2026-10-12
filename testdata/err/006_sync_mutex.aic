@@ -1,0 +1,6 @@
+import fmt
+
+class Counter {
+    var n i32
+    var m sync.Mutex
+}

@@ -1,3 +1,0 @@
-testdata/err/256_this_outside_method.aic:2:12: error: this may only appear inside a method body
-    this
-    fix: a method is a func inside a class body; a free function has no this (core design §4)

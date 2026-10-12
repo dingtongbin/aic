@@ -83,8 +83,8 @@
         if (s == NULL || s->cap == 0) return; \
         aic_usize hit = aic_set_find_##short(s, v); \
         if (hit == (aic_usize)-1) return; \
-        /* 墓碑 + order 末位交换（零分配）。曾经 remove 每次分配 3 个满容量新数组， \
-         * 区域分配器不归还旧的 ⇒ 大规模删除内存失控（与 map.remove 同病）。 \
+        /* 墓碑 + order 末位交换（零分配）。remove 若每次分配 3 个满容量新数组、 \
+         * 区域分配器又不归还旧的 ⇒ 大规模删除内存失控（与 map.remove 同病）。 \
          * ordpos 反向索引（槽 → order 位置）让删除是 O(1)。 */ \
         s->used[hit] = 2; s->holes++; \
         aic_usize p = s->ordpos[hit]; \

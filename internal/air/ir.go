@@ -168,8 +168,8 @@ type DeferReg struct {
 // §三"N8 实参注册点求值"，锚点 ok/757）。方法形态 = 普通函数 + 接收者当首实参
 // （与直调同一条 mangling，后端不必再认识"方法"）。
 // Limits 与 Vals 逐位对齐（空 = 该实参无守卫）：GuardDefer 的注册点界检查
-// （§五 R5：defer 实参的界 ≤ 函数入口；781 锚点 —— 此前检查器标了守卫但降级侧
-// 没有载体，守卫从未发出，defer 在退出时读已弹出的区域）。
+// （§五 R5：defer 实参的界 ≤ 函数入口；781 锚点 —— 检查器标了守卫时降级侧
+// 必须有载体，否则守卫从未发出，defer 在退出时读已弹出的区域）。
 type DeferInit struct {
 	ID       int
 	Callee   string
@@ -242,6 +242,20 @@ type Call struct {
 	Sym      string
 	TypeArgs []string
 	Args     []string
+	// ArgGuard 非空 = 这次调用的某个实参本身是**存储点**（§五 R3 存储点 ③：
+	// 容器 append/insert/put/add 的末位实参）。检查器把 GuardSpec 打在实参节点
+	// 上（types/call.go），降级时必须随调用带到 IR —— 漏了这一路，跨区存入容器
+	// 的守卫就静默消失，而 §五 R5 要求「可证的拒绝、不可证的守」。
+	ArgGuard *CallGuard
+}
+
+// CallGuard 是「实参即存储点」的守卫修饰符。Limit 用受限文法，同 Store.Limit
+// （表达式的唯一生成处是后端，红线 10 —— 这里只带"界是什么"，不带 C 文本）。
+type CallGuard struct {
+	// Arg 是被守实参的下标（容器方法恒为末位的值实参）。
+	Arg int
+	// Limit 是该存储点的深度界：fnentry｜depth｜depth-N｜host。
+	Limit string
 }
 
 // CallInd 是 `call.ind <val>.<slot>(<val>,…)`：接口方法按 vt 槽位分发。

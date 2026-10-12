@@ -456,8 +456,18 @@ func (l *lowerer) finish(f *Func, at parse.Pos) {
 	f.Blocks = append(f.Blocks, exit)
 }
 
-// pruneUnreachable 剪掉从入口不可达的块（V2.3）。
-func (l *lowerer) pruneUnreachable(f *Func) {
+// pruneUnreachable 剪掉从入口不可达的块（V2.3）。lowering 收尾时调用。
+func (l *lowerer) pruneUnreachable(f *Func) { PruneUnreachable(f) }
+
+// PruneUnreachable 剪掉从入口不可达的块（V2.3）。
+//
+// **要跑两次**（§13.1 管线的必然要求，不是补丁）：
+//  1. lowering 收尾：此时 IR-1 原语的分发 Switch 还不存在，只能按
+//     PrimTargets（After ∪ 各臂体）保守地认为臂块可达 —— 否则臂体全被剪掉；
+//  2. desugar 之后：Switch 已建出来，臂体是否真的能汇到 After 才算得清。
+//     所有臂都 `return` 的 match（如 `area`），其 After 在 CFG 里真的不可达，
+//     留着就是空块，CIR 实测报 "block mafter1 was never emitted"。
+func PruneUnreachable(f *Func) {
 	if len(f.Blocks) == 0 {
 		return
 	}
@@ -475,6 +485,12 @@ func (l *lowerer) pruneUnreachable(f *Func) {
 		b := byLabel[label]
 		if b == nil {
 			return
+		}
+		// IR-1 原语块（§13.1 不变式）：后继 = After ∪ 各臂体块。
+		// 只走 After 会把臂块判成不可达剪掉（desugar 的 Switch 那时还不存在），
+		// 只走 Term 会把"原语之后的代码"剪掉。两者都实测过。
+		for _, tgt := range PrimTargets(b) {
+			walk(tgt)
 		}
 		for _, tgt := range termTargets(b.Term) {
 			walk(tgt)
@@ -535,6 +551,12 @@ func (l *lowerer) stmt(s parse.Stmt) error {
 			return l.assign(x)
 		case *parse.MultiAssign:
 			return l.multiAssign(x)
+		}
+		// **语句位自动传播**（§5.6）：裸的 fallible 调用独成一句 = 失败即上抛。
+		// 旧行为是 `l.value(v.X)` 后把 Err **静默丢弃** —— 错误消失、程序继续
+		// 跑在坏状态上（类型检查器要求消费它，AIR 却把它扔掉）。
+		if isFallibleCall(l, v.X) {
+			return l.emitPropagate(v.X, "stmt")
 		}
 		_, err := l.value(v.X)
 		return err
@@ -654,6 +676,16 @@ func (l *lowerer) assign(v *parse.Assign) error {
 // ret：先算出返回值临时量，再 br 到唯一收尾块（V4.4）。
 func (l *lowerer) ret(v *parse.ReturnStmt) error {
 	for i, r := range v.Results {
+		// **return 位自动传播**（§5.6）：`return f()` 里 f() 是 fallible 调用时
+		// 失败即上抛，不需要显式 check。旧行为同样把 Err 丢掉。
+		if _, isCall := r.(*parse.Call); isCall {
+			if isFallibleCall(l, r) {
+				if err := l.emitPropagate(r, "arg"); err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		val, err := l.value(r)
 		if err != nil {
 			return err
@@ -860,7 +892,7 @@ func (l *lowerer) deferStmt(v *parse.DeferStmt, onErr bool) error {
 
 // guardLimitOf 取一个表达式上的存储点守卫的 IR limit 文本（没有守卫 = 空串）。
 // defer/errdefer 实参的界 ≤ 函数入口（§五 R5），检查器把 GuardDefer 标在实参
-// 节点上；此前降级侧从不查它 ⇒ 守卫从未发出（781：defer 退出时读已弹出的区域）。
+// 节点上；降级侧必须查它，否则守卫从未发出（781：defer 退出时读已弹出的区域）。
 func (l *lowerer) guardLimitOf(e parse.Expr) string {
 	if g, ok := l.info.HasGuard(e); ok {
 		return l.limitOf(g, e)
@@ -914,14 +946,11 @@ func (l *lowerer) methodRecv(x parse.Expr) bool {
 	if _, isCh := rt.(*types.ChanT); isCh {
 		return true
 	}
-	if _, isMu := rt.(*types.MutexT); isMu {
-		return true
-	}
 	if _, isBasic := rt.(*types.Basic); isBasic {
 		return true
 	}
 	return types.IsSlice(rt) || types.IsMap(rt) || types.IsSet(rt) || types.IsArray(rt) ||
-		types.IsStrType(rt) || types.IsBytes(rt)
+		types.IsStrType(rt)
 }
 
 // --- 辅助 ---------------------------------------------------------------------
@@ -977,7 +1006,7 @@ func (l *lowerer) placeType(e parse.Expr) string {
 //	host      界 = 宿主对象所在区域的深度（形参派生：只能运行期读）
 //
 // 为什么不是"C 表达式"：limit 的最终形态取决于宿主对象与区域深度运算，只有后端
-// 知道（红线 10：表达式的唯一生成处是后端）。此前 air 直接发 `decl(X)` 或裸数字，
+// 知道（红线 10：表达式的唯一生成处是后端）。air 若直接发 `decl(X)` 或裸数字，
 // Delta/Dynamic 两个决定性的位在降级时被丢掉 —— 后端无法复原，只能猜，于是守卫
 // 要么发错界、要么整条丢掉（实测：`func sink(h Holder, t Buf) { h.b = t }` 会静默悬垂）。
 func (l *lowerer) limitOf(g types.GuardSpec, e parse.Expr) string {

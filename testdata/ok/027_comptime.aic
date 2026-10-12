@@ -1,0 +1,25 @@
+import fmt
+import str
+
+// comptime：const 折叠 + 静态断言 + 内省原语
+// 运行期零元数据——这不是反射
+struct Point { var x i32    var y i32 }
+
+comptime {
+    const PageSize = 4096
+    assert PageSize > 0
+    // 把 ABI 布局钉进源码：结构体被无意改形会立刻炸
+    assert fieldsOf(Point).len == 2
+    assert fieldsOf(Point)[0].name == "x"
+    assert fieldsOf(Point)[0].ty == "i32"
+    assert isValueType(Point)
+}
+
+const NAME str = typeName(Point)
+const NFLD i64 = fieldsOf(Point).len
+
+func main() {
+    fmt.println(NAME)
+    fmt.println("{NFLD}")
+    fmt.println("{sizeOf(i64)}")
+}

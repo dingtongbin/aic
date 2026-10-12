@@ -81,19 +81,20 @@ typedef struct { aic_u32 reg; aic_u32 line; } aic_hdr;
 #endif
 
 /* --- 区域实例：**（槽位, 代龄）**身份（R19）-----------------------------------
- * 旧形态：全局单调 id、永不复用（F7：复用会让陈旧引用误判为活）⇒ 含 region 的循环
- * 每轮消耗一个表项，**记账 32B × 总实例数**（B5 实测 2M 轮 = 65MB vs C 的 4MB）。
+ * 表项身份必须**复用**：每个实例若消耗一个永不回收的表项，记账就是
+ * 32B × 总实例数（B5 实测 2M 轮 = 65MB vs C 的 4MB），含 region 的循环每轮
+ * 都在涨。复用引入的陈旧引用风险由 gen 承担 —— 见下。
  *
- * 新形态：实例身份 = (slot, gen)。对象头 aic_hdr **不变**（仍是 8B）：
+ * 实例身份 = (slot, gen)。对象头 aic_hdr 是 8B：
  *     reg = (slot << 20) | gen          slot ∈ [0, 4096)   gen ∈ [0, 2^20)
  * push 从空闲链取 (slot, gen)，**一次 u32 存储**换发整槽状态（守卫热路径因此
  * 相干：一次加载同时看到 gen/depth/dead，无锁读无交错）；pop 把槽标 DEAD 后归还
  * 空闲链，gen 随下一次 push 自增。陈旧引用 = 头里的 gen 与槽内 gen 不符，或
- * 深度为 DEAD —— 与旧形态 depth=∞ 同义 trap（F7 不变量保持）。
- * gen 到顶（该槽第 2^20 次复用）⇒ 槽**永久退役**（状态永记 DEAD、不再回流），
- * 换一个槽；空闲链耗尽 = 实例空间耗尽（4096 × 2^20 ≈ 4.3G 个实例，旧上限 16M）。
+ * 深度为 DEAD ⇒ trap（F7 不变量：任何陈旧引用都读不到"活"）。
+ * gen 到顶（该槽第 2^20 次复用）⇒ 槽**永久失效**（状态永记 DEAD、不再回流），
+ * 换一个槽；空闲链耗尽 = 实例空间耗尽（4096 × 2^20 ≈ 4.3G 个实例）。
  *
- * 记账因此从 32B × 总实例数 降为 32B ×（存活 + 已退役）：B5 的 2M 轮只退役
+ * 记账因此 = 32B ×（存活 + 已失效），与总实例数脱钩：B5 的 2M 轮只失效
  * 2 个槽 ≈ 64B。表是定长 128KB BSS（按需换页），**只碰存活槽** ⇒ 守卫工作集
  * ≤ 257 槽 × 32B = 8KB，cache 常驻。
  *
@@ -117,7 +118,7 @@ typedef struct { aic_u32 reg; aic_u32 line; } aic_hdr;
 /* 槽状态字：state = (gen << 9) | depth。**一次 u32 存储换发**（对齐 u32 存储在
  * 全部目标平台上是单指令，故守卫的无锁读要么全旧要么全新，不会出现
  * "gen 新 + depth 旧"的交错 —— 那会让已弹出的实例被误判为活）。
- * depth ∈ [0, 508] 为活；511 = AIC_REGION_DEAD（已弹出 / 永久退役）。 */
+ * depth ∈ [0, 508] 为活；511 = AIC_REGION_DEAD（已弹出 / 永久失效）。 */
 #define AIC_REGION_DEPTH_BITS 9u
 #define AIC_REGION_DEPTH_DEAD ((1u << AIC_REGION_DEPTH_BITS) - 1u) /* 511 */
 #define AIC_REGION_STATE(gen, depth) \
@@ -153,7 +154,7 @@ static inline aic_u32 aic_region_depth_of(aic_u32 reg) {
     }
     aic_u32 d = AIC_REGION_STATE_DEPTH(st);
     if (d >= AIC_REGION_DEPTH_DEAD) {
-        return AIC_REGION_DEAD; /* 511 = 已弹出 / 永久退役 */
+        return AIC_REGION_DEAD; /* 511 = 已弹出 / 永久失效 */
     }
     return d;
 }

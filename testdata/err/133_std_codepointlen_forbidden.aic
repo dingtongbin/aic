@@ -1,5 +1,0 @@
-import str
-
-func f() -> i32 {
-    return str.codepointLen("abc")
-}

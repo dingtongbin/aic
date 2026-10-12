@@ -16,105 +16,28 @@ import (
 //   - `scope/spawn` → region.enter/exit + 逐 spawn 一条 `call`（T1 串行 L2）。
 // ---------------------------------------------------------------------------
 
-// checkExpr：`check f()` → 取多返回的末位 Err，判 code ≠ 0 则 checkfail。
-func (l *lowerer) checkExpr(v *parse.CheckExpr) (string, error) {
-	call, ok := v.X.(*parse.Call)
-	if !ok {
-		return "", fmt.Errorf("air: the check operand must be a call (line %d)", v.Pos.Line)
-	}
-	res, err := l.value(call)
-	if err != nil {
-		return "", err
-	}
-	mt := types.MultiElems(l.typeOf(call))
-	if mt == nil {
-		return "", fmt.Errorf("air: the check operand does not return multiple values (line %d)", v.Pos.Line)
-	}
-	last := len(mt) - 1
-	// 前置返回位（check 表达式的值 = 末位之前那一项）。仅 Err 的调用没有前置位
-	// （`check f()` 只传播、无值），此时给一个字面量占位，避免抽出 Err 自身。
-	valT := "const 0"
-	if len(mt) > 1 {
-		valT = l.tmp("t")
-		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: valT, Ty: l.ty(mt[0]),
-			Rhs: &MultiExtract{Val: res, Idx: 0}, Loc: LocOf(v.Pos)})
-	}
-	errT := l.tmp("t")
-	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: errT, Ty: l.ty(mt[last]),
-		Rhs: &MultiExtract{Val: res, Idx: last}, Loc: LocOf(v.Pos)})
-	code := l.tmp("t")
-	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: code, Ty: "i32",
-		Rhs: &FieldRHS{Place: &VarPlace{Name: errT}, Idx: 0}, Loc: LocOf(v.Pos)})
-	bad := l.tmp("t")
-	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: bad, Ty: "bool",
-		Rhs: &Cmp{Op: "ne", A: code, B: "const 0"}, Loc: LocOf(v.Pos)})
-
-	fail := l.newBlock("checkfail", v.Pos)
-	okB := l.newBlock("checkok", v.Pos)
-	l.cur.Term = &Cbr{Cond: bad, Then: fail.Label, Else: okB.Label, Loc: LocOf(v.Pos)}
-
-	// 失败路径：传播值 = 前置返回位零值 + 该 err（§六），由收尾块统一 ret。
-	l.cur = fail
-	zero := "const 0"
-	if len(mt) > 1 {
-		zero = l.tmp("t")
-		fail.Insts = append(fail.Insts, &Let{Tmp: zero, Ty: l.ty(mt[0]),
-			Rhs: &Nil{Ty: l.ty(mt[0])}, Loc: LocOf(v.Pos)})
-	}
-	fail.Term = &CheckFail{Err: errT, Tmp: zero, Loc: LocOf(v.Pos)}
-
-	l.cur = okB
-	return valT, nil
-}
-
-// matchStmt：主体枚举 → enum.tag + switch + 每臂绑定。
+// matchStmt：语句位 match → **IR-1 原语** MatchTerm（§13.2）。
+// subject 与臂体块由 lowering 建好，分发链由 desugar 补。
 func (l *lowerer) matchStmt(v *parse.MatchStmt) error {
-	subj, err := l.value(v.Subject)
+	subj, en, inst, err := l.matchSubject(v.Subject)
 	if err != nil {
 		return err
 	}
-	subjTy := l.typeOf(v.Subject)
-	en, inst := enumOf(subjTy)
-	_ = inst
-	tag := l.tmp("t")
-	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: tag, Ty: "i32",
-		Rhs: &EnumTag{Val: subj}, Loc: LocOf(v.Pos)})
-	join := l.newBlock("mjoin", v.Pos)
-	labels := make([]string, 0, len(v.Arms))
-	armBlocks := make([]*Block, 0, len(v.Arms))
-	for i := range v.Arms {
-		b := l.newBlock(fmt.Sprintf("arm%d", i+1), v.Arms[i].Pos)
-		armBlocks = append(armBlocks, b)
-		labels = append(labels, b.Label)
+	after := l.newBlock("mafter", v.Pos)
+	arms, err := l.matchArms(v.Arms, en, inst, "", after)
+	if err != nil {
+		return err
 	}
-	l.cur.Term = &Switch{Val: tag, Labels: labels, Loc: LocOf(v.Pos)}
-	for i, arm := range v.Arms {
-		l.cur = armBlocks[i]
-		if err := l.bindArm(en, inst, subj, arm); err != nil {
-			return err
-		}
-		switch {
-		case arm.Block != nil:
-			if err := l.block(arm.Block); err != nil {
-				return err
-			}
-		case arm.Value != nil:
-			// **表达式形分支**（`Red => print.println("r")`）：语句位 match 的两种分支
-			// 形态（块形 / 表达式形）都必须折进来。曾经只认 Block，表达式形被**整条丢掉**
-			// —— 求值有副作用（打印/调用），丢掉就是静默少执行（719 实测：少打一行 "b"）。
-			if _, err := l.value(arm.Value); err != nil {
-				return err
-			}
-		}
-		if l.cur.Term == nil {
-			l.cur.Term = &Br{Label: join.Label, Loc: LocOf(arm.Pos)}
-		}
+	// MatchTerm 是**终结符**（ir_prim.go）：pre 块的 Term 即原语本身，
+	// desugar 把它换成 Br dispatch + Switch（PrimAfter 返回 After 供可达性走）。
+	l.cur.Term = &MatchTerm{
+		Subject: subj, SubjTy: l.ty(l.typeOf(v.Subject)), Arms: arms,
+		After: after.Label, Loc: LocOf(v.Pos),
 	}
-	l.cur = join
+	l.cur = after
 	return nil
 }
 
-// bindArm 发射一个 match 臂的负载绑定（payload 形态 → enum.payload）。
 // enumOf 解包枚举类型（泛型实例 → 基枚举 + 实参）。
 func enumOf(t types.Type) (*types.Enum, *types.Instance) {
 	if en, ok := types.IsEnum(t); ok {
@@ -126,42 +49,6 @@ func enumOf(t types.Type) (*types.Enum, *types.Instance) {
 		}
 	}
 	return nil, nil
-}
-
-func (l *lowerer) bindArm(en *types.Enum, inst *types.Instance, subj string, arm parse.MatchArm) error {
-	for _, p := range arm.Patterns {
-		if p.Kind != "payload" || p.Binding == "" || p.Binding == "_" {
-			continue
-		}
-		// 变体名**必须去掉 `Enum.` 限定前缀**（与检查器同一套规则，types.VariantByName）。
-		// 曾经直接用 p.Name 查表：`Shape.Circle(r)` 的 `"Shape.Circle"` 查不到 ⇒ **静默跳过
-		// 绑定** ⇒ 臂体里引用 r 成了"先用后定"（verifier V2.4 报编译器缺陷；直译路径因为
-		// 走检查器解析过的表而正常，于是这个洞只在 IR 路径暴露）。
-		idx, va, ok := types.VariantByName(en, p.Name)
-		if !ok {
-			return fmt.Errorf("air: pattern %s does not name a variant of the matched enum (line %d)", p.Name, p.Pos.Line)
-		}
-		pl := va.Payload
-		if pl == nil {
-			// 无负载变体带绑定 = 检查期已拒；走到这里说明类型表与模式不一致。
-			return fmt.Errorf("air: pattern %s binds a payload-free variant (line %d)", p.Name, p.Pos.Line)
-		}
-		if inst != nil && en != nil {
-			pl = types.Subst(pl, en.TypeParams, inst.Args) // Option[i32] 的负载 = i32
-		}
-		t := l.tmp("t")
-		l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: l.ty(pl),
-			Rhs: &EnumPayload{Val: subj, Idx: idx}, Loc: LocOf(p.Pos)})
-		l.cur.Insts = append(l.cur.Insts, &Var{Name: p.Binding, Ty: l.ty(pl), Init: t, Loc: LocOf(p.Pos)})
-	}
-	return nil
-}
-
-func (l *lowerer) payloadType(en *types.Enum, variant string) (types.Type, bool) {
-	if en == nil {
-		return nil, false
-	}
-	return en.VariantPayload(variant)
 }
 
 // rangeForContainer：`for x in xs` / `for i, x in xs` / `for k, v in m` → 下标循环。
@@ -221,7 +108,7 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 	if len(v.Names) > 0 && v.Names[elemIdx].Name != "_" {
 		elemName = v.Names[elemIdx].Name
 		// **map 迭代：单名 = 键，两名 = (键, 值)**（§2.5）。键/值按插入序下标取
-		// （runtime 的 key_at/val_at）。曾经走通用的 elem 读 ⇒ "element read on
+		// （runtime 的 key_at/val_at）。走通用的 elem 读会报 "element read on
 		// the host type map[str]i32 is not covered"（031/700 实测）。
 		if isMap {
 			if err := l.bindMapIter(xt, xs, idxName, v); err != nil {
@@ -229,7 +116,7 @@ func (l *lowerer) rangeForContainer(v *parse.ForStmt) error {
 			}
 		} else if types.IsStrType(xt) && len(v.Names) == 1 {
 			// **str 单名迭代 = 单字节视图（str）**（§2.5：`for ch in s` 打印该字符）；
-			// 只有 `for i, b in s` 的两名形态才出 u8 字节。曾经两种都发 u8，
+			// 只有 `for i, b in s` 的两名形态才出 u8 字节；两种都发 u8 会让
 			// `println(ch)` 打出 104/101/121（693 实测）。
 			elemName = l.loopVarName(elemName, true)
 			hi := l.tmp("t")

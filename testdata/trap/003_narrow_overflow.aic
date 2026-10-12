@@ -1,0 +1,8 @@
+import fmt
+
+// S-31：收窄溢出 = trap
+func main() {
+    var big i64 = 300
+    var small i8 = i8(big)
+    fmt.println(str.fromI64(small))
+}

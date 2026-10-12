@@ -3,15 +3,14 @@ package parse
 import "strings"
 
 // parseFunc reads a function or method. recv is empty for free functions.
-// v2：方法一律可读写 this，无 `var func` 之分（核心设计 §四）。
-func (p *Parser) parseFunc(recv string, inClass bool, export, extern bool, annotations []string, bodyOptional bool) Decl {
+// 方法一律可读写 this，无 `var func` 之分（核心设计 §四）。
+func (p *Parser) parseFunc(recv string, inClass bool, export, extern bool, bodyOptional bool) Decl {
 	at := p.pos()
 	p.next() // func
 	d := &FuncDecl{
 		Recv:        recv,
 		Export:      export,
 		Extern:      extern,
-		Annotations: annotations,
 		Pos:         at,
 	}
 	// `init` is a method name, not one of the 23 frozen keywords (核心设计 §一),
@@ -123,7 +122,7 @@ func resultText(results []Result) string {
 
 // parseClass reads `class 名字[T] { … }`. v2 无继承、无 implements——
 // 组合 + 接口（核心设计 §四）。
-func (p *Parser) parseClass(export bool, annotations []string) Decl {
+func (p *Parser) parseClass(export bool) Decl {
 	at := p.pos()
 	p.next() // class
 	if !p.atKind(IDENT) {
@@ -132,15 +131,12 @@ func (p *Parser) parseClass(export bool, annotations []string) Decl {
 		p.synchronize(false)
 		return nil
 	}
-	d := &ClassDecl{Name: p.next().Text, Annotations: annotations, Pos: at}
-	for _, a := range annotations {
-		if a == "@packed" {
-			d.Packed = true
-		}
-	}
+	d := &ClassDecl{Name: p.next().Text, Pos: at}
+	// 《AIC 语言规范》§3.2：`derive A, B` 是声明修饰词（非注解）。
+	d.Derives = p.parseDerives()
 	if export {
 		p.errorHere(at, "export is only for exporting functions to C", "export class "+d.Name,
-			"capitalise the first letter to make the type visible across packages (core design §4); a `_` prefix makes it package-private, so drop export")
+			"capitalise the first letter to make the type visible across packages; a `_` prefix makes it package-private, so drop export")
 	}
 	// 泛型类 class Box[T] / class Box[T: Ord]
 	if p.at(PUNCT, "[") {
@@ -153,18 +149,91 @@ func (p *Parser) parseClass(export bool, annotations []string) Decl {
 		p.synchronize(false)
 		return nil
 	}
-	if t := p.cur(); t.Kind == IDENT && t.Text == "implements" {
-		p.errorHere(p.pos(), "`implements` is retired: an interface is satisfied structurally by the method signature set", "implements",
-			"drop the implements clause: a class that matches the interface signatures satisfies it automatically")
-		p.next()
-		p.synchronize(false)
-		return nil
+	// `implements` 是接口满足的唯一途径（硬关键字，C10）。
+	// 判据：大项目里"谁实现了这个接口"必须可 grep；结构式满足让 grep 失效。
+	if p.at(KW, "implements") {
+		p.parseImplements(d)
 	}
 	if p.expect(PUNCT, "{", "class body is missing `{`") {
 		p.parseClassBody(d)
 		p.expect(PUNCT, "}", "class body is missing the closing `}`")
 	}
 	return d
+}
+
+// parseStruct 读 `struct Name derive ... implements ... { fields methods }`。
+// struct 是值类型拼写（《AIC 语言规范》§2.3），语言里没有 `@packed` 注解。
+// 实现上复用 class 的解析机构，语义由类型的值/引用二分决定（Packed = 值类型）。
+func (p *Parser) parseStruct(export bool) Decl {
+	at := p.pos()
+	p.next() // struct
+	if !p.atKind(IDENT) {
+		p.errorHere(at, "struct is missing a name", "got "+describe(p.cur()),
+			"write `struct Name { ... }`; a struct name starts with an ASCII letter or `_`")
+		p.synchronize(false)
+		return nil
+	}
+	d := &ClassDecl{Name: p.next().Text, Pos: at, Packed: true}
+	d.Derives = p.parseDerives()
+	if export {
+		p.errorHere(at, "export is only for exporting functions to C", "export struct "+d.Name,
+			"capitalise the first letter to make the type visible across packages; a `_` prefix makes it package-private, so drop export")
+	}
+	if p.at(PUNCT, "[") {
+		d.TypeParams, d.Constraints = p.parseTypeParamList("a generic struct")
+	}
+	if p.at(KW, "implements") {
+		p.parseImplements(d)
+	}
+	if p.expect(PUNCT, "{", "struct body is missing `{`") {
+		p.parseClassBody(d)
+		p.expect(PUNCT, "}", "struct body is missing the closing `}`")
+	}
+	return d
+}
+
+// parseDerives 读声明修饰词 `derive A, B`（封闭集，见标准库规范 §3.2）。
+// parseImplements 读 `implements I, J` 或 `implements Iterator[i64]`。
+// 存 TypeExpr 而非 string：泛型接口实例 `I[T]` 必须能在语法层表达，
+// 否则 for-in 协议（Iterator[T]）写不出来。满足检查（C10）由检查器做。
+func (p *Parser) parseImplements(d *ClassDecl) {
+	p.next() // implements
+	for {
+		if !p.atKind(IDENT) {
+			p.errorHere(p.pos(), "implements needs an interface name", "got " + describe(p.cur()),
+				"write `implements I, J` or `implements Iterator[i64]`; the names must be interfaces declared in this package or imported")
+			p.synchronize(false)
+			return
+		}
+		d.Implements = append(d.Implements, p.parseType())
+		if p.at(PUNCT, ",") {
+			p.next()
+			continue
+		}
+		return
+	}
+}
+
+func (p *Parser) parseDerives() []string {
+	if !p.at(KW, "derive") {
+		return nil
+	}
+	p.next()
+	var out []string
+	for {
+		if !p.atKind(IDENT) {
+			p.errorHere(p.pos(), "derive needs a capability name", "got "+describe(p.cur()),
+				"the closed set is ToString / Compare / Hash / Clone / Json")
+			return out
+		}
+		out = append(out, p.next().Text)
+		if p.at(PUNCT, ",") {
+			p.next()
+			continue
+		}
+		break
+	}
+	return out
 }
 
 func (p *Parser) parseClassBody(d *ClassDecl) {
@@ -175,9 +244,9 @@ func (p *Parser) parseClassBody(d *ClassDecl) {
 		}
 		switch {
 		case p.at(KW, "var") && p.peekIs(KW, "func"):
-			// `var func` 是 v1 的可变方法标注，v2 已退役（附录 A）
+			// `func` 是关键字，做不了字段名 ⇒ 这不是字段，也不是方法。
 			at := p.pos()
-			p.errorHere(at, "`var func` is retired: every method may read and write this", "var func",
+			p.errorHere(at, "a method must start with `func`", "var func",
 				"write `func name(...)`")
 			p.next()
 			p.next()
@@ -202,7 +271,7 @@ func (p *Parser) parseClassBody(d *ClassDecl) {
 			if m != nil {
 				d.Methods = append(d.Methods, m)
 			}
-		case p.atIdent("use"):
+		case p.at(KW, "use"):
 			// N10：`use b B` —— 把 B 的方法提升到本类（上下文关键字，非 24th 关键字）。
 			uat := p.pos()
 			p.next()
@@ -217,12 +286,6 @@ func (p *Parser) parseClassBody(d *ClassDecl) {
 			d.Uses = append(d.Uses, u)
 		default:
 			at := p.pos()
-			if t := p.cur(); t.Kind == IDENT && isRetiredKeyword(t.Text) {
-				p.errorHere(at, retiredDesc(t.Text), "got "+t.Text, retiredFix(t.Text))
-				p.next()
-				p.synchronize(true)
-				continue
-			}
 			p.errorHere(at, "a class body holds fields and methods only", "got "+describe(p.cur()),
 				"write a field as `var name Type`, a method as `func name(...)`, a constructor as `func init(...)`")
 			p.synchronize(true)
@@ -269,12 +332,8 @@ func (p *Parser) parseField() *FieldDecl {
 	return &FieldDecl{Targets: d.Targets, Type: d.Type, Init: d.Init, Pos: at}
 }
 
-// parseMethod reads `func m(...)` inside a class body, with annotations.
+// parseMethod reads `func m(...)` inside a class body.
 func (p *Parser) parseMethod(class string) *FuncDecl {
-	var annotations []string
-	for p.cur().Kind == ANNOT {
-		annotations = append(annotations, p.parseAnnotationUse())
-	}
 	if !p.at(KW, "func") {
 		at := p.pos()
 		p.errorHere(at, "a method must start with `func`", "got "+describe(p.cur()),
@@ -282,12 +341,37 @@ func (p *Parser) parseMethod(class string) *FuncDecl {
 		p.synchronize(true)
 		return nil
 	}
-	d, _ := p.parseFunc(class, true, false, false, annotations, false).(*FuncDecl)
+	d, _ := p.parseFunc(class, true, false, false, false).(*FuncDecl)
 	return d
 }
 
 // parseInterface reads `interface` with signature-only methods (结构化满足).
-func (p *Parser) parseInterface(export bool, annotations []string) Decl {
+// parseIfaceIncludes 读 `include I, J`（《AIC 语言规范》§3.1）。游标须停在
+// `include` 关键字上。同名同签名的嵌入合一槽，同名不同签名由检查器报错。
+func (p *Parser) parseIfaceIncludes(d *InterfaceDecl) {
+	p.next() // include
+	for {
+		if !p.atKind(IDENT) {
+			p.errorHere(p.pos(), "include needs an interface name", "got "+describe(p.cur()),
+				"write `include Reader, Closer`; the names must be interfaces declared in this package or imported")
+			return
+		}
+		eAt := p.pos()
+		nm := p.next().Text
+		if p.at(PUNCT, ".") && p.peekKind() == IDENT {
+			p.next()
+			nm = nm + "." + p.next().Text
+		}
+		d.Embeds = append(d.Embeds, IfaceEmbed{Name: nm, AfterMethod: len(d.Methods), Pos: eAt})
+		if p.at(PUNCT, ",") {
+			p.next()
+			continue
+		}
+		return
+	}
+}
+
+func (p *Parser) parseInterface(export bool) Decl {
 	at := p.pos()
 	p.next() // interface
 	if !p.atKind(IDENT) {
@@ -296,10 +380,16 @@ func (p *Parser) parseInterface(export bool, annotations []string) Decl {
 		p.synchronize(false)
 		return nil
 	}
-	d := &InterfaceDecl{Name: p.next().Text, Annotations: annotations, Pos: at}
+	d := &InterfaceDecl{Name: p.next().Text, Pos: at}
 	if export {
 		p.errorHere(at, "export is only for exporting functions to C", "export interface "+d.Name,
 			"capitalise the first letter to make the type visible across packages (core design §4); a `_` prefix makes it package-private, so drop export")
+	}
+	// `interface Sink include Flush { }`：include 紧跟接口名，在 `{` 之前
+	// （《AIC 语言规范》§3.1）。显式拼写可 grep——大项目里"这个接口包含谁"
+	// 必须可回答。
+	if p.at(KW, "include") {
+		p.parseIfaceIncludes(d)
 	}
 	if p.expect(PUNCT, "{", "interface body is missing `{`") {
 		for {
@@ -307,12 +397,15 @@ func (p *Parser) parseInterface(export bool, annotations []string) Decl {
 			if p.at(PUNCT, "}") || p.cur().Kind == EOF {
 				break
 			}
-			var ann []string
-			for p.cur().Kind == ANNOT {
-				ann = append(ann, p.parseAnnotationUse())
-			}
 			if !p.at(KW, "func") {
-				// N9：裸名字 = 嵌入一个接口（`interface ReadWriter { Reader; Writer }`）。
+				// `include I, J` = 接口并集（显式拼写，《AIC 语言规范》§3.1）。
+				// 判据：显式拼写可 grep——大项目里"这个接口包含谁"必须可回答。
+				// 接口体内的 `include I, J`（兼容位置；规范推荐接口名后）。
+				if p.at(KW, "include") {
+					p.parseIfaceIncludes(d)
+					continue
+				}
+				// 裸名字 = 嵌入一个接口（兼容形态；include 是推荐拼写）。
 				if p.atKind(IDENT) {
 					eAt := p.pos()
 					e := IfaceEmbed{Name: p.next().Text, AfterMethod: len(d.Methods), Pos: eAt}
@@ -331,7 +424,7 @@ func (p *Parser) parseInterface(export bool, annotations []string) Decl {
 			// A body is parsed here on purpose: the checker owns the
 			// "interface 方法不能有函数体" rule so the diagnostic names the
 			// interface and the method, rather than a generic parse error.
-			m, _ := p.parseFunc(d.Name, true, false, false, ann, true).(*FuncDecl)
+			m, _ := p.parseFunc(d.Name, true, false, false, true).(*FuncDecl)
 			if m != nil {
 				d.Methods = append(d.Methods, m)
 			}
@@ -343,16 +436,28 @@ func (p *Parser) parseInterface(export bool, annotations []string) Decl {
 
 // parseEnum reads `enum` with one-level variant names and optional payloads.
 // 无方法、不得递归含自身（checker 执行，核心设计 §二.6/§四）。
-func (p *Parser) parseEnum(annotations []string) Decl {
+func (p *Parser) parseEnum() Decl {
 	at := p.pos()
 	p.next() // enum
 	if !p.atKind(IDENT) {
 		p.errorHere(at, "enum is missing a name", "got "+describe(p.cur()),
-			"write `enum Name { A, B }` or with payloads `enum Name { A(i32), B }`")
+			"write `enum Name { A, B }`, with payloads `enum Name { A(i32), B }`, or as an error code `enum Name: ErrCode { A, B }`")
 		p.synchronize(false)
 		return nil
 	}
-	d := &EnumDecl{Name: p.next().Text, Annotations: annotations, Pos: at}
+	d := &EnumDecl{Name: p.next().Text, Pos: at}
+	// `enum X: ErrCode { … }`：错误码约束枚举（§7.2）。
+	// 码 = (fnv1a32(模块规范路径) & 0xFFFFF000) | 变体序号，构建期冲突检测。
+	if p.at(PUNCT, ":") {
+		p.next()
+		if !p.atKind(IDENT) || p.cur().Text != "ErrCode" {
+			p.errorHere(p.pos(), "the only enum constraint is ErrCode", "got "+describe(p.cur()),
+				"write `enum HttpErr: ErrCode { Timeout, Connect }`; other constraints are not part of the surface")
+		} else {
+			p.next()
+		}
+		d.ErrCode = true
+	}
 	if p.expect(PUNCT, "{", "enum body is missing `{`") {
 		for {
 			p.skipSemis()
@@ -380,7 +485,7 @@ func (p *Parser) parseEnum(annotations []string) Decl {
 						_ = p.parseType()
 					}
 					p.errorHere(at, "an enum variant takes exactly one payload type", "variant "+v.Name+"(…)",
-						"wrap several fields in a value type: `@packed class P { var a i32  var b i32 }`, then write "+v.Name+"(P) (core design §2: an enum payload is a single value)")
+						"wrap several fields in a value type: `struct P { var a i32  var b i32 }`, then write "+v.Name+"(P) (language spec §2.2: an enum payload is a single value)")
 				}
 				p.expect(PUNCT, ")", "enum variant payload is missing the closing `)`")
 			}

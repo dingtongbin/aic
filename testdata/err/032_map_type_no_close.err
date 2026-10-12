@@ -1,3 +1,0 @@
-testdata/err/032_map_type_no_close.aic:1:18: error: missing `]`
-    got IDENT i32
-    fix: map key type is missing the closing `]`

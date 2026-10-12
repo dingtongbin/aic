@@ -1,0 +1,22 @@
+import fmt
+import str
+
+// 泛型类：按调用点实例化；实例符号带类型参数标识
+class Box[T: value] {
+    var v T
+
+    func init(v T) -> Box[T] {
+        return Box[T]{v: v}
+    }
+
+    func get() -> T {
+        return this.v
+    }
+}
+
+func main() {
+    var bi Box[i64] = Box[i64].init(42)
+    var bs Box[str] = Box[str].init("x")
+    fmt.println("{bi.get()}")
+    fmt.println(bs.get())
+}

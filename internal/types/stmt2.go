@@ -104,6 +104,9 @@ func RangeElemType(iter Type) Type {
 		return t.Value
 	case *SetT:
 		return t.Elem
+	case *ChanT:
+		// S-12：chan[T] for-in 的元素类型（泛型枚举实例照常返回）
+		return t.Elem
 	case *Basic:
 		if t.Name == "str" {
 			return TU8
@@ -126,6 +129,9 @@ func RangeBindTypes(iter Type, names int, isInterval bool) (Type, Type) {
 		switch t := iter.(type) {
 		case *MapT:
 			return t.Key, nil
+		case *ChanT:
+			// S-12：chan[T] 单名 = 元素
+			return t.Elem, nil
 		case *Basic:
 			if t.Name == "str" {
 				return TStr, nil
@@ -145,7 +151,13 @@ func (c *Checker) checkFor(v *parse.ForStmt) {
 			c.checkIndexInt(v.RangeX, "range start")
 			c.checkIndexInt(v.RangeEnd, "range end")
 		} else {
-			xt, _, _ := c.checkExprFull(v.RangeX, nil)
+			xt, _, xu := c.checkExprFull(v.RangeX, nil)
+			if xt == nil {
+				// 未定型字面量（`for v in "hello"`）：§一 把定型推迟到使用点，
+				// **可迭代判定就是那个使用点**（与 checkInterp 同源走 literalDefault）。
+				// 只看 xt 会让 str 掉进 `case nil:` 而整条静默放行（008 实测）。
+				xt = c.literalDefault(xu, parse.ExprPos(v.RangeX))
+			}
 			iterTy = xt
 			switch t := xt.(type) {
 			case *Slice:
@@ -156,12 +168,19 @@ func (c *Checker) checkFor(v *parse.ForStmt) {
 				elemTy = t.Elem
 			case *Basic:
 				if t.Name == "str" {
-					elemTy = TU8 // for i, b in s → 字节
+					// str **不在** for-in 协议内§10.2：字节 ≠ 字符。
+					// 修复提示指向 s.codepoints()。
+					c.errorAt(parse.ExprPos(v.RangeX), "str is not for-in iterable", "for v in s",
+						"bytes are not characters: write `for v in s.codepoints()` (AIC language spec S-12)")
 				}
+			case *ChanT:
+				// S-12：chan[T] 可 for-in；终止 = 所属区域退出且缓冲排空
+				// （正常终止，非 Err）。
+				elemTy = t.Elem
 			case nil:
 			default:
 				c.errorAt(parse.ExprPos(v.RangeX), "this type is not iterable", typeOrUn(xt, untyped{}),
-					"iterable: list / map / set / str (core design §2.5)")
+					"iterable: list / map / set / chan / an Iterator[T] implementation (AIC language spec S-12)")
 			}
 		}
 		// 绑定名：1 个 = 值或计数；2 个 = (索引/键, 值)

@@ -1,0 +1,6 @@
+import fmt
+
+func main() {
+    var xs i32[] = [1, 2, 3]
+    fmt.println(str.fromI64(xs[5]))
+}

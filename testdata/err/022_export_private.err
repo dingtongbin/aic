@@ -1,0 +1,3 @@
+testdata/err/022_export_private.aic:6:8: error: a public signature mentions a package-private type
+    result 1 has type hidden
+    fix: capitalise the type's first letter, or make the function package-private (lowercase name) (AIC language spec §3.3 / §12, C4 / C28)

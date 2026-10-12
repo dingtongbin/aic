@@ -1,0 +1,32 @@
+import fmt
+import str
+
+// str 方法集 = 编译器内置封闭清单，第三方不得扩展
+// str 不在 for-in 协议内（字节 ≠ 字符）
+func main() {
+    var s str = "  Hello, AIC  "
+    fmt.println("{s.len()}")
+    fmt.println("{s.isEmpty()}")
+    fmt.println("[{s.trim()}]")
+    fmt.println("{s.trim().startsWith("Hello")}")
+    fmt.println("{s.trim().endsWith("AIC")}")
+    fmt.println("{s.contains("AIC")}")
+    // indexOf 返回 Option：不存在 = Option，不是 -1
+    var o Option[i64] = s.indexOf("AIC")
+    match o {
+        Option.Some(i) => { fmt.println("{i}") },
+        Option.None => { fmt.println("not found") },
+    }
+    // split / append / toUpper / toLower
+    var parts str[] = "a,b,c".split(",")
+    fmt.println("{parts.len()}")
+    fmt.println("x".append("y").toUpper())
+    // codepoints 返回 rune[]；utf8At 返回 (rune, 下一字节偏移)
+    var cps rune[] = "中a".codepoints()
+    fmt.println("{cps.len()}")
+    var r, off = "中a".utf8At(0)
+    fmt.println(str.fromRune(r))
+    fmt.println("{off}")
+    // slice 是半开 [a, a+n)，与已删的 str.sub(s,i,j) 语义不同
+    fmt.println("hello".slice(1, 3))
+}

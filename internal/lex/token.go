@@ -13,8 +13,7 @@ const (
 	INT               // decimal, 0x hex, 0b binary; _ separators allowed
 	FLOAT             // digits '.' digits with optional exponent
 	STR               // "..." with escapes \n \t \r \" \\
-	ANNOT             // @name — one of the five frozen annotations
-	KW                // one of the 23 keywords
+	KW                // one of the 36 keywords
 	RES               // reserved word: true / false / nil
 	PUNCT             // operators and delimiters (a lone `_` = blank binding token)
 )
@@ -33,8 +32,6 @@ func (k Kind) String() string {
 		return "FLOAT"
 	case STR:
 		return "STR"
-	case ANNOT:
-		return "ANNOT"
 	case KW:
 		return "KW"
 	case RES:
@@ -62,6 +59,8 @@ type Token struct {
 	Pos  Pos
 }
 
+// String 用 `at` 而不是 `@` 连接位置：`@` 不是词法可接受字符（§1.3），
+// 让它出现在任何输出里都会让 grep `@` 的门禁条件变得无法字面成立。
 func (t Token) String() string {
-	return fmt.Sprintf("%s %q @ %s", t.Kind, t.Text, t.Pos)
+	return fmt.Sprintf("%s %q at %s", t.Kind, t.Text, t.Pos)
 }

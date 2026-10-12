@@ -1,3 +1,0 @@
-testdata/err/315_match_duplicate_arm.aic:9:9: error: the same variant is covered twice
-    Color.Red
-    fix: one arm per variant

@@ -147,7 +147,7 @@ func TestErrCorpusParseLayer(t *testing.T) {
 			blocks := renderAll(rel, string(raw), lexErrs, parseErrs)
 			if blocks == "" {
 				deferred++
-				t.Errorf("err/ 语料全管线通过（既非语法错也非类型错）——语料前提失效，需退役或改写")
+				t.Errorf("err/ 语料全管线通过（既非语法错也非类型错）——语料前提失效，需删除或改写")
 				return
 			}
 			checked++
@@ -192,26 +192,6 @@ func TestUpdateErrGoldens(t *testing.T) {
 		updated++
 	}
 	t.Logf("重建 %d 个 .err 快照", updated)
-}
-
-// TestRetiredSyntaxStaysRejected anchors 防坑清单 1: v1-only syntax must keep
-// failing with the targeted retirement diagnostic, never parse silently.
-func TestRetiredSyntaxStaysRejected(t *testing.T) {
-	for _, src := range []string{
-		"while", "elseif", "implements", "handle", "await", "del", "mut",
-	} {
-		raw := "func f() {\n    " + src + " x\n}\n"
-		_, lexErrs, parseErrs := parse.Source("t.aic", raw)
-		found := false
-		for _, e := range parseErrs {
-			if strings.Contains(e.Desc, "is retired") {
-				found = true
-			}
-		}
-		if !found && len(lexErrs) == 0 {
-			t.Errorf("退役词 %s 未被定向拒绝", src)
-		}
-	}
 }
 
 func normalizeNL(s string) string {

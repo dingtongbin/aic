@@ -89,9 +89,6 @@ func (l *lowerer) deferBlockCaptures(b *parse.Block) []capture {
 			}
 		case *parse.CheckExpr:
 			walkExpr(v.X)
-		case *parse.OrExpr:
-			walkExpr(v.X)
-			walkExpr(v.Default)
 		case *parse.CatchExpr:
 			walkExpr(v.X)
 			walkStmts(blockStmts(v.Block))

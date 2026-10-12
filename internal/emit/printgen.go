@@ -3,7 +3,6 @@ package emit
 import (
 	"fmt"
 
-	"aic/internal/parse"
 	"aic/internal/types"
 )
 
@@ -262,7 +261,7 @@ func (c *Ctx) emitContainerPrinterBody(e printerEntry) error {
 	}
 	// 元素访问器：list 用 data[i]，set 用 AIC_SET_SLOT(s, order[i])，map 用
 	// AIC_MAP_SLOT_*。都走运行期的布局中立宏 —— emit 不硬编码槽字段名
-	// （曾经这里直接写 `v->slots[...]`/`v->keys[...]`，运行期一改布局就失配）。
+	// （直接写 `v->slots[...]`/`v->keys[...]` 会让运行期一改布局就失配）。
 	switch {
 	case types.IsSlice(e.ty):
 		c.line("        %s(v->data[i], depth + 1);", en)
@@ -362,13 +361,4 @@ func (c *Ctx) printValue(e string, t types.Type) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s(%s, 0)", pn, e), nil
-}
-
-// printExprOf 取表达式自身的定型（含未定型字面量的定宽回退）。
-func (c *Ctx) printExprOf(arg parse.Expr) types.Type {
-	t := c.ti(arg)
-	if t == nil {
-		t = c.literalType(arg)
-	}
-	return t
 }

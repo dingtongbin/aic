@@ -16,44 +16,32 @@ import (
 //                    纯函数、不捕获（§三）——捕获由源语言禁止，故无环境参数
 // ---------------------------------------------------------------------------
 
-// matchExpr：表达式形态的 match（每臂产出一个值）。
+// matchExpr：表达式形态的 match → **IR-1 原语** MatchExprRHS（§13.2）。
+// 结果槽由 lowering 声明（各臂体往里存），分发与 payload 绑定由 desugar 补。
 func (l *lowerer) matchExpr(v *parse.MatchExpr) (string, error) {
-	subj, err := l.value(v.Subject)
+	subj, en, inst, err := l.matchSubject(v.Subject)
 	if err != nil {
 		return "", err
 	}
-	en, inst := enumOf(l.typeOf(v.Subject))
 	resTy := l.tyOf(v)
 	slot := l.tmp("mres")
-	l.cur.Insts = append(l.cur.Insts, &Var{Name: slot, Ty: resTy, Loc: LocOf(v.Pos)})
 
-	tag := l.tmp("t")
-	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: tag, Ty: "i32",
-		Rhs: &EnumTag{Val: subj}, Loc: LocOf(v.Pos)})
-	join := l.newBlock("mjoin", v.Pos)
-	labels := make([]string, 0, len(v.Arms))
-	armBlocks := make([]*Block, 0, len(v.Arms))
-	for i := range v.Arms {
-		b := l.newBlock(fmt.Sprintf("arm%d", i+1), v.Arms[i].Pos)
-		armBlocks = append(armBlocks, b)
-		labels = append(labels, b.Label)
+	after := l.newBlock("mafter", v.Pos)
+	arms, err := l.matchArms(v.Arms, en, inst, slot, after)
+	if err != nil {
+		return "", err
 	}
-	l.cur.Term = &Switch{Val: tag, Labels: labels, Loc: LocOf(v.Pos)}
-
-	for i, arm := range v.Arms {
-		l.cur = armBlocks[i]
-		if err := l.bindArm(en, inst, subj, arm); err != nil {
-			return "", err
-		}
-		val, err := l.value(arm.Value)
-		if err != nil {
-			return "", err
-		}
-		l.cur.Insts = append(l.cur.Insts, &Store{
-			Place: &VarPlace{Name: slot}, Val: val, Loc: LocOf(arm.Pos)})
-		l.cur.Term = &Br{Label: join.Label, Loc: LocOf(arm.Pos)}
-	}
-	l.cur = join
+	// 槽由**这条 Let 定义**（臂体往里存；desugar 把它折成 `var <slot>` 引用）。
+	// 不另发 Var —— 两份定义会让 V2.5 报"临时量定义两次"（实测）。
+	l.cur.Insts = append(l.cur.Insts, &Let{
+		Tmp: slot, Ty: resTy,
+		Rhs: &MatchExprRHS{
+			Subject: subj, SubjTy: l.ty(l.typeOf(v.Subject)), Arms: arms,
+			Slot: slot, SlotTy: resTy, After: after.Label, Loc: LocOf(v.Pos),
+		},
+		Loc: LocOf(v.Pos),
+	})
+	l.cur = after
 	return slot, nil
 }
 

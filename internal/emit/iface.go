@@ -2,9 +2,7 @@ package emit
 
 import (
 	"fmt"
-	"sort"
 
-	"aic/internal/parse"
 	"aic/internal/types"
 )
 
@@ -56,32 +54,6 @@ func (c *Ctx) witnessFor(cl *types.Class, ifc *types.Interface) (string, error) 
 		c.witnesses = append(c.witnesses, witnessEntry{name: name, cl: cl, ifc: ifc})
 	}
 	return name, nil
-}
-
-// interfaceValue 发射「值 → aic_iface」的装箱表达式（want = 接口类型）。
-func (c *Ctx) interfaceValue(e parse.Expr, want *types.Interface) (string, error) {
-	vt := c.ti(e)
-	cl, isCl := types.IsClass(vt)
-	if !isCl {
-		return "", fmt.Errorf("emit: only a class value can be boxed into an interface (line %d)", nodeLine(e))
-	}
-	name, err := c.witnessFor(cl, want)
-	if err != nil {
-		return "", err
-	}
-	raw, err := c.expr(e, nil)
-	if err != nil {
-		return "", err
-	}
-	if cl.Packed {
-		// 值副本装箱：当前区域分配带头对象 + 拷入 packed 值（§四）。
-		ct := c.cTypeName(cl)
-		tmp := c.tmp("box")
-		c.line("%s *%s = (%s *)aic_alloc_hdr(sizeof(%s), %du);", ct, tmp, ct, ct, uint32(nodeLine(e)))
-		c.line("*%s = %s;", tmp, raw)
-		return fmt.Sprintf("((aic_iface){ .data = (void *)%s, .vt = (const void *const *)%s })", tmp, name), nil
-	}
-	return fmt.Sprintf("((aic_iface){ .data = (void *)(%s), .vt = (const void *const *)%s })", raw, name), nil
 }
 
 // emitWitnesses 发射见证表与薄 trampoline（在原型段之前）。
@@ -166,46 +138,6 @@ func commaPrefix(params string) string {
 	return ", " + params
 }
 
-// interfaceCall 发射接口方法调用（§十 槽位分发 + nil 判）。
-func (c *Ctx) interfaceCall(v *parse.Call, field *parse.Field, recvTy types.Type, want types.Type) (string, bool, error) {
-	ifc, isIfc := types.IsInterface(recvTy)
-	if !isIfc {
-		return "", false, nil
-	}
-	sig, has := ifc.Method(field.Name)
-	if !has {
-		return "", true, fmt.Errorf("emit: interface %s has no method %s (line %d)", ifc.Name, field.Name, v.Pos.Line)
-	}
-	slot := ifc.SlotOf(field.Name)
-	if slot < 0 {
-		return "", true, fmt.Errorf("emit: method %s of interface %s has no slot (line %d)", ifc.Name, field.Name, v.Pos.Line)
-	}
-	recv, err := c.expr(field.X, recvTy)
-	if err != nil {
-		return "", true, err
-	}
-	args, err := c.argsFor(v, sig)
-	if err != nil {
-		return "", true, err
-	}
-	// 调用形态：((retCT (*)(aic_iface, 形参…))(r).vt[槽])((r), 实参…)
-	// r 出现三次，用语句级临时量固定下来（避免重复求值带副作用的接收者）。
-	tmp := c.tmp("ifc")
-	c.line("aic_iface %s = %s;", tmp, recv)
-	c.line("AIC_NONNULL(%s.data, %s, %d);", tmp, cstr(c.Path), v.Pos.Line)
-	params := make([]string, 0, len(sig.ParamTypes)+1)
-	params = append(params, "aic_iface")
-	for _, p := range sig.ParamTypes {
-		params = append(params, c.cTypeName(p))
-	}
-	callArgs := tmp
-	if args != "" {
-		callArgs += ", " + args
-	}
-	return fmt.Sprintf("((%s (*)(%s))(%s).vt[%d])(%s)",
-		c.retCT(sig), joinComma(params), tmp, slot, callArgs), true, nil
-}
-
 // ---------------------------------------------------------------------------
 // 接口值的打印（§十四 的扩展槽）：接口的动态类型在编译期未知，故见证表在方法槽
 // 之后追加**打印槽**（下标 = 接口方法数）。打印槽的 trampoline 调具体类型的打印
@@ -245,12 +177,6 @@ func (c *Ctx) emitIfacePrinterBody(e printerEntry) error {
 	c.line("    ((void (*)(aic_iface))(v.vt[%d]))(v);", slot)
 	return nil
 }
-func (c *Ctx) classValueOf(e parse.Expr) *types.Class {
-	if cl, ok := types.IsClass(c.ti(e)); ok {
-		return cl
-	}
-	return nil
-}
 
 // emitIfacePrintTramp 发射某个具体类在接口打印槽里的 trampoline。
 func (c *Ctx) emitIfacePrintTramp(table int, w witnessEntry) error {
@@ -275,17 +201,4 @@ func (c *Ctx) emitIfacePrintTramp(table int, w witnessEntry) error {
 // ifaceTrampName 是打印槽 trampoline 的 C 名。
 func (c *Ctx) ifaceTrampName(table int) string {
 	return fmt.Sprintf("aic_tramp_%d_print", table+1)
-}
-
-// sortedClassNames 按名字排序取类名（map 序遍历会破坏 H2）。
-func (c *Ctx) sortedClassNames() []string {
-	if c.Info == nil {
-		return nil
-	}
-	names := make([]string, 0, len(c.Info.Classes))
-	for n := range c.Info.Classes {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return names
 }

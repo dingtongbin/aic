@@ -1,0 +1,7 @@
+import fmt
+import app/core/store
+
+// 传递依赖：ui → store
+func Render(s store.Store) -> str {
+    return "items=" + str.fromI64(s.Len())
+}

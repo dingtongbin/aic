@@ -1,0 +1,20 @@
+import fmt
+import str
+
+// live = 提升到任务根（跨 region 存活）
+class Cache {
+    var hits i64
+}
+
+func main() {
+    region {
+        // 无 live：随区域回收
+        var tmp Cache = Cache{hits: 1}
+        fmt.println("{tmp.hits}")
+    }
+    region {
+        // live：活到任务根，跨 region 有效
+        var live keep Cache = Cache{hits: 99}
+        fmt.println("{keep.hits}")
+    }
+}

@@ -1,0 +1,56 @@
+import fmt
+
+enum AppErr: ErrCode { NotFound, BadInput, IoFail }
+
+// 三条正交决策：错误去哪（传播/就地/死）、要不要值、要不要错误对象
+// 由此推出恰好 3 个运算符：check / catch / !
+func lookup(k i32) -> (str, Err) {
+    if k < 0 { return "", Err(AppErr.BadInput, "negative") }
+    if k == 0 { return "", Err(AppErr.NotFound, "missing") }
+    return "value", nil
+}
+
+// ① check：取值位传播
+func viaCheck(k i32) -> (str, Err) {
+    var v = check lookup(k)
+    return v + "!", nil
+}
+
+// ② 绑定：e 必须被消费（E-6）
+func viaBind(k i32) -> (str, Err) {
+    var v, e = lookup(k)
+    if e.code != 0 {
+        return "", Err.wrap(AppErr.IoFail, "lookup", e)
+    }
+    return v, nil
+}
+
+// ③ catch 不绑定：失败取默认值
+func viaCatchDefault(k i32) -> str {
+    return lookup(k) catch { "default" }
+}
+
+// ③ catch 绑定：就地处理
+func viaCatchBind(k i32) -> str {
+    return lookup(k) catch e {
+        fmt.eprintln("failed: {e.msg}")
+        "handled"
+    }
+}
+
+// ④ !：断言，失败即 trap
+func viaAssert(k i32) -> str {
+    return lookup(k)!
+}
+
+func main() -> Err {
+    var vc = check viaCheck(1)
+    fmt.println(vc)
+    var vb = check viaBind(1)
+    fmt.println(vb)
+    fmt.println(viaBind(-1) catch { "wrapped" })
+    fmt.println(viaCatchDefault(0))
+    fmt.println(viaCatchBind(0))
+    fmt.println("{viaAssert(1)}")
+    return nil
+}

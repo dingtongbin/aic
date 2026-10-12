@@ -1,0 +1,8 @@
+import fmt
+
+class Engine { var power i32 }
+
+class Car {
+    use eng Engine
+    var eng Engine
+}

@@ -1,3 +1,0 @@
-testdata/err/320_enum_missing_comma.aic:3:5: error: enum variants need `,` or `}` between them
-    got IDENT Green
-    fix: separate variants with commas: enum E { A, B, C }

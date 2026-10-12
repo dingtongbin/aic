@@ -1,4 +1,0 @@
-func f() -> i64 {
-    var x i32 = 1
-    return x
-}

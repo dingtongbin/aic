@@ -46,7 +46,7 @@ func main() {
 	case "test":
 		code = cmdTest(args)
 	case "version":
-		fmt.Println("aic dev (v2 rebase, R3: emit + CLI)")
+		fmt.Println("aic dev")
 	default:
 		if cmd == "-h" || cmd == "--help" || cmd == "help" {
 			usage()
@@ -62,7 +62,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `aic - the AIC compiler driver (v2 rebase)
+	fmt.Fprint(os.Stderr, `aic - the AIC compiler driver
 
 usage:
   aic check <file.aic>...          lex + parse + type check, three-part diagnostics (all errors at once)
@@ -534,8 +534,28 @@ func emitIRUnit(prog *Program) (*emit.Result, error) {
 		if vs := air.Verify(m); len(vs) > 0 {
 			return nil, fmt.Errorf("IR verification failed: %s", vs[0].String())
 		}
+		// §13.1 唯一管线的后半段：单态化 → 去糖 → IR-2。
+		// 1) 单态化在 IR-1 原语上做（原语里的 BindTy / Mt 含类型形参，此时替换）；
+		// 2) 去糖把原语编译成低层节点（EnumTag/Switch/CheckFail）；
+		// 3) 过完 desugar 后不得再有原语 —— 那是发射期会漏译的硬错误。
+		m, err = air.Monomorphize(m, info)
+		if err != nil {
+			return nil, err
+		}
 		if vs := air.VerifyMono(m, info); len(vs) > 0 {
 			return nil, fmt.Errorf("mair verification failed: %s", vs[0])
+		}
+		m, err = air.Desugar(m)
+		if err != nil {
+			return nil, err
+		}
+		if air.HasPrim(m) {
+			return nil, fmt.Errorf("IR-1 primitives survived desugaring in package %s: emit would silently drop them (AIC language spec §13.1)", name)
+		}
+		// desugar 后再剪一次：分发 Switch 此时才存在，"所有臂都退出 → After
+		// 不可达"才算得清（见 PruneUnreachable 的注释）。
+		for _, f := range m.Funcs {
+			air.PruneUnreachable(f)
 		}
 		cp, err := cir.Build(m)
 		if err != nil {

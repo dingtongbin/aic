@@ -1,0 +1,27 @@
+import fmt
+import str
+
+// 闭包唯一形态 = func(...) 字面量
+// 捕获仅限值类型：标量 / str / rune / 无载荷 enum / [T;N] / 全字段值类型的 struct
+// 捕获引用类型 = 编译错误（C11）
+struct Cfg { var base i64    var step i64 }
+
+func makeAdder(base i64) -> (i64) -> i64 {
+    return func(x i64) -> i64 { return x + base }
+}
+
+func apply(f (i64) -> i64, v i64) -> i64 {
+    return f(v)
+}
+
+func main() {
+    var add10 = makeAdder(10)
+    fmt.println("{add10(1)}")
+    fmt.println("{add10(2)}")
+    // 值类型捕获：struct 全字段为值类型
+    var c Cfg = Cfg{base: 100, step: 5}
+    var f = func(x i64) -> i64 { return x + c.base }
+    fmt.println("{f(1)}")
+    // 作实参
+    fmt.println("{apply(add10, 5)}")
+}

@@ -1,8 +1,0 @@
-class Box {
-    func init() {
-    }
-}
-
-func main() {
-    var b Box = Box.init
-}

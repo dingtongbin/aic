@@ -1,0 +1,23 @@
+import fmt
+import str
+
+// derive 封闭集 = {ToString, Compare, Hash, Clone, Json}
+// 与泛型能力约束集是同一套名单
+struct Money derive Compare, Hash, ToString, Clone {
+    var cents i64
+}
+
+func main() {
+    var a Money = Money{cents: 500}
+    var b Money = Money{cents: 900}
+    // Compare ⇒ compare() 与序关系
+    fmt.println("{a.compare(b)}")
+    fmt.println("{a < b}")
+    // Hash ⇒ hash()
+    fmt.println("{a.hash() == a.hash()}")
+    // ToString ⇒ 插值与打印
+    fmt.println("a={a} b={b}")
+    // Clone ⇒ clone()
+    var c Money = a.clone()
+    fmt.println("{a == c}")
+}

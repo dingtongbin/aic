@@ -1,3 +1,0 @@
-testdata/err/009_unterminated_string.aic:2:13: error: string not closed on the same line
-    "raw
-    fix: add the closing quote; split multi-line text into several strings

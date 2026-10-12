@@ -1,0 +1,24 @@
+import fmt
+import time
+import str
+
+// scope.timeout：到点放弃 join；卡在 FFI 的任务脱离 scope 继续跑，区域延迟回收
+func slow() {
+    time.sleep(time.Sec(30))
+}
+
+func main() {
+    var results chan[Result[i64]] = chan[Result[i64]].new()
+    scope.timeout(50) {
+        spawn slow() into results
+    }
+    // 超时后未入 chan 的任务由运行时标记写入侧关闭，for-in 正常终止
+    var got i64 = 0
+    for r in results {
+        match r {
+            Result.Ok(v) => { got = got + 1 },
+            Result.Fail(e) => { got = got + 1 },
+        }
+    }
+    fmt.println("{got}")
+}

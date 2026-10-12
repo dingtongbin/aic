@@ -1,0 +1,8 @@
+import fmt
+
+// C7：struct 字段禁含引用类型
+struct Bad {
+    var node Node
+}
+
+class Node { var v i32 }

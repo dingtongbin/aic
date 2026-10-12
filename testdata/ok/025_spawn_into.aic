@@ -1,0 +1,26 @@
+import fmt
+import str
+
+// spawn 实参须满足 Move（只禁 class 共享引用；slice 允许，chan 会深拷贝）
+// spawn 目标禁 fallible（E-9）；into 把返回值包装成 Result[T] 送进 chan
+class Job derive Clone { var id i64    var payload u8[] }
+
+func work(j Job) -> Result[i64] {
+    return Result.Ok(j.id * 2)
+}
+
+func main() {
+    var results chan[Result[i64]] = chan[Result[i64]].new(8)
+    scope {
+        var js Job[] = [Job{id: 1, payload: [1]}, Job{id: 2, payload: [2, 3]}]
+        for j in js {
+            spawn work(j) into results
+        }
+    }
+    // scope 退出 = join 全部
+    for r in results {
+        match r {
+            Result.Ok(v) => { fmt.println("{v}") },
+            Result.Fail(e) => { fmt.eprintln(e.msg) },
+        }
+    }}

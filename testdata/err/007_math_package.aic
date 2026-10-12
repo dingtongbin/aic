@@ -1,0 +1,6 @@
+import fmt
+import math
+
+func main() {
+    fmt.println(str.fromF64(math.sqrt(2.0)))
+}

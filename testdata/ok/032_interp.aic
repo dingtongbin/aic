@@ -1,0 +1,20 @@
+import fmt
+
+// 插值：槽内仅名字或字段访问链
+// 可打印类型：标量（含 rune）、无载荷 enum、derive ToString 的 struct/class
+struct User derive ToString { var id i64    var name str }
+
+enum Level { Low, High }
+
+func main() {
+    var u User = User{id: 7, name: "ann"}
+    var n i64 = 3
+    var f f64 = 1.5
+    var b bool = true
+    fmt.println("id={u.id} name={u.name}")
+    fmt.println("n={n} f={f} b={b}")
+    fmt.println("level={Level.High}")
+    fmt.println("rune={rune(0x4e2d)}")
+    // 字面花括号
+    fmt.println("{{literal}}")
+}

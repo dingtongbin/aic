@@ -1,0 +1,9 @@
+import fmt
+
+class Node { var v i32 }
+
+// C6：引用零值 nil，除赋值与比较外操作 = trap
+func main() {
+    var n Node
+    fmt.println(str.fromI64(n.v))
+}

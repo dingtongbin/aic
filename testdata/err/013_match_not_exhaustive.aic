@@ -1,0 +1,11 @@
+import fmt
+
+enum Color { Red, Green, Blue }
+
+func main() {
+    var c Color = Color.Red
+    match c {
+        Color.Red => { },
+        Color.Green => { },
+    }
+}

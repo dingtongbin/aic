@@ -1,0 +1,32 @@
+import fmt
+import str
+
+// 约束三类：能力（= derive 集）/ 接口 / 值性（value / ref）
+// 约束不满足报在调用点
+func maxOf[T: Compare](a T, b T) -> T {
+    if a.compare(b) < 0 { return b }
+    return a
+}
+
+func firstOf[T: value](xs T[]) -> T {
+    return xs[0]
+}
+
+interface Shape {
+    func area() -> i32
+}
+
+func total[T: Shape](xs T[]) -> i32 {
+    var sum i32 = 0
+    for s in xs {
+        sum = sum + s.area()
+    }
+    return sum
+}
+
+func main() {
+    fmt.println("{maxOf(3, 9)}")
+    fmt.println("{maxOf[i64](-2, -7)}")
+    var xs i64[] = [10, 20]
+    fmt.println("{firstOf(xs)}")
+}

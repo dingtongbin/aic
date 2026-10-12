@@ -1,0 +1,36 @@
+import fmt
+import str
+
+// Option / Result 是根类型，无需 import
+// 不存在 = Option；失败 = Err；任何 API 不得用 Option 表达失败
+func parse(s str) -> (i64, Err) {
+    var v, e = str.toI64(s)
+    if e.code != 0 {
+        return 0, e
+    }
+    return v, nil
+}
+
+func find(xs i64[], t i64) -> Option[i64] {
+    for i in 0..xs.len() {
+        if xs[i] == t { return Option.Some(i64(i)) }
+    }
+    return Option.None
+}
+
+func main() {
+    var v, e = parse("42")
+    if e.code != 0 {
+        fmt.eprintln(e.msg)
+        return
+    }
+    fmt.println("{v}")
+    // parse 失败：Err，不是 Option
+    var _, e2 = parse("abc")
+    fmt.println("{e2.code != 0}")
+    // 找不到：Option，不是 Err
+    match find([1, 2, 3], 2) {
+        Option.Some(i) => { fmt.println("{i}") },
+        Option.None => { fmt.println("not found") },
+    }
+}

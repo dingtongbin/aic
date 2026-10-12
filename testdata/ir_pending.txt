@@ -1,2 +1,0 @@
-# 尚未被自有 IR 下降覆盖的语料（只许变短；L5f/P2 时必须为空）
-testdata/trap/779_param_store_guard.aic

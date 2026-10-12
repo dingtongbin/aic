@@ -1,0 +1,32 @@
+import fmt
+import str
+
+// use 字段 接口：把接口方法提升到本类；本类同名方法优先；use 环 = 编译错误
+interface Sink {
+    func write(b u8[]) -> Err
+}
+
+class MemSink implements Sink {
+    var buf u8[]
+
+    func write(b u8[]) -> Err {
+        this.buf = this.buf.append(b[0])
+        return nil
+    }
+}
+
+class Logger {
+    use sink Sink
+    var sink MemSink
+
+    func log(b u8[]) -> Err {
+        return this.write(b)
+    }
+}
+
+func main() {
+    var l Logger = Logger{sink: MemSink{}}
+    var e = l.log([65])
+    if e.code != 0 { return }
+    fmt.println("{l.sink.buf.len()}")
+}

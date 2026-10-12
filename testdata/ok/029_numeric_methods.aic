@@ -1,0 +1,20 @@
+import fmt
+import str
+
+// math 包已取消：标量数值函数即基本类型方法
+// 整数显式回绕走 wrappingAdd/Sub/Mul；普通算术溢出 = trap
+func main() {
+    fmt.println("{2.0.sqrt()}")
+    fmt.println("{(-3.5).abs()}")
+    fmt.println("{2.0.pow(10.0)}")
+    fmt.println("{1.0.floor()}")
+    fmt.println("{1.0.isNaN()}")
+    // 整数字面量上的方法调用必须先归组（`7.min(3)` 的 `7.` 会被当成浮点起点）
+    var a i64 = 7
+    var b i64 = 3
+    fmt.println("{a.min(b)}")
+    fmt.println("{a.max(b)}")
+    fmt.println("{(-7).abs()}")
+    var m i64 = 9223372036854775807
+    fmt.println("{m.wrappingAdd(1)}")
+}

@@ -1,6 +1,10 @@
 package types
 
-import "aic/internal/parse"
+import (
+	"strings"
+
+	"aic/internal/parse"
+)
 
 // ---------------------------------------------------------------------------
 // std 最小类型面（核心设计 §十四；逐条边界语义 R4 以语料冻结【O9】）。
@@ -13,16 +17,8 @@ func stdType(pkg, name string, c *Checker) Type {
 	if pkg == "time" {
 		return nil // time 无类型，只有函数（见 stdFunc）
 	}
-	if pkg == "sync" && name == "Mutex" {
-		return TMutex
-	}
 	if pkg == "ctx" && name == "Ctx" {
 		return ctxClass()
-	}
-	if pkg == "option" && name == "Option" {
-		if en := optionEnum(); en != nil {
-			return en
-		}
 	}
 	return nil
 }
@@ -102,6 +98,104 @@ func optionEnum() *Enum {
 	return en
 }
 
+// resultEnum 构造 std 的 Result[T]（根类型，懒建一次）：
+// enum Result[T] { Ok(T), Fail(Err) }（《AIC 标准库规范》§1 冻结）。
+// 惯用：E-9 的失败通道标准形态 = chan[Result[T]]。
+var resultOnce *Enum
+
+func resultEnum() *Enum {
+	if resultOnce != nil {
+		return resultOnce
+	}
+	en := &Enum{
+		Name:       "Result",
+		Pkg:        "std", // 根类型：mangling 与 Option 口径一致（不用 option 这个旧包名）
+		HasData:    true,
+		TypeParams: []string{"T"},
+		variantI:   map[string]int{"Ok": 0, "Fail": 1},
+		Variants: []Variant{
+			{Name: "Ok", Payload: &TypeParam{Name: "T"}},
+			{Name: "Fail", Payload: TErr},
+		},
+	}
+	resultOnce = en
+	return en
+}
+
+// valueEnum 构造 std 的 Value 动态值枚举（《AIC 标准库规范》§1）：
+// 替代运行期反射的"未知结构"场景。
+var valueOnce *Enum
+
+func valueEnum() *Enum {
+	if valueOnce != nil {
+		return valueOnce
+	}
+	en := &Enum{
+		Name:     "Value",
+		Pkg:      "std",
+		HasData:  true,
+		variantI: map[string]int{"Null": 0, "Bool": 1, "I64": 2, "F64": 3, "Str": 4, "List": 5, "Obj": 6},
+	}
+	// 递归类型：List(Value[]) / Obj(map[str]Value) 指向枚举自身
+	// （自引用枚举合法——标签是 u32，负载是值，无大小递归）。
+	self := func() Type { return en }
+	en.Variants = []Variant{
+		{Name: "Null"},
+		{Name: "Bool", Payload: TBool},
+		{Name: "I64", Payload: TI64},
+		{Name: "F64", Payload: TF64},
+		{Name: "Str", Payload: TStr},
+		{Name: "List", Payload: &Slice{Elem: self()}},
+		{Name: "Obj", Payload: &MapT{Key: TStr, Value: self()}},
+	}
+	valueOnce = en
+	return en
+}
+// logLevelEnum 构造 std 的 LogLevel 枚举（标准库规范 §3.2）。
+var logLevelOnce *Enum
+
+func logLevelEnum() *Enum {
+	if logLevelOnce != nil {
+		return logLevelOnce
+	}
+	en := &Enum{
+		Name:     "LogLevel",
+		Pkg:      "std",
+		variantI: map[string]int{"Debug": 0, "Info": 1, "Warn": 2, "Error": 3},
+		Variants: []Variant{
+			{Name: "Debug"}, {Name: "Info"}, {Name: "Warn"}, {Name: "Error"},
+		},
+	}
+	logLevelOnce = en
+	return en
+}
+
+// durationType 返回 std 的 Duration 结构体（《AIC 标准库规范》§1）：
+// struct Duration derive Compare { var ms i64 }——真 struct，非别名（S-9）。
+// 构造走 time.Sec/Ms/Us：单位进类型，禁裸毫秒参数。
+var durationOnce *Class
+
+func durationType() *Class {
+	if durationOnce != nil {
+		return durationOnce
+	}
+	cl := &Class{
+		Name:     "Duration",
+		Pkg:      "std",
+		Fields:   []Field{{Name: "ms", Type: TI64}},
+		fieldIdx: map[string]int{"ms": 0},
+		Methods:  map[string]*FuncSig{},
+		Derived:  map[string]bool{"Compare": true},
+	}
+	durationOnce = cl
+	return cl
+}
+
+// optionInstance 构造 Option[T] 实例（stdlib 内部共用，禁第二份定义）。
+func optionInstance(elem Type) Type {
+	return &Instance{Base: optionEnum(), Args: []Type{elem}}
+}
+
 // checkStdCall 类型化 import包.函数(...) 调用。
 func (c *Checker) checkStdCall(v *parse.Call, pkg string, expect Type) (Type, bound, untyped) {
 	fnName := ""
@@ -111,39 +205,44 @@ func (c *Checker) checkStdCall(v *parse.Call, pkg string, expect Type) (Type, bo
 	case *parse.Field:
 		fnName = f.Name
 	}
-	// println 特例：接受任意单值（核心设计 §十四）
-	if pkg == "print" {
-		if fnName != "println" {
-			c.errorAt(v.Pos, "no such function in the print package", "print."+fnName,
-				"the print surface has println only (any single value)")
+	// fmt：程序输出（数据，stdout）。《AIC 标准库规范》§3.1：
+	//   print(s str)    — stdout，不追加换行
+	//   println(s str)  — stdout，追加 '\n'
+	//   eprint(s str)   — stderr，不追加换行
+	//   eprintln(s str) — stderr，追加 '\n'
+	// 签名即契约：**只收 str**（格式化唯一入口是字符串插值，不开第二条
+	// "自动 ToString" 的路）。写失败记 sticky sink，main 退出码 4。
+	if pkg == "fmt" {
+		switch fnName {
+		case "print", "println", "eprint", "eprintln":
+		default:
+			c.errorAt(v.Pos, "no such function in the fmt package", "fmt."+fnName,
+				"the fmt surface is print / println / eprint / eprintln / flush; all output takes a single str")
 			return nil, nilBound, untyped{}
 		}
 		if len(v.Args) != 1 {
-			c.errorAt(v.Pos, "println takes exactly one value", "print.println(v)",
-				"one call prints one value; concatenate several with str + str")
+			c.errorAt(v.Pos, "fmt."+fnName+" takes exactly one str", "fmt."+fnName+"(s)",
+				"format with string interpolation first: fmt.println(\"x={v}\")")
 			return nil, nilBound, untyped{}
 		}
-		// 必须走 checkExpr（而非 checkStmtOnly）：println 的实参类型决定 emit
-		// 侧选哪条打印原语，类型表缺这一条就让任意实参形态（如 grade(95)）发不出去。
-		at, _, _ := c.checkExprFull(v.Args[0], nil)
-		// §二.2：多返回值不是值 ⇒ 不能打印。此前放行，到发射才炸出
-		// "type (i32, Err) cannot be printed"（check 与 build 分叉）。
+		// 参数必须是 str——这是契约。多返回值不能打印。
+		at, _, ai := c.checkExprFull(v.Args[0], TStr)
 		if mt, isMulti := at.(*MultiType); isMulti {
 			c.errorAt(parse.ExprPos(v.Args[0]), "a multi-result call cannot be printed",
 				"the argument produces "+mt.String(),
-				"bind it first: var v, err = f(); then print v (or consume the Err with ? / or / catch / !) (core design §2.2)")
+				"bind it first: var v, err = f(); then print a formatted str")
 			c.types[v] = nil
 			return nil, nilBound, untyped{}
 		}
-		c.requirePrintable(v.Args[0], at, v.Pos)
-		c.types[v] = nil // println 无返回值（省略时该节点会落到「未定型字面量」路径）
+		if at != nil {
+			c.requireAssignableAt(v.Args[0], at, ai, TStr, "fmt."+fnName+" argument")
+		}
+		c.types[v] = nil // fmt 无返回值
 		return nil, nilBound, untyped{}
 	}
-	if pkg == "option" {
-		if res, b, u, handled := c.stdOptionCall(v, fnName, expect); handled {
-			return res, b, u
-		}
-	}
+	// 没有 `option` 包 —— Option/Some/None 是根类型（《AIC 标准库规范》§1）。
+	// 旧助手面（option.ok/none/isSome/isNone/unwrap）随之删除：match 是穷尽的，
+	// 不需要那套查询函数。命中旧拼写会给"no such function"（下面统一报错）。
 	if pkg == "testing" {
 		// 面 = eq/gt/lt（§十四），签名恒为 (实得, 期望, "note")：三参、前两值同型、
 		// 说明是 str（失败消息里原样打印）。
@@ -167,6 +266,25 @@ func (c *Checker) checkStdCall(v *parse.Call, pkg string, expect Type) (Type, bo
 		if mt != nil {
 			c.requireAssignableAt(v.Args[2], mt, mi, TStr, "testing note")
 		}
+		return nil, nilBound, untyped{}
+	}
+	// `log.*Json`（《AIC 标准库规范》§3.2：`log.infoJson[T: Json](v T)`）——
+	// 结构化日志的唯一入口，不引入第二套字段 API。
+	// stdFuncSig 里这条签名的形参只能占位成 TStr（表达不了 `[T: Json]` 的
+	// 约束），**实参判定必须落在这里**：少了这个分支，`log.infoJson(Event{…})`
+	// 会被判成 ok.Event 写进 str（034 实测）。约束走 satisfiesConstraints 的
+	// 单一来源（constraint.go），不另立一份 Json 判据。
+	if pkg == "log" && strings.HasSuffix(fnName, "Json") {
+		if len(v.Args) != 1 {
+			c.errorAt(v.Pos, "log."+fnName+" takes exactly one value", "log."+fnName+"(v)",
+				"structured logging takes a single value (AIC standard library spec §3.2)")
+			return nil, nilBound, untyped{}
+		}
+		at, _, _ := c.checkExprFull(v.Args[0], nil)
+		if at != nil {
+			c.satisfiesConstraints(parse.ExprPos(v.Args[0]), "log."+fnName, "T", at, []string{"Json"})
+		}
+		c.types[v] = nil // log.*Json 无返回值
 		return nil, nilBound, untyped{}
 	}
 	sig, ok2 := stdFuncSig(pkg, fnName)
@@ -199,6 +317,34 @@ type stdSig struct {
 
 func stdFuncSig(pkg, name string) (stdSig, bool) {
 	switch pkg {
+	case "code":
+		// `Code.nameOf(code)`：把错误码翻译回枚举名（G3 一切可枚举，§7.2）。
+		// 编译器从构建图内的全部 ErrCode 枚举生成这张表。
+		if name == "nameOf" {
+			return stdSig{[]string{"code"}, []Type{TI32}, []Type{TStr}}, true
+		}
+	case "value":
+		// 动态值助手（《AIC 标准库规范》§1）
+		switch name {
+		case "kind":
+			return stdSig{[]string{"v"}, []Type{valueEnum()}, []Type{TStr}}, true
+		case "get":
+			return stdSig{[]string{"v", "k"}, []Type{valueEnum(), TStr}, []Type{optionInstance(valueEnum())}}, true
+		case "getIdx":
+			return stdSig{[]string{"v", "i"}, []Type{valueEnum(), TI64}, []Type{optionInstance(valueEnum())}}, true
+		case "asStr":
+			return stdSig{[]string{"v"}, []Type{valueEnum()}, []Type{optionInstance(TStr)}}, true
+		case "asI64":
+			return stdSig{[]string{"v"}, []Type{valueEnum()}, []Type{optionInstance(TI64)}}, true
+		case "asF64":
+			return stdSig{[]string{"v"}, []Type{valueEnum()}, []Type{optionInstance(TF64)}}, true
+		case "asBool":
+			return stdSig{[]string{"v"}, []Type{valueEnum()}, []Type{optionInstance(TBool)}}, true
+		case "asList":
+			return stdSig{[]string{"v"}, []Type{valueEnum()}, []Type{optionInstance(&Slice{Elem: valueEnum()})}}, true
+		case "asObj":
+			return stdSig{[]string{"v"}, []Type{valueEnum()}, []Type{optionInstance(&MapT{Key: TStr, Value: valueEnum()})}}, true
+		}
 	case "str":
 		switch name {
 		case "concat":
@@ -212,24 +358,49 @@ func stdFuncSig(pkg, name string) (stdSig, bool) {
 		case "startsWith", "endsWith":
 			return stdSig{[]string{"s", "p"}, []Type{TStr, TStr}, []Type{TBool}}, true
 		case "indexOf":
-			// 未命中 = -1（语料 682 冻结），故返回有符号 i64 而非 usize
-			return stdSig{[]string{"s", "p"}, []Type{TStr, TStr}, []Type{TI64}}, true
+			// 未命中 = Option.None（《AIC 标准库规范》§2.1：不存在 = Option，不用 -1）
+			return stdSig{[]string{"s", "p"}, []Type{TStr, TStr}, []Type{optionInstance(TI64)}}, true
 		case "fromI64":
 			return stdSig{[]string{"v"}, []Type{TI64}, []Type{TStr}}, true
+		case "fromI64Base":
+			// base ∈ [2,36]；越界 = trap
+			return stdSig{[]string{"v", "base"}, []Type{TI64, TI32}, []Type{TStr}}, true
 		case "fromU64":
 			return stdSig{[]string{"v"}, []Type{TU64}, []Type{TStr}}, true
 		case "fromBool":
 			return stdSig{[]string{"v"}, []Type{TBool}, []Type{TStr}}, true
 		case "fromF64":
 			return stdSig{[]string{"v"}, []Type{TF64}, []Type{TStr}}, true
+		case "fromF64Fix":
+			// digits ∈ [0,17]；越界 = trap
+			return stdSig{[]string{"v", "digits"}, []Type{TF64, TI32}, []Type{TStr}}, true
+		case "fromRune":
+			return stdSig{[]string{"v"}, []Type{TRune}, []Type{TStr}}, true
+		case "fromRunes":
+			// 非法标量值 = trap（C24）
+			return stdSig{[]string{"v"}, []Type{&Slice{Elem: TRune}}, []Type{TStr}}, true
 		case "toI64":
 			return stdSig{[]string{"s"}, []Type{TStr}, []Type{TI64, TErr}}, true
 		case "toF64":
 			return stdSig{[]string{"s"}, []Type{TStr}, []Type{TF64, TErr}}, true
+		case "toBytes":
+			// 拷贝（str 不可变）
+			return stdSig{[]string{"s"}, []Type{TStr}, []Type{&Slice{Elem: TU8}}}, true
+		case "fromBytes":
+			// UTF-8 校验显式（RFC 3629，拒代理区）
+			return stdSig{[]string{"b"}, []Type{&Slice{Elem: TU8}}, []Type{TStr, TErr}}, true
+		case "quote":
+			return stdSig{[]string{"s"}, []Type{TStr}, []Type{TStr}}, true
+		case "rawQuote":
+			return stdSig{[]string{"s"}, []Type{TStr}, []Type{TStr}}, true
+		case "hex":
+			return stdSig{[]string{"b"}, []Type{&Slice{Elem: TU8}}, []Type{TStr}}, true
+		case "fromHex":
+			return stdSig{[]string{"s"}, []Type{TStr}, []Type{&Slice{Elem: TU8}, TErr}}, true
 		case "utf8At":
-			return stdSig{[]string{"s", "i"}, []Type{TStr, TUsize}, []Type{TU32, TUsize}}, true
+			return stdSig{[]string{"s", "i"}, []Type{TStr, TUsize}, []Type{TRune, TUsize}}, true
 		case "codepoints":
-			return stdSig{[]string{"s"}, []Type{TStr}, []Type{&Slice{Elem: TU32}}}, true
+			return stdSig{[]string{"s"}, []Type{TStr}, []Type{&Slice{Elem: TRune}}}, true
 		}
 	case "os":
 		switch name {
@@ -247,78 +418,121 @@ func stdFuncSig(pkg, name string) (stdSig, bool) {
 		case "now", "monotonic":
 			return stdSig{nil, nil, []Type{TI64}}, true
 		case "sleep":
-			return stdSig{[]string{"ms"}, []Type{TI64}, nil}, true
+			// sleep(d Duration)：任务让出（非线程阻塞）。单位进类型（P3）。
+			return stdSig{[]string{"d"}, []Type{durationType()}, nil}, true
 		case "after":
 			// N6：`time.after(ms)` 返回**单调毫秒截止点**（select 的时间分支就绪条件）。
 			return stdSig{[]string{"ms"}, []Type{TI64}, []Type{TI64}}, true
+		case "Sec", "Ms", "Us":
+			// Duration 构造（《AIC 标准库规范》§5.3）：单位进类型，禁裸毫秒参数
+			return stdSig{[]string{"n"}, []Type{TI64}, []Type{durationType()}}, true
+		case "nowSec", "nowMs", "monotonicMs":
+			return stdSig{nil, nil, []Type{TI64}}, true
+		}
+	case "log":
+		// 运维遥测（标准库规范 §3.2）：4 级 + enabled 零成本守卫
+		switch name {
+		case "debug", "info", "warn", "error":
+			return stdSig{[]string{"s"}, []Type{TStr}, nil}, true
+		case "debugJson", "infoJson", "warnJson", "errorJson":
+			// 结构化日志唯一入口 = derive Json（不引入第二套字段 API）。
+			// 签名占位为 TStr：实际参数可以是任意类型，由 checkStdCall 按
+			// Json 派生关系放行（见 checkStdCall 的 logJson 分支）。
+			return stdSig{[]string{"v"}, []Type{TStr}, nil}, true
+		case "setLevel", "enabled":
+			// 级别参数是 LogLevel 枚举（不是 i32）。enabled **返回 bool**
+			// （《AIC 标准库规范》§3.2）—— 漏了返回位会让 `if log.enabled(…)`
+			// 拿不到条件类型（034 实测）。
+			res := []Type(nil)
+			if name == "enabled" {
+				res = []Type{TBool}
+			}
+			return stdSig{[]string{"l"}, []Type{logLevelEnum()}, res}, true
+		case "level":
+			return stdSig{nil, nil, []Type{logLevelEnum()}}, true
 		}
 	case "ctx":
 		switch name {
 		case "new":
 			return stdSig{nil, nil, []Type{ctxClass()}}, true
 		}
-	case "math":
-		switch name {
-		case "abs", "floor", "ceil", "sqrt":
-			return stdSig{[]string{"x"}, []Type{TF64}, []Type{TF64}}, true
-		case "min", "max":
-			return stdSig{[]string{"a", "b"}, []Type{TF64, TF64}, []Type{TF64}}, true
-		case "pow":
-			return stdSig{[]string{"a", "b"}, []Type{TF64, TF64}, []Type{TF64}}, true
-		}
+	// math 包已取消（《AIC 标准库规范》§2.5）：标量数值函数进基本类型方法集。
+	// 留这个分支会让人以为 `import math` 还有意义。
 	}
 	return stdSig{}, false
 }
 
-// checkErrCtor: Err(code i32, msg str) 内建构造（核心设计 §六）。
+// checkErrCtor: Err(code, msg) 内建构造（E-8：首参必须 ErrCode 枚举值）。
+// 错误码**不接受**裸整数——码由编译器按（模块路径哈希, 变体序号）分配，
+// 手写数字必然撞码（《AIC 语言规范》§7.2）。
 func (c *Checker) checkErrCtor(v *parse.Call, isWrap bool) (Type, bound, untyped) {
-	// §16 N5 ④：`Err.wrap(code, msg, cause)` 建链；`Err(code, msg)` 建无链错误。
 	if isWrap {
 		if len(v.Args) != 3 {
-			c.errorAt(v.Pos, "Err.wrap needs (code i32, msg str, cause Err)",
+			c.errorAt(v.Pos, "Err.wrap needs (code, msg, cause)",
 				"got "+itoa(len(v.Args))+" arguments",
-				"write Err.wrap(integer code, \"message\", inner); the inner error becomes the cause")
+				"write Err.wrap(ErrCode.Variant, \"message\", inner); the inner error becomes the cause")
 			return nil, nilBound, untyped{}
 		}
-		ct, _, ci := c.checkExprFull(v.Args[0], TI32)
-		if ct != nil {
-			c.requireAssignableAt(v.Args[0], ct, ci, TI32, "Err.wrap code")
-		} else if ci.kind != unInt && ci.kind != unUint {
-			c.errorAt(parse.ExprPos(v.Args[0]), "the error code must be an integer", exprText(v.Args[0]),
-				"write an integer code: Err.wrap(10, \"message\", inner); code 0 is reserved for no error")
-		}
+		c.checkErrCodeArg(v.Args[0], "Err.wrap code")
 		mt, _, mi := c.checkExprFull(v.Args[1], TStr)
 		if mt != nil {
 			c.requireAssignableAt(v.Args[1], mt, mi, TStr, "Err.wrap msg")
 		} else if mi.kind != unStr {
 			c.errorAt(parse.ExprPos(v.Args[1]), "the error message must be a str", exprText(v.Args[1]),
-				"write a message string: Err.wrap(10, \"message\", inner)")
+				"write a message string: Err.wrap(Code, \"message\", inner)")
 		}
 		kt, _, ki := c.checkExprFull(v.Args[2], TErr)
 		if kt != nil {
 			c.requireAssignableAt(v.Args[2], kt, ki, TErr, "Err.wrap cause")
 		} else if ki.kind != unNil {
-			// 只有 nil（= 无 cause）与真正的 Err 值可以进 cause 位；字面量不行（红线 1）。
 			c.errorAt(parse.ExprPos(v.Args[2]), "the cause must be an Err", exprText(v.Args[2]),
-				"pass the inner error value (or nil): Err.wrap(10, \"message\", inner) (core design §16 N5 ④)")
+				"pass the inner error value (or nil): Err.wrap(Code, \"message\", inner) (AIC language spec §7.2)")
 		}
 		return TErr, bound{off: c.regionOff, exact: true}, untyped{}
 	}
 	if len(v.Args) != 2 {
-		c.errorAt(v.Pos, "Err construction needs (code i32, msg str)",
+		c.errorAt(v.Pos, "Err construction needs (code, msg)",
 			"got "+itoa(len(v.Args))+" arguments",
-			"write Err(integer code, \"message\"); code 0 is reserved for no error")
+			"write Err(ErrCode.Variant, \"message\"); code 0 is reserved for no error")
 		return nil, nilBound, untyped{}
 	}
-	ct, _, ci := c.checkExprFull(v.Args[0], TI32)
-	if ct != nil {
-		c.requireAssignableAt(v.Args[0], ct, ci, TI32, "Err code")
-	}
+	c.checkErrCodeArg(v.Args[0], "Err code")
 	mt, _, mi := c.checkExprFull(v.Args[1], TStr)
 	if mt != nil {
 		c.requireAssignableAt(v.Args[1], mt, mi, TStr, "Err msg")
+	} else if mi.kind != unStr {
+		c.errorAt(parse.ExprPos(v.Args[1]), "the error message must be a str", exprText(v.Args[1]),
+			"write a message string: Err(ErrCode.Variant, \"message\")")
 	}
 	return TErr, bound{off: c.regionOff, exact: true}, untyped{}
+}
+
+// checkErrCodeArg 校验 Err 构造首参：必须是 ErrCode 约束枚举（E-8）。
+// 裸整数 = 编译错误（码由编译器分配，手写数字必然撞码）。
+func (c *Checker) checkErrCodeArg(e parse.Expr, what string) {
+	at, _, u := c.checkExprFull(e, nil)
+	if at == nil {
+		// 未定型整数字面量（`Err(10, "bad")`）：§一 把定型推迟到使用点，
+		// 这里就是使用点 —— 只看 at 会**整条静默放行**（010 语料实测）。
+		if u.kind == unInt || u.kind == unUint {
+			c.errorAt(parse.ExprPos(e), "a bare integer is not an error code",
+				what+": "+u.text+" literal",
+				"write an ErrCode variant: Err(PkgErr.Variant, \"msg\") — codes are assigned by the compiler from the module path hash, so hand-written numbers collide (AIC language spec §7.2, E-8)")
+		}
+		return // 解析失败已在别处报错
+	}
+	if en, ok := at.(*Enum); ok && en.ErrCode {
+		return
+	}
+	if b, ok := at.(*Basic); ok {
+		c.errorAt(parse.ExprPos(e), "a bare integer is not an error code",
+			what+": "+b.Name+" literal",
+			"write an ErrCode variant: Err(PkgErr.Variant, \"msg\") — codes are assigned by the compiler from the module path hash, so hand-written numbers collide (AIC language spec §7.2, E-8)")
+		return
+	}
+	c.errorAt(parse.ExprPos(e), "the error code must be an ErrCode enum",
+		what+": "+at.String(),
+		"declare `enum PkgErr: ErrCode { ... }` and write Err(PkgErr.Variant, \"msg\") (AIC language spec §7.2)")
 }
 
 // requirePrintable 校验一个值能否打印（§十四）：
@@ -383,12 +597,9 @@ func unprintableClass(t Type, depth int) *Class {
 	return nil
 }
 
-// stdOptionEnum: import option 后 Some/None 可用。
+// stdOptionEnum: Option/Some/None 是根类型，无需 import（《AIC 标准库规范》§1）。
 func (c *Checker) stdOptionEnum() (*Enum, bool) {
-	if c.imports["option"] {
-		return optionEnum(), true
-	}
-	return nil, false
+	return optionEnum(), true
 }
 
 // checkOptionSome: Some(x) → Option[实参类型]（负载 TypeParam 由实参定型）。
@@ -400,7 +611,7 @@ func (c *Checker) checkOptionSome(v *parse.Call) (Type, bound, untyped) {
 	at, ab, ainfo := c.checkExprFull(v.Args[0], nil)
 	if at == nil {
 		// 未定型字面量（`Some(9)`）按**默认类型**定型 —— 与 option.ok 同一口径。
-		// 此前直接静默返回 ⇒ 整条声明消失，只剩下游"undeclared name"的级联诊断。
+		// 直接静默返回会让整条声明消失，只剩下游"undeclared name"的级联诊断。
 		at = c.literalDefault(ainfo, parse.ExprPos(v.Args[0]))
 	}
 	if at == nil {
@@ -412,50 +623,4 @@ func (c *Checker) checkOptionSome(v *parse.Call) (Type, bound, untyped) {
 	// Some(x) 是创建表达式（装箱在当前区域）
 	_ = ab
 	return inst, bound{off: c.regionOff, exact: true}, untyped{}
-}
-
-// optionUnwrapSuite: option.ok / none / isSome / isWrap 面_type化。
-func (c *Checker) stdOptionCall(v *parse.Call, fnName string, expect Type) (Type, bound, untyped, bool) {
-	switch fnName {
-	case "ok":
-		if len(v.Args) != 1 {
-			c.errorAt(v.Pos, "option.ok takes exactly one value", "option.ok(v)", "T is decided by the argument")
-			return nil, nilBound, untyped{}, true
-		}
-		at, _, ainfo := c.checkExprFull(v.Args[0], nil)
-		if at == nil {
-			at = c.literalDefault(ainfo, parse.ExprPos(v.Args[0]))
-			if at == nil {
-				return nil, nilBound, untyped{}, true
-			}
-		}
-		return &Instance{Base: optionEnum(), Args: []Type{at}}, bound{off: c.regionOff}, untyped{}, true
-	case "none":
-		if inst, ok := IsOptionInstance(expect); ok {
-			return inst, bound{off: c.regionOff}, untyped{}, true
-		}
-		c.errorAt(v.Pos, "option.none() has no target type", "the right-hand type cannot be inferred",
-			"write the element type in the declaration: var o Option[i32] = option.none()")
-		return nil, nilBound, untyped{}, true
-	case "isSome", "isNone":
-		if len(v.Args) != 1 {
-			c.errorAt(v.Pos, fnName+" takes exactly one argument", "option."+fnName+"(o)", "the argument is an Option value")
-			return nil, nilBound, untyped{}, true
-		}
-		c.checkStmtOnly(v.Args[0])
-		return TBool, nilBound, untyped{}, true
-	case "unwrap":
-		if len(v.Args) != 1 {
-			c.errorAt(v.Pos, "unwrap takes exactly one argument", "option.unwrap(o)", "the argument is an Option value")
-			return nil, nilBound, untyped{}, true
-		}
-		at, _, _ := c.checkExprFull(v.Args[0], nil)
-		if inst, ok := IsOptionInstance(at); ok {
-			return inst.Args[0], nilBound, untyped{}, true
-		}
-		c.errorAt(v.Pos, "the argument of unwrap must be an Option value", typeOrUn(at, untyped{}),
-			"test isSome first, or destructure with match")
-		return nil, nilBound, untyped{}, true
-	}
-	return nil, nilBound, untyped{}, false
 }

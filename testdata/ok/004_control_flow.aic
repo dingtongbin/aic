@@ -1,0 +1,36 @@
+import fmt
+import str
+
+// for 五形态（唯一循环构造）；无 while / 无循环标签
+func main() {
+    // 形态 1：条件
+    var i = 0
+    for i < 3 {
+        fmt.println("{i}")
+        i += 1
+    }
+    // 形态 2：三段
+    for var j = 0; j < 3; j += 1 {
+        fmt.println("{j}")
+    }
+    // 形态 3：范围（半开）；计数变量类型 = 末端表达式类型
+    for k in 0..3 {
+        fmt.println("{k}")
+    }
+    // 形态 4：for-in 单名
+    var xs i32[] = [7, 8, 9]
+    for v in xs {
+        fmt.println("{v}")
+    }
+    // 形态 5：for-in 双名（值, 下标）
+    for v, idx in xs {
+        fmt.println("{idx}")
+        fmt.println("{v}")
+    }
+    // break / continue
+    for m in 0..10 {
+        if m == 2 { continue }
+        if m == 4 { break }
+        fmt.println("{m}")
+    }
+}

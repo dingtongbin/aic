@@ -241,33 +241,67 @@ func g() {
 func TestMatchRejects(t *testing.T) {
 	// 表达式形分支不能是块
 	mustFail(t, "func f(e i32) {\n    var x = match e { A => { } }\n}\n", "not a `{ ... }` block")
-	// 或模式不在表面
-	mustFail(t, "enum E { A, B }\nfunc f(e E) {\n    match e {\n        E.A | E.B => { }\n    }\n}\n", "`|` and or-patterns")
+	// 或模式不存在
+	mustFail(t, "enum E { A, B }\nfunc f(e E) {\n    match e {\n        E.A | E.B => { }\n    }\n}\n", "or-patterns")
 	// 通配符 `_` 不是模式
 	mustFail(t, "enum E { A, B }\nfunc f(e E) {\n    match e {\n        _ => { }\n    }\n}\n", "invalid match pattern")
 	// 无字面量模式
 	mustFail(t, "enum E { A, B }\nfunc f(e E) {\n    match e {\n        1 => { }\n    }\n}\n", "invalid match pattern")
 }
 
-// --- 用例组 4：lambda ------------------------------------------------------------
+// --- 用例组 4：函数值与闭包 ------------------------------------------------------
 
-func TestLambdaForms(t *testing.T) {
-	// 单参表达式体
-	f := mustParse(t, "func f() {\n    var g = x => x + 1\n    g(1)\n}\n")
-	fn := f.Decls[0].(*FuncDecl)
-	init := fn.Body.Stmts[0].(*VarDecl)
-	lm, ok := init.Init.(*LambdaExpr)
-	if !ok || len(lm.Params) != 1 || lm.Params[0] != "x" || lm.Body == nil {
-		t.Fatalf("x => x + 1 解析不符：%T", init.Init)
-	}
-	// 括号参数 + 块体
-	mustParse(t, "func f() {\n    var g = (a, b) => {\n        return a + b\n    }\n    g(1, 2)\n}\n")
-	// 函数类型：v2 无 func 类型关键字，写作 (P) -> R（核心设计 §三）
+// TestFuncLitIsTheOnlyForm：`func(...)` 字面量是唯一拼写。
+// `=>` 不是运算符：同一语义不允许两种拼写（P1）。
+func TestFuncLitIsTheOnlyForm(t *testing.T) {
+	// 判据 = 可解析（AST 形状由更下层的用例看住，这里看形态覆盖面）。
+	// 单参 + 紧凑形态
+	mustParse(t, "func f() {\n    var g = func(x i32) -> i32 { return x + 1 }\n    g(1)\n}\n")
+	// 多参
+	mustParse(t, "func f() {\n    var g = func(a i32, b i32) -> i32 { return a + b }\n    g(1, 2)\n}\n")
+	// 无参（空形参表 `()`）
+	mustParse(t, "func f() {\n    var g = func() { }\n}\n")
+	// fallible 闭包：多结果 + Err 末位
+	mustParse(t, "func f() {\n    var g = func(p str) -> (str, Err) { return p, nil }\n}\n")
+	// 零参函数类型作参数（`() -> (str, Err)`）
+	mustParse(t, "func f(g () -> (str, Err)) -> str {\n    return g() catch { \"d\" }\n}\n")
+	// 函数类型写作 (P) -> R（无 func 类型关键字）
 	mustParse(t, "func apply(g (i32, i32) -> i32) -> i32 {\n    return g(1, 2)\n}\n")
-	// lambda 作实参
-	mustParse(t, "func take(g (i32) -> i32) {\n}\nfunc f() {\n    take(x => x * 2)\n}\n")
+	// 闭包作实参
+	mustParse(t, "func take(g (i32) -> i32) {\n}\nfunc f() {\n    take(func(x i32) -> i32 { return x * 2 })\n}\n")
 }
 
+// TestArrowLambdaRejected：`x => e` 与 `(a, b) => a + b` 必须被拒绝。
+func TestArrowLambdaRejected(t *testing.T) {
+	// `=>` 不是任何合法拼写。判据 = **必须被拒绝**（具体文案随解析路径而
+	// 定：`x => …` 在标识符后遇到 `=>`；`(a, b) => …` 在括号表达式后遇到 `=>`）。
+	// 两条都是"解析无法继续"类的错误。
+	mustFail(t, "func f() {\n    var g = x => x + 1\n}\n", "")
+	mustFail(t, "func f() {\n    var g = (a, b) => a + b\n}\n", "")
+}
+
+// TestCatchBindingOptional：catch 绑定可选（v7 §5.6）。
+func TestCatchBindingOptional(t *testing.T) {
+	// 不绑定：失败取默认值
+	mustParse(t, "func f(g () -> (str, Err)) -> str {\n    return g() catch { \"default\" }\n}\n"+
+		"func g() -> (str, Err) { return \"x\", nil }\n")
+	// 绑定：就地处理
+	mustParse(t, "func f(g () -> (str, Err)) -> str {\n    return g() catch e { return e.msg }\n}\n"+
+		"func g() -> (str, Err) { return \"x\", nil }\n")
+}
+
+// TestQuestionRejected 与 TestArrowLambdaRejected 只断言**本层**能判定的拒绝：
+//   `?` 不在运算符表 → 词法层必须报错；
+//   `x => e` 的 `=>` 不是任何合法拼写 → 语法层必须报错。
+// `f() or d` 的拒绝发生在检查器（`or` 沦为未声明标识符），
+// 由 testdata/err/003_or_fallback.aic 在 golden 层断言——parse 包不能 import
+// types（会成环），不在这里重复断言。
+func TestQuestionRejected(t *testing.T) {
+	_, lexErrs, _ := Source("t.aic", "func f(g () -> (str, Err)) {\n    var v = g()?\n}\n")
+	if len(lexErrs) == 0 {
+		t.Error("`?` 不在运算符表，词法层应报错")
+	}
+}
 // --- 用例组 5：复合字面量与条件位歧义 ----------------------------------------------
 
 func TestCompositeLiteral(t *testing.T) {
@@ -351,26 +385,33 @@ func TestTopLevelRules(t *testing.T) {
 
 // --- 用例组 10：无继承、无 implements ----------------------------------------------
 
-func TestNoInheritanceNoImplements(t *testing.T) {
+// `implements` 是**硬关键字**，且是接口满足的唯一途径
+// （《AIC 语言规范》§3.1 / C10）。结构式满足不存在——大项目里"谁实现了这个
+// 接口"必须可 grep。
+func TestImplementsIsTheOnlySatisfactionPath(t *testing.T) {
+	// implements 子句必须解析干净
+	mustParse(t, "interface I {\n    func m() -> i32\n}\nclass C implements I {\n    func m() -> i32 {\n        return 1\n    }\n}\n")
+	// struct 也可 implements
+	mustParse(t, "interface I {\n    func m() -> i32\n}\nstruct S implements I {\n    var v i32\n    func m() -> i32 {\n        return this.v\n    }\n}\n")
+	// 类级 `:` 继承仍然拒绝（无继承）
 	mustFail(t, "class A {\n}\nclass B: A {\n}\n", "no inheritance")
-	mustFail(t, "interface I {\n    func m()\n}\nclass C implements I {\n    func m() {\n    }\n}\n", "`implements` is retired")
+	// implements 后必须是接口名
+	mustFail(t, "interface I {\n    func m() -> i32\n}\nclass C implements 42 {\n    func m() -> i32 {\n        return 1\n    }\n}\n", "")
 }
 
-// --- 用例组 11：退役词定向报错（附录 A / 防坑清单 1） --------------------------------
+// --- 用例组 11：普通标识符（《AIC 语言规范》§1.3） --------------------------------
 
-func TestRetiredKeywordsGetTargetedErrors(t *testing.T) {
-	cases := []struct{ src, want string }{
-		{"func f() {\n    while x < 3 {\n    }\n}\n", "`while` is retired"},
-		{"func f(b bool) {\n    if b {\n    } elseif b {\n    }\n}\n", "`elseif` is retired"},
-		{"func f() {\n    handle err {\n    }\n}\n", "`handle` is retired"},
-		{"func f() {\n    await g()\n}\nfunc g() {\n}\n", "`await` is retired"},
-		{"func f() {\n    del x\n}\n", "`del` is retired"},
-		{"func f() {\n    var mut x = 1\n    _ = x\n}\n", "`mut` is retired"},
-		{"func f(x i32) {\n    return mut + 1\n}\n", "`mut` is retired"},
-	}
-	for _, c := range cases {
-		mustFail(t, c.src, c.want)
-	}
+// while/elseif/handle/await/del/mut 不是关键字：能放标识符的位置就能放它们，
+// 解析层不为这些拼写定制任何诊断。
+//
+// 反面（`while x < 3 {}` 这类写法不被接受）由 testdata/err/023_not_a_loop.aic
+// 在**全管线**层锁定：解析层把它们读成三条普通语句，拒绝发生在检查器。
+func TestNonKeywordSpellingsArePlainIdentifiers(t *testing.T) {
+	// 变量 / 函数 / 类 / 字段 / 形参 / 局部量
+	mustParse(t, "func f() -> i32 {\n    var while i32 = 1\n    return while\n}\n")
+	mustParse(t, "func handle() {\n}\nfunc f() {\n    handle()\n}\n")
+	mustParse(t, "class mut {\n    var del i32\n}\n")
+	mustParse(t, "func f(elseif i32) -> i32 {\n    var await = elseif\n    return await\n}\n")
 }
 
 // --- 用例组 12：Err 末位（红线 2）与 check 位置 -------------------------------------
@@ -382,8 +423,8 @@ func TestErrLastAndCheckPosition(t *testing.T) {
 	mustParse(t, "func open(p str) -> Err {\n    return Err(0, \"\")\n}\nfunc f(p str) -> Err {\n    var e = check open(p)\n    return e\n}\n")
 	// check 嵌套在实参里 = 错
 	mustFail(t, "func open(p str) -> Err {\n    return Err(0, \"\")\n}\nfunc g(x i32) {\n}\nfunc f() -> Err {\n    g(check open(\"\"))\n    return Err(0, \"\")\n}\n", "check may only appear")
-	// lambda 内 check 合法（lambda 参数不带类型；类型写在参数位 (P) -> R）
-	mustParse(t, "func open(p str) -> Err {\n    return Err(0, \"\")\n}\nfunc f() {\n    var g = (p) => check open(p)\n    g(\"\")\n}\n")
+	// 闭包内 check 合法（唯一形态是 func 字面量，形参带类型）
+	mustParse(t, "func open(p str) -> Err {\n    return Err(0, \"\")\n}\nfunc f() {\n    var g = func(p str) -> Err { return check open(p) }\n    g(\"\")\n}\n")
 	// const 初始化禁 check
 	mustFail(t, "func open(p str) -> Err {\n    return Err(0, \"\")\n}\nconst K = check open(\"\")\n", "const")
 }
@@ -417,7 +458,7 @@ class C {
 
 func TestMultipleErrorsOneRun(t *testing.T) {
 	// 两个错误分别位于独立函数：恢复停在函数边界，第二次编译报出全部。
-	errs := parseErrors(t, "func f() {\n    while 1 {\n    }\n}\n\nfunc g() {\n    handle e {\n    }\n}\n")
+	errs := parseErrors(t, "func f() {\n    var p (i32, str)\n}\n\nfunc g() {\n    var q (i32, str)\n}\n")
 	if len(errs) < 2 {
 		t.Fatalf("一次编译应报出全部错误，实际 %d：%s", len(errs), descList(errs))
 	}

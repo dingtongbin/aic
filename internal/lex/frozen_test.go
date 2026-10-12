@@ -1,29 +1,30 @@
 package lex
 
 import (
-	"strings"
 	"testing"
 )
 
-// TestFrozenSurface is the H7 gate (核心设计 §一/§十三): the literal surface
-// tables must match the frozen lists exactly — no additions, no removals.
-// v2 = 24 keywords + 4 annotations (R0 换基 + R20：@live 退役为 live 关键字;
-// v1 的 29+8 全部随附录 A 退役).
+// TestFrozenSurface is the H7 gate (《AIC 语言规范》§1.3/§1.5): the literal
+// surface tables must match the frozen lists exactly — no additions, no
+// removals.
+// v7 = 36 keywords + 0 contextual words + 0 annotations.
 func TestFrozenSurface(t *testing.T) {
 	t.Run("keywords", func(t *testing.T) {
 		want := []string{
-			"class", "interface", "enum", "var", "const", "live", "func",
+			"class", "interface", "enum", "struct", "var", "const", "live", "func",
 			"if", "else", "for", "in",
 			"return", "break", "continue",
-			"match", "defer", "check",
-			"spawn", "scope", "region", "this",
+			"match", "defer", "errdefer", "check", "catch",
+			"spawn", "scope", "region", "this", "into",
+			"select", "case", "use", "implements", "include", "derive",
+			"comptime", "assert",
 			"import", "export", "extern",
 		}
-		if len(want) != 24 {
-			t.Fatalf("冻结清单自身出错：期望 24 个关键字，清单含 %d 个", len(want))
+		if len(want) != 36 {
+			t.Fatalf("冻结清单自身出错：期望 36 个关键字，清单含 %d 个", len(want))
 		}
-		if len(Keywords) != 24 {
-			t.Fatalf("Keywords 表大小 = %d，期望 24（H7：表面不许增减）", len(Keywords))
+		if len(Keywords) != 36 {
+			t.Fatalf("Keywords 表大小 = %d，期望 36（H7：表面不许增减）", len(Keywords))
 		}
 		if len(KeywordNames) != len(want) {
 			t.Fatalf("KeywordNames 长度 = %d，期望 %d", len(KeywordNames), len(want))
@@ -50,36 +51,36 @@ func TestFrozenSurface(t *testing.T) {
 		}
 	})
 
-	t.Run("retired", func(t *testing.T) {
-		// 防坑清单 1: while/elseif/implements/handle/await/del/mut
-		// 均非关键字——出现了就是事故。它们必须以 IDENT 身份流出，由解析层
-		// 给出定向的退役报错。
-		// 注意：`errdefer` 已由 N8 收回（核心设计 §16），以**上下文关键字**身份
-		// 在语句位识别，故不在此列（H7：关键字与注解表不变）。
-		for _, r := range RetiredNames {
-			if Keywords[r] {
-				t.Errorf("退役词 %q 不得出现在关键字表（H7）", r)
+	t.Run("plain identifiers", func(t *testing.T) {
+		// 《AIC 语言规范》§1.3：while/elseif/handle/await/del/mut 是**普通标识符**，
+		// 不在关键字表里；词法一律以 IDENT 流出（解析层不为它们定制任何诊断）。
+		words := []string{"while", "elseif", "handle", "await", "del", "mut"}
+		for _, w := range words {
+			if Keywords[w] {
+				t.Errorf("%q 不得出现在关键字表（H7）", w)
 			}
 		}
-		if len(RetiredNames) != 7 {
-			t.Fatalf("退役名单数量 = %d，期望 7", len(RetiredNames))
-		}
-		toks, errs := File("t.aic", "while elseif implements handle await del mut")
+		toks, errs := File("t.aic", "while elseif handle await del mut")
 		if len(errs) != 0 {
-			t.Fatalf("退役词应词法干净（作为标识符流出）: %v", errs)
+			t.Fatalf("这些拼写词法必须干净（作为标识符流出）: %v", errs)
 		}
-		for i := range RetiredNames {
-			if toks[i].Kind != IDENT || toks[i].Text != RetiredNames[i] {
-				t.Errorf("token[%d] = %s %q，期望 IDENT %q", i, toks[i].Kind, toks[i].Text, RetiredNames[i])
+		for i := range words {
+			if toks[i].Kind != IDENT || toks[i].Text != words[i] {
+				t.Errorf("token[%d] = %s %q，期望 IDENT %q", i, toks[i].Kind, toks[i].Text, words[i])
 			}
 		}
-		// errdefer 同样是 IDENT（不是关键字），但属于**合法**表面。
-		if Keywords["errdefer"] {
-			t.Errorf("errdefer 不得成为第 24 个关键字（H7）")
-		}
-		etoks, eerrs := File("t.aic", "errdefer")
-		if len(eerrs) != 0 || etoks[0].Kind != IDENT {
-			t.Errorf("errdefer 必须是 IDENT（上下文关键字），实际 %v %v", etoks[0], eerrs)
+		// errdefer/select/case/use/comptime/assert/catch/into/include/derive
+		// 全部从上下文词升为**硬关键字**（上下文关键字归零，P4 要求零猜测）。
+		// 它们必须词法为 KW，不得作标识符。
+		for _, k := range []string{"errdefer", "select", "case", "use", "comptime",
+			"assert", "catch", "into", "include", "derive"} {
+			if !Keywords[k] {
+				t.Errorf("%q 必须是硬关键字（v7 上下文词归零）", k)
+			}
+			ktoks, kerrs := File("t.aic", k)
+			if len(kerrs) != 0 || ktoks[0].Kind != KW {
+				t.Errorf("%q 应词法为 KW，实际 %v %v", k, ktoks[0], kerrs)
+			}
 		}
 	})
 
@@ -98,42 +99,41 @@ func TestFrozenSurface(t *testing.T) {
 		}
 	})
 
-	t.Run("annotations", func(t *testing.T) {
-		want := []string{"packed", "derive", "noblock", "blocking"}
-		if len(want) != 4 {
-			t.Fatalf("冻结清单自身出错：期望 4 个注解，清单含 %d 个", len(want))
+	t.Run("no-annotations", func(t *testing.T) {
+		// 语言没有注解机制。@packed/@derive/@noblock/@blocking 都不是合法写法，
+		// `@` 不是词法可接受字符，出现即词法错误。
+		_, errs := File("t.aic", "@packed class P { var x i32 }")
+		if len(errs) == 0 {
+			t.Fatalf("@packed 应报词法错误（语言没有注解机制）")
 		}
-		if len(Annotations) != len(want) {
-			t.Fatalf("Annotations 表大小 = %d，期望 %d（H7 = 4 注解）", len(Annotations), len(want))
+	})
+
+	t.Run("no-question-operator", func(t *testing.T) {
+		// `?` 不是运算符：唯一传播形态是 check（《AIC 语言规范》§5.6）。
+		_, errs := File("t.aic", "var v = f()?")
+		if len(errs) == 0 {
+			t.Fatalf("`?` 应报词法错误（`?` 不在运算符表）")
 		}
-		if len(AnnotationNames) != len(want) {
-			t.Fatalf("AnnotationNames 长度 = %d，期望 %d", len(AnnotationNames), len(want))
+	})
+
+	t.Run("basic-type-names", func(t *testing.T) {
+		// 《AIC 语言规范》§2.1：15 个基本类型名禁作用户标识符（C2）。
+		if len(BasicTypeNames) != 15 {
+			t.Fatalf("基本类型名数量 = %d，期望 15", len(BasicTypeNames))
 		}
-		for i, a := range want {
-			if AnnotationNames[i] != a {
-				t.Errorf("AnnotationNames[%d] = %q，期望 %q", i, AnnotationNames[i], a)
+		for _, b := range BasicTypeNames {
+			if b == "" {
+				t.Errorf("基本类型名清单含空条目")
 			}
-			if !Annotations[a] {
-				t.Errorf("Annotations 缺少冻结注解 %q", a)
-			}
-		}
-		for a := range Annotations {
-			found := false
-			for _, w := range want {
-				if w == a {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Annotations 含冻结名单外条目 %q（H7 违规）", a)
+			if Keywords[b] {
+				t.Errorf("基本类型名 %q 不得同时列为关键字", b)
 			}
 		}
 	})
 
 	t.Run("live-is-a-keyword", func(t *testing.T) {
-		// R20：`live` 是第 24 个关键字（变量存储层级修饰），不是注解、不是标识符。
-		// 旧形态 @live 必须有迁移提示（不是裸"未知注解"）。
+		// `live` 是变量存储层级修饰关键字（第 7 个），不是注解、不是标识符。
+		// `@live` 不是合法写法 —— `@` 不是词法可接受字符，报"无法识别字符"。
 		toks, errs := File("t.aic", "var live x")
 		if len(errs) != 0 {
 			t.Fatalf("`var live x` 应词法干净: %v", errs)
@@ -144,13 +144,9 @@ func TestFrozenSurface(t *testing.T) {
 				t.Errorf("token[%d] kind = %s，期望 %s", i, toks[i].Kind, k)
 			}
 		}
-		if toks[0].Text != "var" || toks[1].Text != "live" {
-			t.Errorf("token 文本 = %q %q，期望 \"var\" \"live\"", toks[0].Text, toks[1].Text)
-		}
+		// @live 现在只能得到"非法字符"，因为 @ 已不是词法字符
 		if _, errs := File("t.aic", "@live x"); len(errs) != 1 {
-			t.Fatalf("旧 @live 应恰好一个词法错误，实际 %d 个: %v", len(errs), errs)
-		} else if !strings.Contains(errs[0].Fix, "live is a keyword now") {
-			t.Errorf("旧 @live 的错误缺迁移提示：%q", errs[0].Fix)
+			t.Errorf("旧 @live 应恰好一个词法错误（@ 已非法），实际 %d 个", len(errs))
 		}
 	})
 
@@ -200,20 +196,20 @@ func TestFrozenSurface(t *testing.T) {
 	})
 
 	// H7 缺口补齐（L4-h）：冻结面不止关键字与注解 —— **运算符表**与**类型构造子**
-	// 同样是"使用者会当成语法"的表面。此前 H7 只钉前两张表，`?`/`or`/`catch`/后缀 `!`
+	// 同样是"使用者会当成语法"的表面，H7 必须四张表一起钉 —— 只钉前两张表，`?`/`or`/`catch`/后缀 `!`
 	// 四个 E1–E4 运算符与 `bytes`/`chan[T]`/`map[K]V`/`set[T]`/`[T;N]`/`func(T)->R` 六个
 	// 类型构造子都没有断言（文档与实现脱节时门禁看不出来）。
 	t.Run("operators", func(t *testing.T) {
-		// 冻结运算符表（核心设计 §一 + §16 N5 的四个错误通路运算符）。
-		// 逐条**必须能词法成 PUNCT 或 IDENT**（`or`/`catch`/`check`/`in` 是上下文关键字，
-		// 词法层按 IDENT 流出、由解析层在语句/表达式位认出）。
+		// 冻结运算符表（《AIC 语言规范》§1.5）——逐条必须能词法为 PUNCT。
+		// v7 删除：`?`（与 check 同语义）、`::`、`...`。
+		// v7 未采用：复合位运算赋值（`&=` 等）—— 写 `x = x & m` 零歧义。
 		ops := []string{
 			"+", "-", "*", "/", "%",
 			"==", "!=", "<", "<=", ">", ">=",
 			"&&", "||", "!",
 			"&", "|", "^", "<<", ">>",
-			"=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=",
-			".", ",", ";", ":", "::", "->", "=>", "?", "...", "..", "[", "]", "(", ")", "{", "}",
+			"=", "+=", "-=", "*=", "/=", "%=",
+			".", ",", ";", ":", "->", "=>", "..", "[", "]", "(", ")", "{", "}",
 		}
 		for _, op := range ops {
 			toks, errs := File("t.aic", op)
@@ -225,15 +221,22 @@ func TestFrozenSurface(t *testing.T) {
 				t.Errorf("冻结运算符 %q 应词法为 PUNCT，实际 %s", op, toks[0].Kind)
 			}
 		}
-		// 上下文关键字（词法层 = IDENT；解析层在对应位置认出）。
-		// 注意 `check` **是** 23 关键字之一（不是上下文关键字），故不在此列。
-		for _, ck := range []string{"or", "catch", "errdefer", "comptime"} {
-			toks, errs := File("t.aic", ck)
-			if len(errs) != 0 || toks[0].Kind != IDENT {
-				t.Errorf("上下文关键字 %q 必须是 IDENT（不占 23 关键字表），实际 %v %v", ck, toks[0], errs)
+		// 未采用的拼写：不得成为**单一** token（被切成两个 token 后由解析层
+		// 报错，同样是拒绝；这里钉住的是"词法层不认这个拼写"）。
+		for _, bad := range []string{"?", "::", "...", "&=", "|=", "^=", "<<=", ">>="} {
+			toks, errs := File("t.aic", bad)
+			if len(errs) != 0 {
+				continue // 词法直接报错，也是拒绝
 			}
-			if Keywords[ck] {
-				t.Errorf("上下文关键字 %q 不得进关键字表（H7）", ck)
+			if len(toks) > 0 && toks[0].Kind == PUNCT && toks[0].Text == bad {
+				t.Errorf("未采用的拼写 %q 不应成为单一 token", bad)
+			}
+		}
+		// 上下文关键字 0 个。catch/errdefer/comptime 等都是硬关键字（KW）。
+		for _, k := range []string{"catch", "errdefer", "comptime"} {
+			toks, errs := File("t.aic", k)
+			if len(errs) != 0 || toks[0].Kind != KW {
+				t.Errorf("%q 必须是硬关键字（上下文词归零），实际 %v %v", k, toks[0], errs)
 			}
 		}
 	})
@@ -241,7 +244,8 @@ func TestFrozenSurface(t *testing.T) {
 	t.Run("type-constructors", func(t *testing.T) {
 		// 类型构造子：预声明类型名 + 容器/通道/数组/函数类型的**前缀与后缀**写法。
 		// 判据 = 词法干净（名必须是 IDENT 或关键字位）；语义解析由 parse/types 负责。
-		idents := []string{"bytes", "f32", "f64", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize", "bool", "str", "map", "set", "chan"}
+		// `bytes` 不是类型名（u8 才是）；`rune` 在册。
+		idents := []string{"f32", "f64", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize", "bool", "str", "rune", "map", "set", "chan"}
 		for _, id := range idents {
 			toks, errs := File("t.aic", id)
 			if len(errs) != 0 {

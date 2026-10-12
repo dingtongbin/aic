@@ -1,5 +1,0 @@
-func f() {
-    handle err {
-        return
-    }
-}

@@ -1,33 +1,21 @@
 package parse
 
+
+var debugParen = false
+
 // Expression parsing with explicit precedence climbing (单遍，无回溯).
 // Precedence, low to high: assignment < lambda < || < && < | < ^ < &
 // < equality < relational < shift < additive < multiplicative < unary <
 // postfix (call / index / field / composite literal).
 //
-// v2：`..` 只存在于 for-in 位与 str 视图位（核心设计 §一/§二.3）；复合字面量
+// `..` 只存在于 for-in 位与 str 视图位（核心设计 §一/§二.3）；复合字面量
 // C{f: v} 合法化，但条件位禁写（与块体 `{` 歧义，Go 同款规则）。
 
-// parseExpr parses one expression including assignment forms and the
-// lowest-precedence error path `or` (核心设计 §15.7 E2).
+// parseExpr parses one expression including the assignment forms.
+// `or` 不是运算符（P1 违反）——失败取默认值走 catch 的不绑定形态
+// （《AIC 语言规范》§5.6）。
 func (p *Parser) parseExpr() Expr {
-	e := p.parseAssign()
-	// `expr or <默认值>`：优先级最低（低于赋值右侧的一切），左结合链式。
-	for p.atIdent("or") && p.sameLine(e) {
-		at := p.pos()
-		p.next()
-		def := p.parseAssign()
-		e = &OrExpr{X: e, Default: def, Pos: at}
-	}
-	return e
-}
-
-// atIdent reports whether the cursor sits on a plain identifier with the given
-// spelling. `or` / `catch` 保持**上下文关键字**身份（H7：关键字恒为 23 个），
-// 只在运算符位被识别。
-func (p *Parser) atIdent(name string) bool {
-	t := p.cur()
-	return t.Kind == IDENT && t.Text == name
+	return p.parseAssign()
 }
 
 func (p *Parser) parseAssign() Expr {
@@ -42,11 +30,6 @@ func (p *Parser) parseAssign() Expr {
 	}
 	if p.at(PUNCT, ",") && p.multiAssignAhead() && p.multiTargetsAhead() {
 		return p.parseMultiAssignTail(lhs)
-	}
-	// Pure lambda with an unparenthesised parameter: x => e
-	if id, ok := lhs.(*Ident); ok && p.at(PUNCT, "=>") {
-		p.next()
-		return p.parseLambdaTail([]string{id.Name}, id.Pos)
 	}
 	return lhs
 }
@@ -316,16 +299,36 @@ func (p *Parser) parsePostfix() Expr {
 			p.expect(PUNCT, ")", "call is missing the closing `)`")
 			x = call
 		case p.at(PUNCT, "["):
+			// `map[K]V` / `set[T]` 在**表达式位**（`.new()` 的接收者）：
+			// 值类型 V 跟在 `]` 之后、括号之外，普通 Index 只会吃掉 `[K]`
+			// 而把 V 留在符号流里 → 后续解析全乱。
+			// 判据：类型构造子在表达式位必须有与类型位一致的吃掉规则（P1 无歧义）。
+			if id, ok := x.(*Ident); ok && (id.Name == "map" || id.Name == "set") {
+				p.next() // [
+				key := p.parseType()
+				if !p.expect(PUNCT, "]", "map/set type constructor is missing the closing `]`") {
+					return x
+				}
+				// set[T] 只有一个类型实参；map[K]V 有两个（值类型在 `]` 之外）。
+				// 判据：值类型之后可能紧跟 `.new()`，而 parseType 会把 `.` 当成
+				// 包限定名的前缀（pkg.Type）从而吞掉 `.new`——表达式位的值类型
+				// 只吃到"单个类型名"为止。
+				var val TypeExpr
+				if id.Name == "map" {
+					val = p.parseTypeNoDot()
+				}
+				x = &TypeExprNode{Name: id.Name, Key: key, Val: val, Pos: at}
+				continue
+			}
 			p.next()
 			idx := p.parseExpr()
 			var end Expr
 			var typeArgs []Expr
-			if p.at(PUNCT, "..") { // s[i..j] str 视图（核心设计 §二.3）
+			if p.at(PUNCT, "..") { // s[i..j] str 视图
 				p.next()
 				end = p.parseExpr()
 			} else if p.at(PUNCT, ",") {
-				// `Name[T, U]`：表达式位的多实参泛型实例化（单实参走 Index 本身，
-				// 与下标读写同形，由 checker 按头部名字区分）。
+				// `Name[T, U]`：表达式位的多实参泛型实例化
 				for p.at(PUNCT, ",") {
 					p.next()
 					typeArgs = append(typeArgs, p.parseExpr())
@@ -337,26 +340,21 @@ func (p *Parser) parsePostfix() Expr {
 			p.next()
 			if !p.atKind(IDENT) && p.cur().Kind != KW && p.cur().Kind != RES {
 				p.errorHere(at, "member name is missing after the dot", "got "+describe(p.cur()),
-					"write `.member`; a member name starts with an ASCII letter or `_` (this.x / sync.Mutex)")
+					"write `.member`; a member name starts with an ASCII letter or `_`")
 				p.synchronize(false)
 				return x
 			}
 			x = &Field{X: x, Name: p.next().Text, Pos: at}
-		case p.at(PUNCT, "?"):
-			// `expr?` = E1 传播（与 `check expr` 等价；后缀形位置无关，推荐）。
-			p.next()
-			x = &CheckExpr{X: x, Postfix: true, Pos: at}
 		case p.at(PUNCT, "!"):
 			// `expr!` = E4 断言（出错即 trap）。注意与一元 `!x` 的区别：
 			// 这一支只在**表达式之后**到达，故不会与前缀取反冲突。
 			p.next()
 			x = &AssertExpr{X: x, Pos: at}
-		case p.atIdent("catch") && p.sameLine(x):
-			// `expr catch e { … }` = E3 就地处理。
+		case p.at(KW, "catch") && p.sameLine(x):
+			// `expr catch { … }` / `expr catch e { … }` = E3 就地处理（§5.6）。
 			x = p.parseCatchTail(x)
 		case p.at(PUNCT, "{") && p.noComposite == 0 && p.compositeHead(x) && p.sameLine(x):
-			// C{f: v}（核心设计 §四）。条件位 noComposite > 0：`{` 归块体，
-			// 不组字面量（`if ready {` 因此不受影响）。
+			// C{f: v}。条件位 noComposite > 0：`{` 归块体，不组字面量。
 			x = p.parseCompositeTail(x)
 		default:
 			return x
@@ -409,80 +407,20 @@ func (p *Parser) parseCompositeTail(head Expr) Expr {
 	return c
 }
 
-// parseLambdaTail finishes a lambda after its parameter list: `=> body`.
-// Body form: expression, or `{ …; return r }` block (核心设计 §三).
-func (p *Parser) parseLambdaTail(params []string, at Pos) Expr {
-	if p.at(PUNCT, "{") {
-		// Block-body lambda. Disambiguated from a composite literal by the
-		// arrow: `x => { … }` is always a body, never a literal.
-		return &LambdaExpr{Params: params, Block: p.parseBlock(), Pos: at}
-	}
-	body := p.parseAssign()
-	return &LambdaExpr{Params: params, Body: body, Pos: at}
-}
 
-// lambdaHeadAhead reports whether the `(` at the cursor opens a parameter
-// list: elements are exactly `IDENT (, IDENT)*` (or `_`), and the closing `)`
-// is followed by `=>`. Typed "parameters" like `(p str)` do not match — 参数
-// 不带类型 (核心设计 §三). Pure lookahead — the cursor does not move.
-func (p *Parser) lambdaHeadAhead() bool {
-	depth := 0
-	seenInElem := 0 // identifiers seen since the last top-level comma
-	for j := p.i + 1; j < len(p.toks); j++ {
-		t := p.toks[j]
-		if t.Kind == EOF {
-			return false
-		}
-		if t.Kind == PUNCT {
-			switch t.Text {
-			case "(", "[", "{":
-				depth++
-			case ")", "]", "}":
-				if t.Text == ")" && depth == 0 {
-					if seenInElem == 0 {
-						return false // empty list () — not a lambda head
-					}
-					nx := p.toks[min(j+1, len(p.toks)-1)]
-					return nx.Kind == PUNCT && nx.Text == "=>"
-				}
-				depth--
-			case ",":
-				if depth == 0 {
-					// element separator: both neighbours must be plain names
-					prev, nxt := p.toks[j-1], p.toks[min(j+1, len(p.toks)-1)]
-					prevOK := prev.Kind == IDENT || (prev.Kind == PUNCT && prev.Text == "_")
-					nextOK := nxt.Kind == IDENT || (nxt.Kind == PUNCT && nxt.Text == "_")
-					if !prevOK || !nextOK || seenInElem > 1 {
-						return false
-					}
-					seenInElem = 0
-				}
-			case "_":
-				if depth == 0 {
-					seenInElem++
-				}
-			default:
-				if depth == 0 {
-					return false // operators/types inside → not a parameter list
-				}
-			}
-			continue
-		}
-		if depth == 0 {
-			if t.Kind != IDENT || seenInElem > 1 {
-				return false
-			}
-			seenInElem++
-		}
-	}
-	return false
-}
 
 // parenGroupFollowedByArrow 报告当前 `(` 的配对 `)` 之后是否紧跟 `->`。
 // 用途：`-> (i32) -> i32` 里的括号是**函数类型的形参表**，不是结果列表。
 // 纯前瞻，游标不动。
 func (p *Parser) parenGroupFollowedByArrow() bool {
 	depth := 0
+	if debugParen {
+		var ts []string
+		for k := p.i; k < p.i+8 && k < len(p.toks); k++ {
+			ts = append(ts, p.toks[k].Text)
+		}
+		println("DBG parenGroupFollowedByArrow at", p.i, ts)
+	}
 	for j := p.i; j < len(p.toks); j++ {
 		t := p.toks[j]
 		if t.Kind == EOF {
@@ -505,18 +443,18 @@ func (p *Parser) parenGroupFollowedByArrow() bool {
 	return false
 }
 
-// parseCatchTail reads `catch <名字> { … }` after the guarded expression
-// (核心设计 §15.7 E3). 绑定的名字是块内的 Err；块的值规则由检查器裁决。
+// parseCatchTail reads `catch { … }` or `catch e { … }` after the guarded
+// expression（《AIC 语言规范》§5.6 E3）。
+// **绑定是可选的**：不绑定时块内看不到 Err 值，用于"失败取默认值"；
+// 绑定时块内可引用该 Err。块的值规则由检查器裁决。
 func (p *Parser) parseCatchTail(x Expr) Expr {
 	at := p.pos()
 	p.next() // catch
 	c := &CatchExpr{X: x, Pos: at}
-	if p.atKind(IDENT) || p.at(PUNCT, "_") {
+	if p.atKind(IDENT) {
 		c.Name = p.next().Text
-	} else {
-		p.errorHere(p.pos(), "catch is missing the name it binds the error to", "got "+describe(p.cur()),
-			"write `expr catch e { ... }`; e is the Err value inside the block")
 	}
+	// 直接跟 `{` = 不绑定形态；空块由检查器拒绝（E-5/E-6：不得丢弃错误）。
 	p.enterNoComposite()
 	c.Block = p.parseBlock()
 	p.leaveNoComposite()
@@ -534,7 +472,7 @@ func (p *Parser) parseFuncLit() Expr {
 	at := p.pos()
 	p.next() // func
 	lit := &LambdaExpr{Pos: at, Func: true}
-	// `func name(...)` 在表达式位 = 把函数声明写进了函数体（v2：函数声明只在顶层）。
+	// `func name(...)` 在表达式位 = 把函数声明写进了函数体（函数声明只在顶层）。
 	if p.atKind(IDENT) {
 		p.errorHere(p.pos(), "a function declaration cannot appear inside a function body", "func "+p.cur().Text,
 			"move it to the top level of the file; a func literal in an expression position has no name: func(x i32) -> i32 { ... }")
@@ -612,14 +550,6 @@ func (p *Parser) parsePrimary() Expr {
 			return &NilLit{Pos: at}
 		}
 	case IDENT:
-		// 退役词在名字使用位 = 事故（防坑清单 1）：给出定向迁移报错而不是
-		// 让它流入后续阶段产生级联误报。
-		if isRetiredKeyword(t.Text) {
-			p.errorHere(at, retiredDesc(t.Text), "got "+t.Text, retiredFix(t.Text))
-			p.next()
-			p.synchronize(false)
-			return &Ident{Name: "?", Pos: at}
-		}
 		p.next()
 		return &Ident{Name: t.Text, Pos: at}
 	case PUNCT:
@@ -628,19 +558,12 @@ func (p *Parser) parsePrimary() Expr {
 			p.next()
 			return &Ident{Name: "_", Pos: at}
 		case "(":
-			if p.lambdaHeadAhead() { // (a, b) => e
-				return p.parseParenLambda(at)
-			}
 			p.next()
 			saved := p.noComposite
 			p.noComposite = 0 // 括号内复合字面量恢复合法：if (C{a:1}.x > 0)
 			x := p.parseExpr()
 			p.noComposite = saved
 			p.expect(PUNCT, ")", "parenthesised expression is missing the closing `)`")
-			if p.at(PUNCT, "=>") {
-				p.errorHere(nodePos(x), "lambda parameters must be plain names without operators", "got "+describeAt(x)+"'s `=>`",
-					"write (a, b) => expression; assign complex arguments to locals first")
-			}
 			return x
 		case "[":
 			p.next()
@@ -679,29 +602,6 @@ func (p *Parser) parsePrimary() Expr {
 	return &Ident{Name: "?", Pos: at}
 }
 
-// parseParenLambda consumes `(a, b) => body`. The caller has proven via
-// lambdaHeadAhead that the parenthesised list is a parameter list.
-func (p *Parser) parseParenLambda(at Pos) Expr {
-	p.next() // (
-	params := []string{}
-	for {
-		if p.at(PUNCT, "_") {
-			p.errorHere(p.pos(), "lambda parameters must be fresh names", "a _",
-				"a lambda captures nothing (core design §3); name unused parameters anyway and simply do not reference them")
-			p.next()
-		} else if p.atKind(IDENT) {
-			params = append(params, p.next().Text)
-		}
-		if p.at(PUNCT, ",") {
-			p.next()
-			continue
-		}
-		break
-	}
-	p.expect(PUNCT, ")", "lambda parameter list is missing the closing `)`")
-	p.expect(PUNCT, "=>", "lambda is missing `=>`")
-	return p.parseLambdaTail(params, at)
-}
 
 // --- composite literal gating --------------------------------------------------
 
@@ -750,8 +650,6 @@ func nodePos(e Expr) Pos {
 	case *Field:
 		return v.Pos
 	case *CheckExpr:
-		return v.Pos
-	case *OrExpr:
 		return v.Pos
 	case *CatchExpr:
 		return v.Pos

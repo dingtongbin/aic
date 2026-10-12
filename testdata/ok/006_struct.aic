@@ -1,0 +1,27 @@
+import fmt
+import str
+
+// struct = 值类型：零对象头、ABI 与 C 逐字节同构、按值拷贝
+// 字段禁含引用类型（class/slice/map/set/chan/interface/func）
+struct Point { var x i32    var y i32 }
+struct Line  { var a Point  var b Point }
+
+func shift(p Point, dx i32) -> Point {
+    var q Point = p
+    q.x = q.x + dx
+    return q
+}
+
+func main() {
+    var p Point = Point{x: 1, y: 2}
+    var q Point = shift(p, 10)
+    // 按值传递：原值不受影响
+    fmt.println("{p.x}")
+    fmt.println("{q.x}")
+    // == / != 逐字段比较
+    fmt.println("{p == Point{x: 1, y: 2}}")
+    fmt.println("{p != q}")
+    // 内联在宿主里，无独立对象头
+    var l Line = Line{a: p, b: q}
+    fmt.println("{l.a.x + l.b.x}")
+}

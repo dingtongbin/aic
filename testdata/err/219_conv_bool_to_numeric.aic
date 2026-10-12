@@ -1,4 +1,0 @@
-func f() -> i32 {
-    var b bool = true
-    return b
-}

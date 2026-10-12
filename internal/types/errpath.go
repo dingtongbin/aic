@@ -75,22 +75,6 @@ func (c *Checker) errPayload(e parse.Expr, at parse.Pos, path string) (Type, []T
 	return head, mt, true
 }
 
-// checkOr: E2 `expr or <默认值>`。
-func (c *Checker) checkOr(v *parse.OrExpr, expect Type) (Type, bound, untyped) {
-	head, _, ok := c.errPayload(v.X, v.Pos, "or")
-	if !ok {
-		return nil, nilBound, untyped{}
-	}
-	want := expect
-	if want == nil {
-		want = head
-	}
-	dt, db, di := c.checkExprFull(v.Default, want)
-	c.requireAssignableAt(v.Default, dt, di, head, "the fallback value of `or`")
-	_ = db
-	return head, nilBound, untyped{}
-}
-
 // checkAssert: E4 `expr!` —— 出错即 trap，值 = 负载。
 func (c *Checker) checkAssert(v *parse.AssertExpr, expect Type) (Type, bound, untyped) {
 	head, _, ok := c.errPayload(v.X, v.Pos, "!")
@@ -163,9 +147,18 @@ func BlockAlwaysExits(b *parse.Block) bool { return alwaysExitsBlock(b) }
 // checkInterp: 插值字面量的类型恒为 str；每个占位符单独定型并校验可格式化性。
 func (c *Checker) checkInterp(v *parse.InterpLit) (Type, bound, untyped) {
 	for _, e := range v.Values {
-		vt, _, _ := c.checkExprFull(e, nil)
+		vt, _, u := c.checkExprFull(e, nil)
 		if vt == nil {
-			continue
+			// 占位符是**未定型常量**（`{1000}` / `{6 & 3}` / `{~0}`）：检查器
+			// 按 §一 把定型推迟到使用点 —— 插值选格式化器正是那个使用点
+			// （与 `var x = …` 的 inferFromInit 同源）。不定型则 c.types[e] 恒为
+			// nil，IR-1 的 ValueTys 拿不到类型，去糖无从选格式化器（002/003/017
+			// 语料实测全部卡在降级）。
+			vt = c.literalDefault(u, parse.ExprPos(e))
+			if vt == nil {
+				continue
+			}
+			c.types[e] = vt
 		}
 		if interpFormattable(vt) {
 			continue
@@ -177,16 +170,24 @@ func (c *Checker) checkInterp(v *parse.InterpLit) (Type, bound, untyped) {
 	return TStr, nilBound, untyped{}
 }
 
-// interpFormattable 报告某类型能否直接插值。
+// interpFormattable 报告某类型能否直接插值（《AIC 语言规范》§1.4）。
+// 集合：标量（含 rune）、无载荷 enum、derive ToString 的 struct/class。
+// 判据：插值是唯一格式化路径，集合过窄会逼用户回到 str.fromXxx 噪声；
+// 过宽则要把任意类型的 ToString 塞进语言核心 —— derive ToString 正是封闭的
+// "我可打印"声明，用它划界。
 func interpFormattable(t Type) bool {
-	b, ok := t.(*Basic)
-	if !ok {
+	switch v := t.(type) {
+	case *Basic:
+		switch v.Name {
+		case "str", "bool", "f32", "f64", "rune",
+			"i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize":
+			return true
+		}
 		return false
-	}
-	switch b.Name {
-	case "str", "bool", "f32", "f64",
-		"i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize":
-		return true
+	case *Enum:
+		return !v.HasData // 无载荷 enum 按 tag 名打印
+	case *Class:
+		return v.Derived["ToString"]
 	}
 	return false
 }
@@ -239,6 +240,15 @@ func (c *Checker) noteCapture(e parse.Expr, name string, sym *Symbol) {
 		t := sym.Type
 		if t == nil {
 			t = TStr // 未定型 const 字面量：按 str 记（只影响区域判定）
+		}
+		// C11 扩展（§5.3）：`func` 字面量**只许捕获值类型**。捕获引用时闭包环境
+		// 就含区域头 —— 闭包一旦活得比区域长即悬垂，而守卫在 store 点检查、
+		// 闭包逃逸路径对静态分析不可见（§5.3 判据 1）。只在首次记录处报一次，
+		// 与"同名字只记一次"对齐，避免同一捕获刷屏。
+		if e != nil && !captureSafe(t, 0) {
+			c.errorAt(parse.ExprPos(e), "a closure may only capture value types",
+				name+" has type "+t.String(),
+				"pass it in explicitly instead: `func(ctx "+t.String()+") -> R`, with the caller supplying ctx (AIC language spec §5.3 / §12, C11)")
 		}
 		*c.caps = append(*c.caps, capture{Name: name, Type: t, Off: sym.DeclOffset})
 		slot = len(*c.caps) - 1

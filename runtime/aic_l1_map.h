@@ -3,7 +3,7 @@
  * put 已存在键 = 覆盖值保原位；get 未命中 = 零值；remove 不存在 = 无操作；
  * keyAt/valAt 越界 = trap。
  * **删除用墓碑（used = 2）**：remove 只标记槽位 + order 原地压缩（零分配）。
- * 曾经 remove 每次分配 4 个满容量新数组，而区域分配器不归还旧的 ⇒ 25000 次
+ * remove 若每次分配 4 个满容量新数组，区域分配器又不归还旧的 ⇒ 25000 次
  * 删除 = 50GB 失控（B8 bench 实测 OOM）。holes = 墓碑数，与 len 一起参与增长判据。
  * 符号名编码 (K,V) 两者：头未实例化的 (K,V) 无符号可调 = 编译错（§三）。 */
 #ifndef AIC_L1_MAP_H
@@ -13,7 +13,7 @@
 #include <string.h>
 
 /* 槽内字段名只在这里定义一次（布局中立访问器）。aic_l1_print 与 emit 侧
- * printgen 生成的都是这两个宏 ⇒ 改槽布局不必动编译器（曾经 emit 里硬编码
+ * printgen 生成的都是这两个宏 ⇒ 改槽布局不必动编译器（emit 里若硬编码
  * `v->keys[...]` / `v->vals[...]`，一改布局就与运行期失配 = 静默坏码）。 */
 #define AIC_MAP_SLOT_KEY(m, i) ((m)->slots[i].k)
 #define AIC_MAP_SLOT_VAL(m, i) ((m)->slots[i].v)
@@ -102,7 +102,7 @@
         if (m == NULL || m->cap == 0) return; \
         aic_usize hit = aic_map_find_##KS##_##VS(m, k); \
         if (hit == (aic_usize)-1) return; \
-        /* 墓碑 + order 原地压缩（零分配）。曾经这里每次删除都分配 4 个满容量 \
+        /* 墓碑 + order 原地压缩（零分配）。此处若每次删除都分配 4 个满容量 \
          * 新数组而区域分配器不归还旧的 ⇒ 25000 次删除 = 50GB 失控 \
          * （B8 bench 实测 OOM；增长判据把 holes 算进去，墓碑不会把探测链拖长）。 \
          * ordpos 反向索引（槽 → order 位置）让删除是 O(1)：与 order 末位交换。 */ \

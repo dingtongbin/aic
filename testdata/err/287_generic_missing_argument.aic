@@ -1,6 +1,0 @@
-func f() {
-    var b Box[int]
-}
-
-func main() {
-}

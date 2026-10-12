@@ -1,0 +1,27 @@
+import fmt
+import str
+
+// class = 引用类型：8B 对象头 + 字段，区域分配，零值 nil
+// func init(...) 是唯一工厂
+class Buf {
+    var data u8[]
+    var n i32
+
+    func init(data u8[]) -> Buf {
+        return Buf{data: data, n: 0}
+    }
+
+    func grow(k i32) -> i32 {
+        this.n = this.n + k
+        return this.n
+    }
+}
+
+func main() {
+    var b Buf = Buf.init([1, 2, 3])
+    fmt.println("{b.grow(5)}")
+    fmt.println("{b.n}")
+    // class 零值 = nil；除赋值与比较外操作 = trap
+    var z Buf
+    fmt.println("{z == nil}")
+}

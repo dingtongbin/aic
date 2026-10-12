@@ -1,0 +1,19 @@
+import fmt
+import str
+
+// ErrCode 约束枚举：码 = (fnv1a32(模块规范路径) & 0xFFFFF000) | 变体序号
+// 裸整数错误码 = 编译错误（E-8）；code 0 保留为 ok
+enum HttpErr: ErrCode { Timeout, Connect, Tls, Dns, TooLarge, Malformed }
+
+func main() {
+    // 变体直构：X.Variant(msg) ≡ Err(X.Variant, msg, nil)
+    var e Err = HttpErr.Timeout("upstream slow")
+    fmt.eprintln(e.msg)
+    fmt.println("{e.code()}")
+    // is() 沿 cause 链任层命中
+    var w Err = Err.wrap(HttpErr.Connect, "dial", e)
+    fmt.println("{w.is(HttpErr.Timeout)}")
+    fmt.println("{w.is(HttpErr.Connect)}")
+    // 可枚举：码 → 枚举名
+    fmt.println("{e.code()}")
+}

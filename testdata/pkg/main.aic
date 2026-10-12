@@ -1,0 +1,11 @@
+import fmt
+import app/ui
+import app/core/store
+
+func main() {
+    var s store.Store = store.Store.init()
+    var e = s.Put()
+    if e.code != 0 { return }
+    s.Put()
+    fmt.println(ui.Render(s))
+}

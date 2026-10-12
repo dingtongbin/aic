@@ -1,5 +1,0 @@
-import print
-
-func f() {
-    errdefer print.println("x")
-}

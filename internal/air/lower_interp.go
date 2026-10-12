@@ -27,38 +27,6 @@ import (
 // 故 C 后端只需要一张 std 名表（禁第二套命名）。
 // ---------------------------------------------------------------------------
 
-// interpLit 把一个插值字面量降级成一串 str 拼接。
-func (l *lowerer) interpLit(v *parse.InterpLit) (string, error) {
-	if len(v.Texts) != len(v.Values)+1 {
-		return "", fmt.Errorf("air: malformed interpolation (line %d)", v.Pos.Line)
-	}
-	acc := ""
-	add := func(part string) {
-		if acc == "" {
-			acc = part
-			return
-		}
-		acc = l.strConcat(acc, part, v.Pos)
-	}
-	if v.Texts[0] != "" {
-		add(l.strConst(v.Texts[0], v.Pos))
-	}
-	for i, val := range v.Values {
-		f, err := l.interpFormat(val, v.Pos)
-		if err != nil {
-			return "", err
-		}
-		add(f)
-		if txt := v.Texts[i+1]; txt != "" {
-			add(l.strConst(txt, v.Pos))
-		}
-	}
-	if acc == "" { // 只有 `{{` / `}}` 转义的串：退化成空串常量
-		acc = l.strConst("", v.Pos)
-	}
-	return acc, nil
-}
-
 // strConst 把一个文本段变成 AIR 常量值。文本段保留源码里的转义拼写（与 StrLit
 // 同源：解码发生在 C 字符串字面量那一层，禁第二份解码器）。
 func (l *lowerer) strConst(s string, at parse.Pos) string {

@@ -1,5 +1,0 @@
-func f() {
-    var a i32 = 1
-    var b i64 = 2
-    a += b
-}

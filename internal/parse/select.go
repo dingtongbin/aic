@@ -19,7 +19,9 @@ package parse
 // ---------------------------------------------------------------------------
 
 // atCase 报告游标是否在上下文关键字 `case` 上。
-func (p *Parser) atCase() bool { return p.atIdent("case") }
+// case 是硬关键字（《AIC 语言规范》§1.3 上下文词归零），atIdent 只认 IDENT，
+// 会永远返回 false —— select 的 case 臂会整体失效。
+func (p *Parser) atCase() bool { return p.at(KW, "case") }
 
 // parseSelect 读 `select { case … }`。
 func (p *Parser) parseSelect(at Pos) Stmt {

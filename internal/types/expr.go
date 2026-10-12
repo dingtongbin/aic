@@ -99,6 +99,22 @@ func (c *Checker) checkExprFullRec(e parse.Expr, expect Type) (Type, bound, unty
 	case *parse.Call:
 		return c.checkCall(v, expect)
 	case *parse.Field:
+		// 泛型枚举的无载荷变体引用：`Option.None` / `Result.Fail` / `Value.Null`。
+		// 判据：根类型变体无需 import 即可用；类型形参由**上下文期望类型**解出
+		// （`var o Option[i64] = Option.None` 的声明位）——否则返回裸枚举会丢实参。
+		if id, isID := v.X.(*parse.Ident); isID {
+			if en, isEnum := c.enums[id.Name]; isEnum && len(en.TypeParams) > 0 {
+				if inst, ok := expect.(*Instance); ok && inst.Base == en {
+					return inst, nilBound, untyped{}
+				}
+				if en2, ok2 := expect.(*Enum); ok2 && en2 == en {
+					return en, nilBound, untyped{}
+				}
+				c.errorAt(v.Pos, "cannot infer the type argument of "+en.Name, en.Name+"."+v.Name,
+					"give the target type in the declaration: var x "+en.Name+"[i64] = "+en.Name+"."+v.Name+" (AIC language spec §6.1)")
+				return nil, nilBound, untyped{}
+			}
+		}
 		return c.checkField(v, expect)
 	case *parse.Index:
 		return c.checkIndex(v, expect)
@@ -112,8 +128,6 @@ func (c *Checker) checkExprFullRec(e parse.Expr, expect Type) (Type, bound, unty
 		return c.checkMatchExpr(v, expect)
 	case *parse.CheckExpr:
 		return c.checkCheckExpr(v, expect)
-	case *parse.OrExpr:
-		return c.checkOr(v, expect)
 	case *parse.CatchExpr:
 		return c.checkCatch(v, expect)
 	case *parse.AssertExpr:
@@ -140,6 +154,9 @@ func (c *Checker) checkIdent(v *parse.Ident, expect Type) (Type, bound, untyped)
 		if c.caps != nil && !c.lookupInsideLambda(v.Name) {
 			c.noteCapture(v, v.Name, sym)
 		}
+		// C22：**表达式读点 = 一次使用**。写入点（assign.go / stmt.go 直接
+		// Lookup，不走本函数）不置位 —— 否则纯死存储会被判成"用过了"。
+		sym.Used = true
 		switch sym.Kind {
 		case SymVar:
 			if st := c.nilState[v.Name]; st != nil && st.mustNil {
@@ -199,7 +216,7 @@ func (c *Checker) checkIdent(v *parse.Ident, expect Type) (Type, bound, untyped)
 	}
 	if pkg.IsStd(v.Name) && !c.imports[v.Name] {
 		// 缺 import 是最常见的首因之一；"未声明的名字 + 去声明一个变量"对它是**误导**
-		// （照做也不能用）。已有的"包未导入"诊断此前只覆盖类型位，这里补名字位。
+		// （照做也不能用）。已有的"包未导入"诊断只覆盖类型位，名字位由这里覆盖。
 		c.errorAt(v.Pos, "package not imported", v.Name,
 			"write `import "+v.Name+"` first, then use its members (a directory is a package; core design §11)")
 		return nil, nilBound, untyped{}

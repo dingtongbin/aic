@@ -1,0 +1,5 @@
+import fmt
+
+func main() {
+    var b bytes = [1, 2, 3]
+}

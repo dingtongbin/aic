@@ -1,3 +1,0 @@
-func f() -> i32 {
-    var x i32 = nil
-}

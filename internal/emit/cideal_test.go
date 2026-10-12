@@ -69,7 +69,7 @@ var (
 
 // TestNoBareCharLongC10: C10 —— 产物与运行时一律定宽 typedef，禁裸 char/long。
 func TestNoBareCharLongC10(t *testing.T) {
-	src := `import print
+	src := `import fmt
 import str
 
 class Box {
@@ -84,12 +84,12 @@ func label(b Box) -> str {
 func main() {
     var xs i32[] = [1, 2, 3]
     var b = Box{n: 42, name: "x"}
-    print.println(label(b))
-    print.println(xs[0])
-    print.println(str.fromI64(b.n))
-    print.println(1.5)
+    fmt.println(label(b))
+    fmt.println(str.fromI64(i64(xs[0])))
+    fmt.println(str.fromI64(b.n))
+    fmt.println(str.fromF64(1.5))
     for i in 0..3 {
-        print.println(i)
+        fmt.println(str.fromI64(i64(i)))
     }
 }
 `
@@ -139,6 +139,9 @@ func main() {
     var lg = Log{}
     var r1 = add2(lg.add("a"), lg.add("b"))
     var r2 = lg.add("c") + lg.add("d")
+    // 收尾读一次 r1/r2：C22 未使用局部变量是编译错，测试语料自己不能踩；
+    // 这一行是纯算术（零调用），不影响上面 C15 的"每条语句最多一个调用"判据。
+    lg.n = r1 + r2
 }
 `
 	c := stripDirectives(stripStringLiterals(emitSrc(t, src)))

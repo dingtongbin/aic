@@ -11,7 +11,6 @@ const (
 	INT   = "INT"
 	FLOAT = "FLOAT"
 	STR   = "STR"
-	ANNOT = "ANNOT"
 	RES   = "RES"
 	PUNCT = "PUNCT"
 	ILL   = "ILL"
@@ -34,7 +33,7 @@ type Parser struct {
 
 // Token mirrors lex.Token without importing lex internals beyond the kinds.
 type Token struct {
-	Kind string // "KW" | "IDENT" | "INT" | "FLOAT" | "STR" | "ANNOT" | "RES" | "PUNCT" | "ILL" | "EOF"
+	Kind string // "KW" | "IDENT" | "INT" | "FLOAT" | "STR" | "RES" | "PUNCT" | "ILL" | "EOF"
 	Text string
 	Line int
 	Col  int
@@ -299,5 +298,7 @@ func isBoundary(t Token) bool {
 			return true
 		}
 	}
-	return t.Kind == "ANNOT"
+	// 注解（`@name`）已随 §1.3 删除：`@` 在词法层就是非法字符，注解这个 kind
+	// 连同 parseAnnotationUse 一起不存在了 —— 这里不再有可命中的分支。
+	return false
 }

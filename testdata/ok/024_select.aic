@@ -1,0 +1,29 @@
+import fmt
+import time
+import str
+
+// select：case 必须是 chan recv 调用位；臂内 return 合法、break 禁止
+// 多分支同时就绪时实现取源码序最前者，语言不承诺顺序
+func main() {
+    var ch chan[i32] = chan[i32].new()
+    ch.send(7)
+    select {
+        case v = ch.recv() {
+            fmt.println("{v}")
+        }
+        case time.after(10000) {
+            fmt.println("timeout")
+        }
+    }
+    // 时间臂已到期：通道为空 → 走时间臂
+    var empty chan[i32] = chan[i32].new()
+    select {
+        case v, ok = empty.recv() {
+            fmt.println("{v}")
+            fmt.println("{ok}")
+        }
+        case time.after(0) {
+            fmt.println("expired")
+        }
+    }
+}

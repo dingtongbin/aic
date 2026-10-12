@@ -90,12 +90,15 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 	case *parse.Call:
 		return l.call(v)
 	case *parse.Field:
-		// **枚举变体引用**（`Color.Red` / `lib.Color.green`）：基座是**类型名**，不是值。
-		// 判据 = 该表达式在检查器里的类型是 enum —— enum 没有字段，字段读不可能定型成
-		// enum，所以这条判定不会与真字段读相撞（唯一判据，不另立名字表）。
-		// 曾经这里直接走通用字段路径：`Color.Green` 被降成 `field Color, 0`（fieldIndex
+		// **枚举变体引用**（`Color.Red` / `lib.Color.green` / `Option.None`）：基座是
+		// **类型名**，不是值。判据 = 该表达式在检查器里的类型是 enum —— enum 没有
+		// 字段，字段读不可能定型成 enum，所以这条判定不会与真字段读相撞。
+		// 走 enumOf 而非裸 types.IsEnum：`return Option.None` 的期望类型是
+		// **泛型实例** Option[i64]，IsEnum 只认 *Enum ⇒ 判成"非枚举"，一路跌到
+		// 字段下标解析，报 "receiver type unknown"（031 实测）。
+		// 直接走通用字段路径会让 `Color.Green` 被降成 `field Color, 0`（fieldIndex
 		// 对非类接收者返回 0），**静默错译成第一个变体**（026 实测 red/red/red）。
-		if en, ok := types.IsEnum(l.typeOf(v)); ok {
+		if en, _ := enumOf(l.typeOf(v)); en != nil {
 			idx, _, found := types.VariantByName(en, v.Name)
 			if !found {
 				return "", fmt.Errorf("air: %s is not a variant of enum %s (line %d)", v.Name, en.Name, parse.ExprPos(v).Line)
@@ -115,8 +118,8 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 		}
 		// **接收者的 place** + 本字段下标 —— 不能写 `place(v)`：那已经是一次
 		// `field base, idx` 的 place，再套一层 `FieldRHS{Place: 它, Idx: idx}` 就成了
-		// `field (field x, i), i`（**读两次字段**）。此前 AIR 的每个字段读都被降成双层，
-		// 与直译路径不一致；因为发射走直译路径、verifier 只查结构，这个洞一直没暴露。
+		// `field (field x, i), i`（**读两次字段**）。AIR 的每个字段读必须降成单层、
+		// 与直译路径一致；双层降级与发射路径不一致而 verifier 只查结构，这个洞不会暴露。
 		pl, err := l.basePlace(v.X)
 		if err != nil {
 			return "", err
@@ -131,7 +134,7 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 		return t, nil
 	case *parse.Index:
 		// str 视图 `s[lo..hi]`：显式化成 StrViewRHS（零拷贝 + 运行期边界检查）。
-		// 曾经这里直接走 place()，StrViewPlace 又把 Lo/Hi 丢掉 ⇒ emit 只剩一个裸基座，
+		// 这里若直接走 place()，StrViewPlace 又把 Lo/Hi 丢掉 ⇒ emit 只剩一个裸基座，
 		// "视图未发射"其实是"视图的边界在降级时被丢了"（720 实测）。
 		if v.End != nil {
 			base, err := l.value(v.X)
@@ -166,8 +169,6 @@ func (l *lowerer) value(e parse.Expr) (string, error) {
 		return l.composite(v)
 	case *parse.CheckExpr:
 		return l.checkExpr(v)
-	case *parse.OrExpr:
-		return l.orExpr(v)
 	case *parse.CatchExpr:
 		return l.catchExpr(v)
 	case *parse.AssertExpr:
@@ -320,8 +321,19 @@ func (l *lowerer) emitCall(v *parse.Call, sym string, ta, args []string) (string
 	if len(l.callResults(v)) == 0 {
 		ty = "void"
 	}
-	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: ty,
-		Rhs: &Call{Sym: sym, TypeArgs: ta, Args: args}, Loc: LocOf(v.Pos)})
+	call := &Call{Sym: sym, TypeArgs: ta, Args: args}
+	// 存储点 ③：容器方法的**末位实参**是存储点（append 的值 / insert(i, v) 的 v），
+	// 检查器把 GuardSpec 打在那个实参节点上（types/call.go）。这里随调用把它带上
+	// IR —— 漏了这一路，跨区存入容器的守卫就静默消失（§五 R5：既不拒也不守 = 漏）。
+	if len(v.Args) > 0 && len(args) > 0 {
+		last := v.Args[len(v.Args)-1]
+		if g, ok := l.info.HasGuard(last); ok {
+			if lim := l.limitOf(g, last); lim != "" {
+				call.ArgGuard = &CallGuard{Arg: len(args) - 1, Limit: lim}
+			}
+		}
+	}
+	l.cur.Insts = append(l.cur.Insts, &Let{Tmp: t, Ty: ty, Rhs: call, Loc: LocOf(v.Pos)})
 	return t, nil
 }
 
@@ -427,7 +439,7 @@ func (l *lowerer) callee(v *parse.Call) (string, []string) {
 		return fn.Name, nil
 	case *parse.Index:
 		// **显式类型实参的调用** `id[i32](x)` / `Box[Box[i32]](...)`：Fn 是索引表达式，
-		// 此前落到 `unknown`（AIR 里根本无法复原要哪个实例）。实参表同样由检查器登记
+		// 不特判会落到 `unknown`（AIR 里根本无法复原要哪个实例）。实参表同样由检查器登记
 		// （CallTypeArgs 的键是**调用节点**，两条路共用一份）。
 		switch base := fn.X.(type) {
 		case *parse.Ident:
@@ -524,8 +536,6 @@ func (l *lowerer) runtimeCtor(v *parse.Call) (string, bool) {
 			return "", false
 		}
 		return "map_new_" + ks + "_" + vs, true
-	case isMutexType(t):
-		return "sync_Mutex_new", true
 	}
 	return "", false
 }
@@ -535,24 +545,13 @@ func isChanType(t types.Type) bool {
 	return ok
 }
 
-func isMutexType(t types.Type) bool {
-	_, ok := t.(*types.MutexT)
-	return ok
-}
-
-// recvTypeSym 是内建方法接收者的符号段（容器/chan/str/bytes 等）。
+// recvTypeSym 是内建方法接收者的符号段（容器/chan/str 等）。
 func recvTypeSym(t types.Type) string {
-	if types.IsBytes(t) {
-		return "bytes"
-	}
 	if ch, ok := t.(*types.ChanT); ok {
 		if suf, ok2 := types.RuntimeSuffix(ch.Elem); ok2 {
 			return "chan_" + suf
 		}
 		return "chan"
-	}
-	if _, ok := t.(*types.MutexT); ok {
-		return "sync_Mutex"
 	}
 	if types.IsStrType(t) {
 		return "str"
@@ -838,8 +837,6 @@ func tyText(t types.Type) string {
 		return fmt.Sprintf("[%s;%d]", tyText(v.Elem), v.N)
 	case *types.ChanT:
 		return "chan[" + tyText(v.Elem) + "]"
-	case *types.MutexT:
-		return "sync_Mutex"
 	case *types.Instance:
 		// 基类的引用标记 `*` 属于**最外层**：`ok_Box[i32]*`。写成 `ok_Box*[i32]`
 		// （星号嵌在实例实参中间）会让 emit 侧所有「尾部判 `*`」的规则失效：

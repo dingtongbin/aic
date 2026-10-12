@@ -1,0 +1,5 @@
+import fmt
+
+func main() {
+    var f = (x i32) => x + 1
+}

@@ -27,8 +27,8 @@ func (p *Parser) parseBlock() *Block {
 }
 
 // parseStmt reads one statement. The dispatch covers every statement keyword
-// of the v2 surface (核心设计 §三). 退役词（while/elseif/handle/errdefer/
-// await/del/mut/implements）以 IDENT 身份到达这里，给出定向退役报错（附录 A）。
+// of the surface (核心设计 §三); everything else reaches the expression path
+// as a plain identifier (《AIC 语言规范》§1.3).
 func (p *Parser) parseStmt() Stmt {
 	at := p.pos()
 	switch {
@@ -83,8 +83,8 @@ func (p *Parser) parseStmt() Stmt {
 		}
 		return d
 
-	case p.atIdent("errdefer"):
-		// N8：`errdefer` 是**上下文关键字**（H7 恒 23 关键字），只在语句位识别。
+	case p.at(KW, "errdefer"):
+		// errdefer 是硬关键字（上下文词归零，《AIC 语言规范》§1.3）。
 		p.next()
 		d := &ErrDeferStmt{Pos: at}
 		if p.at(PUNCT, "{") {
@@ -117,8 +117,8 @@ func (p *Parser) parseStmt() Stmt {
 		p.synchronize(true)
 		return nil
 
-	case p.atIdent("select"):
-		// N6：`select` 是**上下文关键字**（H7 的 23 关键字不变），只在语句位识别。
+	case p.at(KW, "select"):
+		// select 是硬关键字（上下文词归零）。
 		return p.parseSelect(at)
 	}
 
@@ -128,15 +128,6 @@ func (p *Parser) parseStmt() Stmt {
 		at := p.pos()
 		p.errorHere(at, "a top-level declaration cannot appear inside a function body", "got "+describe(p.cur()),
 			"move it to the top level of the file; a function body holds statements only")
-		p.synchronize(true)
-		return nil
-	}
-
-	// Retired v1 keywords at statement position get the targeted retirement
-	// diagnostic instead of a cascade (防坑清单 1 / 附录 A).
-	if t := p.cur(); t.Kind == IDENT && isRetiredKeyword(t.Text) {
-		p.errorHere(at, retiredDesc(t.Text), "got "+t.Text, retiredFix(t.Text))
-		p.next()
 		p.synchronize(true)
 		return nil
 	}
@@ -156,61 +147,6 @@ func (p *Parser) parseStmt() Stmt {
 		return nil
 	}
 	return &ExprStmt{X: x, Pos: at}
-}
-
-// isRetiredKeyword reports v1 keywords that became plain identifiers in v2.
-// `errdefer` 不在列：它由 N8 收回为上下文关键字（语句位识别）。
-func isRetiredKeyword(name string) bool {
-	for _, r := range []string{"while", "elseif", "handle", "await", "del", "mut", "implements"} {
-		if name == r {
-			return true
-		}
-	}
-	return false
-}
-
-func retiredDesc(name string) string {
-	switch name {
-	case "while":
-		return "`while` is retired: the only loop is for, in three forms"
-	case "elseif":
-		return "`elseif` is retired: write `else if`"
-	case "handle":
-		return "`handle` is retired: errors are Err values propagated with check (core design §6)"
-	case "errdefer":
-		return "`errdefer` is retired: use defer with a committed flag (core design §6)"
-	case "await":
-		return "`await` is retired: concurrency uses chan send/recv (core design §7)"
-	case "del":
-		return "`del` is retired: regions reclaim memory, there is no manual free (core design §5)"
-	case "mut":
-		return "`mut` is retired: assignment shares a reference, there is no mutability annotation (core design §5 R2)"
-	case "implements":
-		return "`implements` is retired: an interface is satisfied structurally by its method signature set (core design §4)"
-	}
-	return name + " is retired"
-}
-
-func retiredFix(name string) string {
-	switch name {
-	case "while":
-		return "write `for condition { ... }`"
-	case "elseif":
-		return "write `} else if condition { ... }`"
-	case "handle":
-		return "the callee returns Err last: after `var r, err = f()` test `err != nil`, or simply `var r = check f()`"
-	case "errdefer":
-		return "write `var committed bool = false` plus `defer { if !committed { ... } }`"
-	case "await":
-		return "write `var v, ok = ch.recv()`; see core design §7 for the concurrency model"
-	case "del":
-		return "delete the statement: objects are reclaimed when the region block exits"
-	case "mut":
-		return "drop the mut keyword: `var x = ...`; variables are reassignable by default"
-	case "implements":
-		return "drop the implements clause: a matching method signature set satisfies the interface"
-	}
-	return "use the v2 surface (core design §1)"
 }
 
 // endOfStmt reports whether the current token ends a statement implicitly.
@@ -401,8 +337,10 @@ func (p *Parser) parseSimpleStmtNoBlock() Stmt {
 	return &ExprStmt{X: x, Pos: at}
 }
 
-// parseSpawn reads `spawn f()`; 词法级强制 scope 包裹 (红线 5).
-// 文法形态的最终裁决见开放点 O1（黄金执行规划 §5.5）。
+// parseSpawn reads `spawn f(args)` 以及 `spawn f(args) into ch`（《AIC 语言规范》§9.1）。
+// into 子句把任务返回值包装成 Result[T] 送进 ch —— 这是 E-9"失败通道标准形态
+// = chan[Result[T]]"的落地语法；无 into = 结果丢弃。
+// 词法级强制 scope 包裹。
 func (p *Parser) parseSpawn(at Pos) Stmt {
 	p.next() // spawn
 	if p.scopeDepth == 0 {
@@ -410,7 +348,13 @@ func (p *Parser) parseSpawn(at Pos) Stmt {
 			"outside any scope", "wrap the spawn in a scope: scope { spawn f() ... } (the scope joins on exit)")
 	}
 	x := p.parseExpr()
-	return &SpawnStmt{Call: x, Pos: at}
+	s := &SpawnStmt{Call: x, Pos: at}
+	// `into ch`：into 是硬关键字，紧跟 spawn 的调用表达式。
+	if p.at(KW, "into") {
+		p.next()
+		s.Into = p.parseExpr()
+	}
+	return s
 }
 
 // parseMatchStmt reads the statement-position match (核心设计 §三):

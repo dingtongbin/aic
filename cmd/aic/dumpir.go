@@ -7,7 +7,6 @@ import (
 
 	"aic/internal/air"
 	"aic/internal/cir"
-	"aic/internal/emit"
 	"aic/internal/escape"
 	"aic/internal/intrange"
 	"aic/internal/parse"
@@ -139,6 +138,3 @@ func cmdDumpIR(args []string) int {
 	fmt.Print(air.PrintAll(mods))
 	return 0
 }
-
-// 保留 emit 引用（dump-ir 与 emit 共用程序装载路径；后续 AIR→C 会替换 emit 入口）。
-var _ = emit.EmitUnit

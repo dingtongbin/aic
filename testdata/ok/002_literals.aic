@@ -1,0 +1,17 @@
+import fmt
+import str
+
+// 整数字面量：十进制 / 0x / 0b / _ 分隔；默认 i64
+// 浮点：1.5 / 1e9 / 1.5E-3 / 0x1.8p3
+// rune：Unicode 标量值，越界构造 = trap
+func main() {
+    fmt.println("{1000}")
+    fmt.println("{0xff}")
+    fmt.println("{0b1010}")
+    fmt.println("{1_000_000}")
+    fmt.println("{1.5e3}")
+    fmt.println("{0x1.8p3}")
+    fmt.println(str.fromRune(rune(0x4e2d)))
+    fmt.println("{true}")
+    fmt.println("")
+}

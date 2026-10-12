@@ -1,5 +1,5 @@
-import print
+import fmt
 
 func main() {
-    print.println("hello, aic")
+    fmt.println("hello, aic")
 }

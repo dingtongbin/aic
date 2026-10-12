@@ -1,0 +1,24 @@
+import fmt
+import str
+
+// C 互操作是一等公民：extern from 直接包装 C 头文件
+// ptr[T] 是唯一采纳 C 语义的类型：p[i] / p.f / p.cast 不检查，越界 = 未定义行为
+extern from "aictest.h"
+
+func main() {
+    // 标量与定长数组直接映射
+    fmt.println("{aictest_add(1, 2)}")
+    // extern struct：ABI 同构，字段直访
+    var p aictest_point
+    p.x = 3
+    p.y = 4
+    fmt.println("{aictest_area(p)}")
+    // C 字符串：const char* → ptr[i8]，经 c.toStr 拷贝
+    var name ptr[i8] = aictest_name()
+    fmt.println(c.toStr(name))
+    // 对象宏 → AIC const
+    fmt.println("{AICTEST_MAGIC}")
+    // ptr 运算：addr + cast，不做指针算术
+    var q ptr[i32] = ptr.of(p.x)
+    fmt.println("{q[0]}")
+}

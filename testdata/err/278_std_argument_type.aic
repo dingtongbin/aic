@@ -1,5 +1,0 @@
-import str
-
-func main() {
-    var b = str.contains(1, 2)
-}

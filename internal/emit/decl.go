@@ -251,9 +251,6 @@ func (c *Ctx) typeOfTypeExpr(te parse.TypeExpr) types.Type {
 					base = ifc
 				}
 			}
-		case nt.Pkg == "sync" && nt.Name == "Mutex":
-			// std 具名类型：sync.Mutex（值类型，零值 = 未加锁，§七）
-			base = types.TMutex
 		case nt.Pkg == "option" && nt.Name == "Option":
 			// std 泛型枚举：option.Option / option.Option[i32]
 			base = types.OptionBaseEnum()

@@ -3,7 +3,6 @@ package emit
 import (
 	"fmt"
 
-	"aic/internal/parse"
 	"aic/internal/types"
 )
 
@@ -67,19 +66,12 @@ func (c *Ctx) cTypeName(t types.Type) string {
 		_ = ifc
 		return "aic_iface"
 	}
-	if _, ok := t.(*types.MutexT); ok {
-		return "aic_mutex" // 值类型（零值 = 未加锁，§七）
-	}
 	if ch, ok := t.(*types.ChanT); ok {
 		suf, has := c.containerSuffix(ch.Elem)
 		if !has {
 			return c.unsupported(t)
 		}
 		return "aic_chan_" + suf + " *"
-	}
-	if types.IsBytes(t) {
-		// N7：bytes 与 u8[] 共用运行时实例（独立类型身份 + 独立方法集）。
-		return "aic_list_u8 *"
 	}
 	if types.IsSlice(t) {
 		suf, ok := c.containerSuffix(types.SliceElem(t))
@@ -226,12 +218,6 @@ func (c *Ctx) zeroValue(t types.Type) string {
 		return fmt.Sprintf("(%s){0}", c.cTypeName(t))
 	}
 	return "0"
-}
-
-// isNilLiteral 报告表达式是否 nil 字面量 (零值发射的分支点)。
-func isNilLiteral(e parse.Expr) bool {
-	_, ok := e.(*parse.NilLit)
-	return ok
 }
 
 func joinComma(parts []string) string {

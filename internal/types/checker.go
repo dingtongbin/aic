@@ -110,13 +110,23 @@ type Checker struct {
 	// callTypeArgs 是泛型调用点的实例实参（键 = 调用节点）：推断与显式两条路都登记，
 	// 单态化（mair）与 C 发端按它决定要给哪个实例发符号。
 	callTypeArgs map[parse.Expr][]Type
+	// unusedVars 是**当前正在检查的函数**里登记过的局部变量（C22 未使用局部变量）。
+	// 每个 checkOneFunc 存/取一对，函数体走完即结算 —— 逐函数结算才能把诊断
+	// 指回各自那行，也不会跨函数串味。
+	unusedVars []*Symbol
+	// rootIfaces 按实参缓存根接口实例（`Iterator[i64]` → *Interface，键 = 实参文本）。
+	// 必须缓存：每次解析都 new 一个同形接口，identical() 与"结构化满足"就会在
+	// 两个长得一样的接口之间失配（同形不同指针）。
+	rootIfaces map[string]*Interface
 }
 
-// implementedStd 是**当前构建真的可用**的 std 包（其余注册名 = 阶段 S 的路线图条目）。
+// implementedStd 是**当前构建真的可用**的 std 包（其余注册名 = 路线图条目）。
 // 这张表是"状态"不是"规则"：每个包的成员面仍由 stdFuncSig/stdType 唯一决定。
+// 输出包是 fmt（没有 print）；math/sync/option 不存在（标量数值方法进基本类型，
+// 互斥走 chan，Option 是根类型）。
 var implementedStd = map[string]bool{
-	"print": true, "str": true, "os": true, "math": true, "option": true,
-	"testing": true, "sync": true, "time": true, "ctx": true,
+	"fmt": true, "str": true, "os": true, "time": true, "log": true,
+	"ctx": true, "testing": true, "code": true, "value": true,
 }
 
 // capture 是一个按值捕获的绑定（名字 + 类型 + 声明的区域深度）。
@@ -164,10 +174,12 @@ func CheckPackage(files []*parse.File, deps map[string]*Info) *CheckResult {
 	}
 	c.file = files[0].Path
 	c.pkg = pkgNameFromPath(files[0].Path) // 包名唯一所有者（目录即包，§四）
+	// std 根类型枚举进入名字表：根类型无需 import 即可用（变体构造/match）
+	c.stdEnums()
 	c.collectDecls(files)
 	// 约束名的校验**推迟到收集结束**：接口可以声明在用到它的泛型之后
-	// （`func sum[T: Shape]` 写在 `interface Shape` 之前是合法的 —— 此前在收集期
-	// 逐条校验，于是"先写函数后写接口"报"未知泛型约束"）。
+	// （`func sum[T: Shape]` 写在 `interface Shape` 之前是合法的 —— 若在收集期
+	// 逐条校验，"先写函数后写接口"就会报"未知泛型约束"）。
 	c.flushConstraints()
 	c.checkFuncBodies(files)
 	return &CheckResult{
@@ -235,7 +247,7 @@ func (c *Checker) collectDecls(files []*parse.File) {
 				continue
 			}
 			// 幽灵包（注册了名字但一个成员都没有）在 **import 位**就报"尚未实现"：
-			// 此前 `import json` 过 check、直到调用成员才报"包内无此函数"，使用者会以为
+			// 若拖到调用成员才报"包内无此函数"，`import json` 会过 check，使用者会以为
 			// 包存在只是自己拼错了。
 			if pkg.IsStd(im.Name) && !implementedStd[im.Name] {
 				c.errorAt(im.Pos, "this standard package is not implemented yet", "import "+im.Name,
@@ -323,7 +335,21 @@ func (c *Checker) collectConst(v *parse.ConstDecl) {
 	c.consts[v.Name] = &Symbol{Kind: SymConst, Name: v.Name, Type: ty, Const: val, Private: !exported(v.Name)}
 }
 
+// checkReservedTypeName: C2 —— 保留类型名禁作用户声明的名字（§12）。
+// 返回 false = 已报错，调用方应跳过登记（否则后续解析会拿保留名当类型用）。
+func (c *Checker) checkReservedTypeName(name, kind string, at parse.Pos) bool {
+	if !reservedTypeNames[name] {
+		return true
+	}
+	c.errorAt(at, name+" is a reserved type name", kind+" "+name,
+		"pick another name: the builtin vocabulary (i8..i64 / u8..u64 / usize / f32 / f64 / bool / str / rune / Err / Option / Result / Value / Duration / Code / Iterator / LogLevel) is reserved (AIC language spec §12, C2)")
+	return false
+}
+
 func (c *Checker) collectClass(v *parse.ClassDecl) {
+	if !c.checkReservedTypeName(v.Name, "class", v.Pos) {
+		return
+	}
 	if _, exists := c.classes[v.Name]; exists {
 		c.errorAt(v.Pos, "duplicate class declaration", "class "+v.Name,
 			"only one type may carry this name; rename or delete one")
@@ -347,37 +373,30 @@ func (c *Checker) collectClass(v *parse.ClassDecl) {
 	}
 }
 
-// derivesOf 解析 @derive 能力集（§四 三件套 + §16 N4 扩展）。
-//
-// **能力集是封闭枚举**（核心设计 §16 N4）：ToString / Compare / Hash /
-// Default / Clone 已实现；Json / Row 是设计里承诺的（序列化代码生成），
-// 尚未实现 —— 这里**明确报「未实现」而不是静默接受**（接受了却不生成方法 = 撒谎）。
-// 非法能力名 = 编译错（不静默忽略：注解写错必须报）。
+// deriveCapabilities 是 v7 的封闭能力集（《AIC 语言规范》§3.2 / 标准库规范 §3.2）。
+// **它与泛型能力约束集是同一套名单**——写成两份会让 agent 学两套名字，
+// 且约束与派生行为会不一致（这是本仓库犯过的错）。
+var deriveCapabilities = map[string]bool{
+	"ToString": true,
+	"Compare":  true,
+	"Hash":     true,
+	"Clone":    true,
+	"Json":     true,
+}
+
+// derivesOf 读声明修饰词 `derive A, B`（v7 起无注解）。
 func (c *Checker) derivesOf(v *parse.ClassDecl) map[string]bool {
 	out := map[string]bool{}
-	for _, ann := range v.Annotations {
-		// 词法把注解原文整段留下（含 @ 前缀）：@derive(ToString)。
-		if !strings.HasPrefix(ann, "@derive(") {
-			continue
-		}
-		inner := strings.TrimSuffix(strings.TrimPrefix(ann, "@derive("), ")")
-		for _, part := range strings.Split(inner, ",") {
-			name := strings.TrimSpace(part)
-			switch name {
-			case "ToString", "Compare", "Hash", "Default", "Clone":
-				out[name] = true
-			case "":
-				c.errorAt(v.Pos, "@derive capability name is missing", "@derive("+inner+")",
-					"write @derive(ToString) / @derive(Compare) / @derive(Hash) / @derive(Default) / @derive(Clone); they may be combined")
-			case "Json", "Row":
-				// 能力集是封闭枚举（§16 N4），Json/Row 在其中但**本构建不可用**：
-				// 文案要说明"现在能写什么"，而不是给一句路线图。
-				c.errorAt(v.Pos, "@derive("+name+") is not available in this build", name,
-					"serialise explicitly (write a toJson/fromJson method on the class), or use @derive(ToString) for printing; "+name+" lands with the standard library (core design §16 N4 / §15.3)")
-			default:
-				c.errorAt(v.Pos, "unsupported @derive capability", name,
-					"the closed set is ToString / Compare / Hash / Default / Clone (core design §16 N4)")
-			}
+	for _, name := range v.Derives {
+		switch {
+		case name == "":
+			c.errorAt(v.Pos, "derive capability name is missing", "derive "+strings.Join(v.Derives, ", "),
+				"write `derive ToString, Compare`; the closed set is ToString / Compare / Hash / Clone / Json")
+		case !deriveCapabilities[name]:
+			c.errorAt(v.Pos, "unsupported derive capability", name,
+				"the closed set is ToString / Compare / Hash / Clone / Json; a custom derive is not expressible")
+		default:
+			out[name] = true
 		}
 	}
 	return out
@@ -386,6 +405,11 @@ func (c *Checker) derivesOf(v *parse.ClassDecl) map[string]bool {
 // finishClass 第二轮：字段类型与方法签名（类型彼此已可引用）。
 func (c *Checker) finishClass(v *parse.ClassDecl) {
 	cl := c.classes[v.Name]
+	if cl == nil {
+		// 声明处已被拒（重名 / 保留类型名 C2）：没有可完成的类。
+		// 不返回就是 nil 解引用 panic —— 诊断路径绝不允许崩（019 实测）。
+		return
+	}
 	// 泛型类的字段与方法签名在**类型参数在作用域内**时解析：`var v T` 里的 T
 	// 必须解析成 TypeParam，否则泛型类根本声明不出来（T1 泛型单态化的前提）。
 	saved := c.typeParams
@@ -445,7 +469,45 @@ func (c *Checker) finishClass(v *parse.ClassDecl) {
 	}
 	c.deriveMethods(v, cl)
 	c.delegateMethods(v, cl)
+	c.checkImplementsComplete(v, cl)
 	c.typeParams = saved
+}
+
+// checkImplementsComplete: C10 —— `class X implements I` 必须真的给出 I 的全部
+// 方法，漏一个就报清单（《AIC 语言规范》§12）。
+//
+// 满足是**结构化**的（方法集齐了就算），但 `implements` 是一条**声明**：
+// 声明与事实不符就是错。不查它，接口将来新增方法时实现类会静默"掉出"契约，
+// 而编译器一声不吭 —— 正是多人/多 agent 协作最怕的那种静默漂移。
+// 排序按 Slots（声明序 = 分发槽位号），诊断确定性与 H2 同源。
+func (c *Checker) checkImplementsComplete(v *parse.ClassDecl, cl *Class) {
+	if len(v.Implements) == 0 {
+		return
+	}
+	for _, te := range v.Implements {
+		t := c.resolveType(te)
+		if t == nil {
+			continue
+		}
+		ifc, ok := t.(*Interface)
+		if !ok {
+			c.errorAt(v.Pos, "implements names an interface, not a type", cl.Name+" implements "+t.String(),
+				"write the interface name: `implements "+t.String()+"`; a class or struct cannot be implemented (AIC language spec §12, C10)")
+			continue
+		}
+		missing := []string{}
+		for _, name := range ifc.Slots {
+			if _, has := cl.Methods[name]; !has {
+				missing = append(missing, name)
+			}
+		}
+		if len(missing) == 0 {
+			continue
+		}
+		c.errorAt(v.Pos, "class "+cl.Name+" does not implement "+ifc.Name,
+			"missing: "+strings.Join(missing, ", "),
+			"add the missing methods to "+cl.Name+", or drop `implements "+ifc.Name+"` (AIC language spec §12, C10)")
+	}
 }
 
 // delegateMethods 处理 `use 字段 类型`（N10，核心设计 §16）：
@@ -462,51 +524,61 @@ func (c *Checker) delegateMethods(v *parse.ClassDecl, cl *Class) {
 		if t == nil {
 			continue
 		}
-		var target *Class
-		switch tv := t.(type) {
-		case *Class:
-			target = tv
-		default:
+		// S-7 / C18：`use 字段 接口` —— 委托目标**只能是接口**。
+		// 判据：委托到接口才有界 —— 委托到具体类会把该类的全部方法（含将来
+		// 新增的）提升到本类，跨包演进时静默改变本类的公开面；接口的方法是
+		// 冻结契约。放行 `*Class` 会让 `use eng Engine`（类）因此静默
+		// 通过（015 语料实测）。
+		ifc, isIfc := t.(*Interface)
+		if !isIfc {
 			if _, isInst := t.(*Instance); isInst {
 				c.errorAt(u.Pos, "use does not support a generic instance field yet", cl.Name+"."+u.Field+" "+t.String(),
 					"embed the concrete instantiation as a class of its own, or call the field's methods explicitly")
 				continue
 			}
-			c.errorAt(u.Pos, "use needs a class field", cl.Name+"."+u.Field+" "+t.String(),
-				"`use field Type` promotes the methods of a class (or @packed) field (core design §16 N10)")
+			c.errorAt(u.Pos, "a use field must have an interface type", cl.Name+"."+u.Field+" "+t.String(),
+				"declare the field as an interface: `var "+u.Field+" "+t.String()+"` promotes only the frozen method set of an interface, never a concrete class (AIC language spec §12, C18)")
 			continue
 		}
 		if _, ok := cl.fieldIdx[u.Field]; !ok {
 			c.errorAt(u.Pos, "the delegated field is not declared in this class", cl.Name+"."+u.Field,
-				"declare the field first: var "+u.Field+" "+target.Name+"; then use "+u.Field+" "+target.Name+" (fields stay local to the class)")
+				"declare the field first: var "+u.Field+" "+typeName2(ifc)+"; then use "+u.Field+" "+typeName2(ifc)+" (fields stay local to the class)")
 			continue
 		}
 		// 方法名按字典序处理：登记顺序必须确定（map 遍历序会破坏 H2）。
-		names := make([]string, 0, len(target.Methods))
-		for name := range target.Methods {
+		var names []string
+		for name := range ifc.Methods {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			sig, ok := target.Method(name)
-			if !ok || sig.IsInit {
+			sig, ok := ifc.Methods[name]
+			if !ok {
 				continue
 			}
 			if prev, dup := cl.Methods[name]; dup {
 				if prev.DelegateField != "" && prev.DelegateField != u.Field {
 					c.errorAt(u.Pos, "two use fields promote the same method name", cl.Name+"."+name,
-						"implement "+name+" explicitly in "+cl.Name+", or drop one of the use declarations (core design §16 N10)")
+						"implement "+name+" explicitly in "+cl.Name+", or drop one of the use declarations (AIC language spec S-7)")
 				}
-				// 本类显式实现（或有 @derive 的同名方法）获胜：不覆盖、不报错。
+				// 本类显式实现（或有 derive 的同名方法）获胜：不覆盖、不报错。
 				continue
 			}
 			promoted := *sig
 			promoted.Recv = cl.Name
 			promoted.DelegateField = u.Field
-			promoted.DelegateClass = target.Name
+			promoted.DelegateClass = ifc.Name
 			cl.Methods[name] = &promoted
 		}
 	}
+}
+
+// typeName2 给诊断文案用：委托目标的接口名。
+func typeName2(ifc *Interface) string {
+	if ifc == nil {
+		return "?"
+	}
+	return ifc.Name
 }
 
 // typeParamSet 把声明的类型参数名收成集合（空 = 非泛型）。
@@ -529,6 +601,12 @@ func (c *Checker) deriveMethods(v *parse.ClassDecl, cl *Class) {
 		if _, dup := cl.Methods["compare"]; dup {
 			c.errorAt(v.Pos, "a derived method collides with an explicit one", cl.Name+".compare",
 				"@derive(Compare) generates compare(other) -> i32; drop the explicit method or the capability")
+		} else if bad, bline, hit := packedF64Field(cl); hit {
+			// C21（规范 §3.2）：含 f64 的 struct 禁 Compare。f64 有 NaN，
+			// 比较不构成全序 —— 派生出的 compare 会给出不自反的结果。
+			// comparableField 对 numeric 一律放行，所以这条必须单独判。
+			c.errorAt(deriveFieldPos(v.Pos, bline), "a struct with an f64 field cannot derive Compare", bad,
+				"f64 has NaN, so the order is not total; store the quantity as an integer (e.g. cents i64), or drop Compare (AIC language spec §3.2, C21)")
 		} else if bad, bline := firstNonComparable(cl); bad != "" {
 			c.errorAt(deriveFieldPos(v.Pos, bline), "a field of @derive(Compare) is not comparable", bad,
 				"Compare supports numeric / bool / str / payload-free enum / @packed / Compare-enabled class fields only (core design §4)")
@@ -577,7 +655,7 @@ func (c *Checker) deriveMethods(v *parse.ClassDecl, cl *Class) {
 			c.errorAt(v.Pos, "a derived method collides with an explicit one", cl.Name+".clone",
 				"@derive(Clone) generates clone() -> T; drop the explicit method or the capability")
 		} else if bad := firstNonClonable(cl); bad != "" {
-			c.errorAt(v.Pos, "a field of @derive(Clone) cannot be copied", bad,
+			c.errorAt(v.Pos, "a field of derive(Clone) cannot be deep-copied", bad,
 				"Clone copies value fields; a reference field would alias the original — copy it explicitly in a method (core design §16 N4)")
 		} else {
 			cl.Methods["clone"] = &FuncSig{
@@ -591,21 +669,76 @@ func (c *Checker) deriveMethods(v *parse.ClassDecl, cl *Class) {
 // firstNonClonable 返回第一个不可按值拷贝字段的说明（全可拷贝返回空串）。
 // Clone 的语义是**值拷贝**：引用字段（class/interface/容器）会变成别名，
 // 那不是"克隆"——必须显式实现。
+// firstNonClonable 返回第一个不可深拷贝的字段（诊断用）。
+// 判据：Clone 是**深拷贝**——struct 逐字段拷贝，class 引用字段重新分配并
+// 递归拷贝。因此 slice/map/set/class 字段都允许；只有 chan / interface /
+// func 不可（它们的所有权无法用值语义表达）。
 func firstNonClonable(cl *Class) string {
 	for i := range cl.Fields {
 		ft := cl.Fields[i].Type
-		if isReference(ft) {
+		switch v := ft.(type) {
+		case *ChanT:
 			return cl.Name + "." + cl.Fields[i].Name + " is " + ft.String()
-		}
-		if containsReference(ft) {
-			return cl.Name + "." + cl.Fields[i].Name + " contains a reference"
+		case *Interface:
+			return cl.Name + "." + cl.Fields[i].Name + " is " + ft.String()
+		case *FuncT:
+			return cl.Name + "." + cl.Fields[i].Name + " is " + ft.String()
+		case *Slice:
+			if bad := firstNonClonableType(v.Elem); bad != "" {
+				return cl.Name + "." + cl.Fields[i].Name + " element " + bad
+			}
+		case *MapT:
+			if bad := firstNonClonableType(v.Value); bad != "" {
+				return cl.Name + "." + cl.Fields[i].Name + " value " + bad
+			}
+		case *SetT:
+			if bad := firstNonClonableType(v.Elem); bad != "" {
+				return cl.Name + "." + cl.Fields[i].Name + " element " + bad
+			}
+		case *ArrayT:
+			if bad := firstNonClonableType(v.Elem); bad != "" {
+				return cl.Name + "." + cl.Fields[i].Name + " element " + bad
+			}
 		}
 	}
 	return ""
 }
 
+// firstNonClonableType 递归判断元素类型是否可深拷贝。
+func firstNonClonableType(t Type) string {
+	switch v := t.(type) {
+	case *ChanT, *Interface, *FuncT:
+		return t.String()
+	case *Slice:
+		return firstNonClonableType(v.Elem)
+	case *MapT:
+		return firstNonClonableType(v.Value)
+	case *SetT:
+		return firstNonClonableType(v.Elem)
+	case *ArrayT:
+		return firstNonClonableType(v.Elem)
+	case *Class:
+		return firstNonClonable(v)
+	}
+	return ""
+}
+
+// firstNonClonableFor 是 Clone 约束用的大门：struct 逐字段查，class 查 derive Clone。
+func firstNonClonableFor(t Type) string {
+	switch v := t.(type) {
+	case *Class:
+		if !v.Packed && !v.Derived["Clone"] {
+			return v.Name + " has no `derive Clone`"
+		}
+		return firstNonClonable(v)
+	case *Enum:
+		return "" // enum 浅拷贝即克隆
+	}
+	return ""
+}
+
 // deriveFieldPos 把"类声明位置 + 字段行号"合成为字段处的诊断位置
-// （@derive 的字段级错误必须指到**那个字段**，而不是类声明行）。
+// （derive 的字段级错误必须指到**那个字段**，而不是类声明行）。
 func deriveFieldPos(clsPos parse.Pos, fieldLine int) parse.Pos {
 	if fieldLine <= 0 {
 		return clsPos
@@ -614,7 +747,21 @@ func deriveFieldPos(clsPos parse.Pos, fieldLine int) parse.Pos {
 }
 
 // firstNonComparable 返回第一个不可比较字段的说明与**它的行号**（全可比较 = ("", 0)）。
-// 行号是必须的：@derive 的字段级错误此前报在**类声明行**，用户要自己找是哪个字段。
+// 行号是必须的：@derive 的字段级错误若报在**类声明行**，用户要自己找是哪个字段。
+// packedF64Field 报告值语义 struct 里首个 f64 字段（C21）：含 f64 的 struct
+// 禁 derive Compare（规范 §3.2）。非 struct（引用 class）不在此列。
+func packedF64Field(cl *Class) (string, int, bool) {
+	if cl == nil || !cl.Packed {
+		return "", 0, false
+	}
+	for i := range cl.Fields {
+		if b, ok := cl.Fields[i].Type.(*Basic); ok && b.Name == "f64" {
+			return cl.Name + "." + cl.Fields[i].Name, cl.Fields[i].Line, true
+		}
+	}
+	return "", 0, false
+}
+
 func firstNonComparable(cl *Class) (string, int) {
 	for i := range cl.Fields {
 		fd := cl.Fields[i]
@@ -697,6 +844,9 @@ func hashableField(t Type, depth int) string {
 }
 
 func (c *Checker) collectInterface(v *parse.InterfaceDecl) {
+	if !c.checkReservedTypeName(v.Name, "interface", v.Pos) {
+		return
+	}
 	if _, exists := c.ifaces[v.Name]; exists {
 		c.errorAt(v.Pos, "duplicate interface declaration", "interface "+v.Name,
 			"only one type may carry this name")
@@ -805,12 +955,15 @@ func (c *Checker) lookupInterfaceRef(name string) *Interface {
 
 
 func (c *Checker) collectEnum(v *parse.EnumDecl) {
+	if !c.checkReservedTypeName(v.Name, "enum", v.Pos) {
+		return
+	}
 	if _, exists := c.enums[v.Name]; exists {
 		c.errorAt(v.Pos, "duplicate enum declaration", "enum "+v.Name,
 			"only one type may carry this name")
 		return
 	}
-	en := &Enum{Name: v.Name, Pkg: c.pkg, variantI: map[string]int{}, DeclPos: v.Pos}
+	en := &Enum{Name: v.Name, Pkg: c.pkg, variantI: map[string]int{}, DeclPos: v.Pos, ErrCode: v.ErrCode}
 	c.enums[v.Name] = en
 	for _, va := range v.Variants {
 		if _, dup := en.variantI[va.Name]; dup {
@@ -819,8 +972,8 @@ func (c *Checker) collectEnum(v *parse.EnumDecl) {
 		}
 		en.variantI[va.Name] = len(en.Variants)
 		// 变体名先登记、**负载类型推迟到类型收齐后**解析（`enum E { X(Late) }` 允许
-		// `class Late` 声明在后面 —— 与类的字段解析同一口径；此前在收集期就地解析，
-		// 于是枚举负载的前向引用报"未知类型名"）。
+		// `class Late` 声明在后面 —— 与类的字段解析同一口径；在收集期就地解析会让
+		// 枚举负载的前向引用报"未知类型名"）。
 		pv := Variant{Name: va.Name}
 		if va.Payload != nil {
 			en.HasData = true
@@ -936,20 +1089,26 @@ func (c *Checker) buildSig(v *parse.FuncDecl, recv string) *FuncSig {
 		return nil
 	}
 	// 公开函数的签名是**跨包契约**：签名里出现本包私有类型 = 调用方拿不到那个类型
-	// （此前放行 ⇒ `func Make() -> secret` 编译通过，跨包调用点却无法书写该类型）。
+	// （放行会让 `func Make() -> secret` 编译通过，跨包调用点却无法书写该类型）。
 	c.checkExportedSig(v.Pos, sig)
 	return sig
 }
 
 // checkExportedSig 检查公开（跨包可见）函数/方法的签名里是否出现本包私有类型。
+//
+// 「公开」有**两条**入口，缺一条就漏（022 实测）：
+//  1. 首字母大写（§3.3 可见性）；
+//  2. `export` 修饰符 —— 它把函数直接挂到 C 导出面，与名字大小写无关。
+//     只认第 1 条会让 `export func leak() -> hidden` 这种"名字小写、
+//     靠 export 强行出面"的签名把私有类型带出去却无人拦（C28 首项）。
 func (c *Checker) checkExportedSig(at parse.Pos, sig *FuncSig) {
 	if sig == nil {
 		return
 	}
-	// 可见性：自由函数看名字；方法随所属类型（R7 决策一：成员不单独按大小写判定）。
-	pub := exported(sig.Name)
+	// 可见性：自由函数看名字或 export 修饰符；方法随所属类型（R7 决策一：成员不单独按大小写判定）。
+	pub := exported(sig.Name) || sig.Export
 	if sig.Recv != "" {
-		pub = exported(sig.Recv)
+		pub = exported(sig.Recv) || sig.Export
 	}
 	if !pub {
 		return
@@ -958,7 +1117,7 @@ func (c *Checker) checkExportedSig(at parse.Pos, sig *FuncSig) {
 		if name := c.privateTypeName(t, 0); name != "" {
 			c.errorAt(at, "a public signature mentions a package-private type",
 				"parameter "+itoa(i+1)+" has type "+name,
-				"capitalise the type's first letter, or make the function package-private (lowercase name) (core design §4 visibility)")
+				"capitalise the type's first letter, or make the function package-private (lowercase name) (AIC language spec §3.3 / §12, C4 / C28)")
 			return
 		}
 	}
@@ -966,7 +1125,7 @@ func (c *Checker) checkExportedSig(at parse.Pos, sig *FuncSig) {
 		if name := c.privateTypeName(t, 0); name != "" {
 			c.errorAt(at, "a public signature mentions a package-private type",
 				"result "+itoa(i+1)+" has type "+name,
-				"capitalise the type's first letter, or make the function package-private (lowercase name) (core design §4 visibility)")
+				"capitalise the type's first letter, or make the function package-private (lowercase name) (AIC language spec §3.3 / §12, C4 / C28)")
 			return
 		}
 	}
@@ -1030,17 +1189,87 @@ func (c *Checker) isPrivateType(pkg, name string) bool {
 	return !exported(name)
 }
 
+// rootIterator 解析根接口 `Iterator[T]`（《AIC 标准库规范》§1 的 for-in 协议）。
+//
+// 它**不是**用户接口：接口声明里没有 T，只能在解析点按实参装配一个带具体
+// next 签名的接口值，并按实参缓存（同形同指针 ⇒ identical / 结构化满足都对得上）。
+// 唯一方法 `next() -> (T, bool)`：bool=false = 终止；fallible 迭代器把 T 写成
+// Result[T]（同规范 §1）。
+func (c *Checker) rootIterator(v *parse.NamedType) Type {
+	if len(v.Args) != 1 {
+		c.errorAt(v.Pos, "Iterator takes exactly one type argument", "Iterator["+itoa(len(v.Args))+" type arguments]",
+			"write Iterator[T]; the for-in protocol carries one element type (AIC standard library spec §1)")
+		return nil
+	}
+	at := c.resolveType(v.Args[0])
+	if at == nil {
+		return nil
+	}
+	if c.rootIfaces == nil {
+		c.rootIfaces = map[string]*Interface{}
+	}
+	if hit, ok := c.rootIfaces[at.String()]; ok {
+		return hit
+	}
+	ifc := &Interface{Name: "Iterator", Pkg: "", Methods: map[string]*FuncSig{}}
+	ifc.Methods["next"] = &FuncSig{Name: "next", Results: []Type{at, TBool}}
+	ifc.Slots = []string{"next"} // 声明序 = 分发槽位号（§十）
+	c.rootIfaces[at.String()] = ifc
+	return ifc
+}
+
 // resolveType 把 parse 类型表达式解析为语义类型；失败时报错并返回 nil。
 //
 // **解析结果按节点登记**（`TypeExprTypes`）：AIR 与 emit 需要"这个类型写法对应哪个语义
 // 类型"时必须读这份表，而不是各自再写一份 typeExpr→type 的规则 —— 那类副本各自漏东西
 // （AIR 那份漏了 `NamedType.Args` ⇒ `Box[Box[i32]]` 静默退化成 `ok_Box`）。
+// stdRootType 解析根类型枚举的泛型实例（Option/Result 共用）。
+func (c *Checker) stdRootType(v *parse.NamedType, name string, en *Enum) Type {
+	inst := &Instance{Base: en}
+	for _, a := range v.Args {
+		at := c.resolveType(a)
+		if at == nil {
+			return nil
+		}
+		inst.Args = append(inst.Args, at)
+	}
+	if len(inst.Args) != len(en.TypeParams) {
+		c.errorAt(v.Pos, "wrong number of type arguments",
+			name+" arguments "+itoa(len(inst.Args))+", parameters "+itoa(len(en.TypeParams)),
+			name+"[T] takes exactly one type argument (AIC standard library spec §1)")
+		return nil
+	}
+	return inst
+}
+
 func (c *Checker) resolveType(t parse.TypeExpr) Type {
 	ty := c.resolveTypeInner(t)
 	if t != nil {
 		c.typeExprTypes[t] = ty
 	}
 	return ty
+}
+
+// stdEnums 把 std 根类型枚举登记进 c.enums，使**变体构造与 match** 能用裸名
+// （Value.Null / Result.Ok / Option.Some / LogLevel.Debug）。
+// 判据：根类型无需 import，因此必须对名字解析可见（否则 `Value.Null` 会报
+// "未声明的名字"——根类型的定义就是"无需导入即可用"）。
+func (c *Checker) stdEnums() {
+	if c.enums == nil {
+		c.enums = map[string]*Enum{}
+	}
+	if _, ok := c.enums["Option"]; !ok {
+		c.enums["Option"] = optionEnum()
+	}
+	if _, ok := c.enums["Result"]; !ok {
+		c.enums["Result"] = resultEnum()
+	}
+	if _, ok := c.enums["Value"]; !ok {
+		c.enums["Value"] = valueEnum()
+	}
+	if _, ok := c.enums["LogLevel"]; !ok {
+		c.enums["LogLevel"] = logLevelEnum()
+	}
 }
 
 func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
@@ -1101,31 +1330,48 @@ func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
 		if v.Name == "chan" {
 			return c.resolveChanType(v)
 		}
-		// bytes（N7）：预声明类型，与 str/Err 同级，不需要 import。
-		if v.Name == "bytes" {
-			return TBytes
+		// 根类型 Option[T] / Result[T]（无需 import，《AIC 标准库规范》§1）。
+		// 判据：它们是语言面的惯用枚举， import 门槛会让每个文件都多一行导入，
+		// 且让"根类型"与"包类型"的区分对 agent 变模糊。
+		if v.Name == "Option" {
+			return c.stdRootType(v, "Option", optionEnum())
 		}
-		// 裸 `Option[T]`：`option` 已 import 时按 `option.Option[T]` 解析。
-		// 文档（语言规范 §3/§17）与编译器自己的修复文案都推荐裸拼写，此前只有
-		// 限定拼写能解析 —— 照文档写会得到 "unknown type name"。
-		if v.Name == "Option" && c.imports["option"] {
-			if en, ok := stdType("option", "Option", c).(*Enum); ok && en != nil {
-				inst := &Instance{Base: en}
-				for _, a := range v.Args {
-					at := c.resolveType(a)
-					if at == nil {
-						return nil
-					}
-					inst.Args = append(inst.Args, at)
-				}
-				if len(inst.Args) != len(en.TypeParams) {
-					c.errorAt(v.Pos, "wrong number of type arguments",
-						"Option arguments "+itoa(len(inst.Args))+", parameters "+itoa(len(en.TypeParams)),
-						"Option[T] takes exactly one type argument (core design §14)")
+		if v.Name == "Result" {
+			return c.stdRootType(v, "Result", resultEnum())
+		}
+		// 根接口 Iterator[T]（《AIC 标准库规范》§1：for-in 的语言协议）。
+		// `class Range implements Iterator[i64]` 必须解析得出来 —— 否则 C10 的
+		// implements 完备检查一跑就报 "unknown type name"（035 实测）。
+		if v.Name == "Iterator" {
+			return c.rootIterator(v)
+		}
+		// Value / LogLevel / Duration 是 std 根类型（标准库规范 §1 / §3.2 / §5.3）
+		if v.Name == "LogLevel" && len(v.Args) == 0 {
+			return logLevelEnum()
+		}
+		if v.Name == "Duration" && len(v.Args) == 0 {
+			return durationType()
+		}
+		if v.Name == "Value" {
+			if len(v.Args) == 0 {
+				return valueEnum()
+			}
+			// Value[T]：递归动态值（List(Value[]) / Obj(map[str]Value) 的实参化）
+			inst := &Instance{Base: valueEnum()}
+			for _, a := range v.Args {
+				at := c.resolveType(a)
+				if at == nil {
 					return nil
 				}
-				return inst
+				inst.Args = append(inst.Args, at)
 			}
+			if len(inst.Args) != 1 {
+				c.errorAt(v.Pos, "wrong number of type arguments",
+					"Value arguments "+itoa(len(inst.Args))+", parameters 1",
+					"Value[T] takes exactly one type argument (AIC standard library spec §1)")
+				return nil
+			}
+			return inst
 		}
 		// 类型参数在作用域内（泛型类/泛型函数的声明体里）：`T` 就是类型参数。
 		if c.typeParams[v.Name] {
@@ -1208,7 +1454,7 @@ func (c *Checker) resolveTypeInner(t parse.TypeExpr) Type {
 			return nil
 		}
 		// 把折出来的长度记进表：emit 侧按**同一份结果**发 C 数组维度
-		// （此前 emit 自己再折一遍、只认字面量与 const 名 ⇒ `[i32; sizeOf(i32)]` 发出 `[0]`）。
+		// （emit 自己再折一遍、只认字面量与 const 名，会让 `[i32; sizeOf(i32)]` 发出 `[0]`）。
 		if v.Size != nil {
 			c.arrayLens[v.Size] = n
 		}
@@ -1279,7 +1525,7 @@ func (c *Checker) instantiate(base Type, args []parse.TypeExpr, at parse.Pos) Ty
 			}
 		}
 		c.checkCallConstraints(at, b.Name, b.Constraints, m)
-		// @packed 的字段白名单在实例化时校验（形参字段此前无法判定）。
+		// @packed 的字段白名单在实例化时校验（形参字段只有在实例化之后才能判定）。
 		if b.Packed {
 			for i := range b.Fields {
 				ft := subst(b.Fields[i].Type, b.TypeParams, inst.Args)

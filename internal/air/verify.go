@@ -107,9 +107,14 @@ func (v *verifier) checkFunc(f *Func) {
 		}
 		labels[b.Label] = b
 	}
-	// V2.1：每块恰一个终结符
+	// V2.1：每块恰一个终结符。
+	//
+	// IR-1 例外（§13.1）：**含 IR-1 原语的块的 Term 由 desugar 填**——原语的
+	// 控制流（check 的两分支、match 的分发、propagate 的传播）在 IR-1 里还
+	// 不是终结符形态。因此这里只对"已去糖"的块要求终结符；IR-1 原语块的
+	// 终结符由 desugar 补齐，并在 desugar 之后由 Verify 复核。
 	for _, b := range f.Blocks {
-		if b.Term == nil {
+		if b.Term == nil && !blockEndsInPrim(b) {
 			v.fail("V2.1", "block "+b.Label+" has no terminator", b.Loc)
 		}
 	}
@@ -122,6 +127,10 @@ func (v *verifier) checkFunc(f *Func) {
 		}
 	}
 	// V2.3：无不可达块（从入口块可达）
+	//
+	// IR-1 例外（§13.1）：以原语收尾的块 Term 待 desugar 填，但它的控制流
+	// 目标是已知的（原语的 After 字段）—— 可达性按 After 继续走，否则
+	// "原语之后的全部代码"会被误判为不可达。
 	reach := map[string]bool{}
 	if len(f.Blocks) > 0 {
 		var walk func(string)
@@ -133,6 +142,9 @@ func (v *verifier) checkFunc(f *Func) {
 			b := labels[l]
 			if b == nil {
 				return
+			}
+			for _, tgt := range PrimTargets(b) {
+				walk(tgt)
 			}
 			for _, tgt := range termTargets(b.Term) {
 				walk(tgt)
@@ -177,6 +189,18 @@ func (v *verifier) checkFunc(f *Func) {
 		defs[p.Name] = f.Loc
 	}
 	// 按块序（结构序）近似支配序：定义必须出现在使用之前（同块或前块）。
+	//
+	// IR-1 例外（§13.1）：match 的 payload 绑定由 desugar 插在臂 prologue 里，
+	// lowering 期的 IR-1 里它还没有定义。这里把原语声明的绑定**预先登记为
+	// 已定义**（它由原语引入，语义上等于定义），否则 V2.4 会对每个
+	// `Option.Some(v) => …` 误报"v 未定义"（实测）。
+	for _, b := range f.Blocks {
+		for _, bind := range primBindings(b) {
+			if _, ok := defs[bind]; !ok {
+				defs[bind] = b.Loc
+			}
+		}
+	}
 	for _, b := range f.Blocks {
 		for _, in := range b.Insts {
 			for _, name := range instUses(in) {
@@ -359,6 +383,56 @@ func regionDepths(f *Func, v *verifier) map[string]int {
 
 // isRefType 判定类型文本是否为**带头引用**（指针 / 接口 / 容器句柄）。
 // 值语义聚合（@packed、[T;N]、无头 enum）加守卫是错的（V5.3 的另一半）。
+// blockEndsInPrim 报告块是否以 IR-1 原语收尾（Term 待 desugar 补齐）。
+// 这是 IR-1 与 IR-2 的分界在 verifier 上的投影：IR-2 里不存在这种块。
+// primBindings 返回 IR-1 原语**引入的绑定名**（desugar 会在臂 prologue 里
+// 为它们发 Var）。V2.4 据此把它们预登记为已定义 —— 否则 IR-1 期每个
+// `Pattern(binding) => …` 都报"binding 未定义"。
+func primBindings(b *Block) []string {
+	var out []string
+	collect := func(arms []MatchArm) {
+		for _, a := range arms {
+			for _, p := range a.Patterns {
+				if p.Binding != "" && p.Binding != "_" && p.HasPay {
+					out = append(out, p.Binding)
+				}
+			}
+		}
+	}
+	if IsPrimTerm(b.Term) {
+		if t, ok := b.Term.(*MatchTerm); ok {
+			collect(t.Arms)
+		}
+	}
+	if len(b.Insts) > 0 {
+		if l, ok := b.Insts[len(b.Insts)-1].(*Let); ok {
+			switch r := l.Rhs.(type) {
+			case *MatchExprRHS:
+				collect(r.Arms)
+			case *CatchRHS:
+				if r.Bind != "" && r.Bind != "_" {
+					out = append(out, r.Bind)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func blockEndsInPrim(b *Block) bool {
+	if IsPrimTerm(b.Term) {
+		return true
+	}
+	if len(b.Insts) == 0 {
+		return false
+	}
+	last := b.Insts[len(b.Insts)-1]
+	if l, ok := last.(*Let); ok && IsPrimRHS(l.Rhs) {
+		return true
+	}
+	return IsPrimInst(last)
+}
+
 func isRefType(ty string) bool {
 	if strings.Contains(ty, "*") {
 		return true

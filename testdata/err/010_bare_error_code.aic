@@ -1,0 +1,6 @@
+import fmt
+
+// 裸整数错误码 = 编译错误（E-8）
+func main() -> Err {
+    return Err(10, "bad")
+}

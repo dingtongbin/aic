@@ -1,8 +1,0 @@
-enum E { A, B }
-
-func f(e E) {
-    match e {
-        E.A | E.B => {
-        }
-    }
-}

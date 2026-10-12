@@ -47,9 +47,9 @@ func opAllowedByConstraint(cons []string, op string) bool {
 	}
 	switch op {
 	case "==", "!=":
-		return has("Eq") || has("Ord")
+		return has("Compare")
 	case "<", "<=", ">", ">=":
-		return has("Ord")
+		return has("Compare")
 	}
 	return false
 }
@@ -62,9 +62,6 @@ func (c *Checker) resolveTypeArgName(e parse.Expr) Type {
 	case *parse.Ident:
 		if b, ok := basicType(v.Name); ok {
 			return b
-		}
-		if v.Name == "bytes" {
-			return TBytes
 		}
 		return c.lookupType(v.Name)
 	case *parse.Field:
@@ -123,10 +120,11 @@ func (c *Checker) checkComptimeCall(v *parse.Call, name string, expect Type) (Ty
 	return nil, nilBound, untyped{}
 }
 
-// CapabilityNames 是能力约束的封闭枚举（与 @derive 同源，禁第二份）。
-var CapabilityNames = map[string]bool{
-	"Eq": true, "Ord": true, "Hash": true, "Print": true, "Zero": true,
-}
+// CapabilityNames 是能力约束的封闭枚举。
+// **它与 derive 修饰词的封闭集是同一套名单**（《AIC 语言规范》§3.2 / §6.2）——
+// 写成两份会让 agent 学两套名字，且约束与派生行为不一致（执行标准 §3.3 禁止）。
+// 单一来源在 checker.go 的 deriveCapabilities，这里别名引用。
+var CapabilityNames = deriveCapabilities
 
 // ValueConstraintNames 是值性约束。
 var ValueConstraintNames = map[string]bool{"value": true, "ref": true}
@@ -144,7 +142,7 @@ func (c *Checker) checkConstraintDecl(owner string, tpc parse.TypeParamConstrain
 			continue
 		}
 		c.errorAt(tpc.Pos, "unknown generic constraint", owner+"["+tpc.Name+": "+name+"]",
-			"constraints are the @derive capabilities (Eq/Ord/Hash/Print/Zero), a declared interface, or value/ref (core design §16 N3)")
+			"constraints are the derive capabilities (ToString / Compare / Hash / Clone / Json), a declared interface, or value / ref (AIC language spec §6.2)")
 	}
 }
 
@@ -154,43 +152,48 @@ func (c *Checker) satisfiesConstraints(at parse.Pos, owner, param string, t Type
 	ok := true
 	for _, name := range cons {
 		switch {
-		case name == "Eq":
-			if bad := comparableType(t); bad != "" {
-				c.errorAt(at, t.String()+" does not satisfy Eq", owner+"["+param+": Eq]: "+bad,
-					"== needs comparable fields: numeric / bool / str / payload-free enum / @packed / Eq-enabled class (core design §16 N3)")
+		case name == "ToString":
+			if bad := unprintableClass(t, 0); bad != nil {
+				c.errorAt(at, t.String()+" does not satisfy ToString", owner+"["+param+": ToString]: "+bad.String()+" has no ToString",
+					"add `derive ToString` to the type, or drop the ToString constraint (AIC language spec §6.2)")
 				ok = false
 			}
-		case name == "Ord":
+		case name == "Compare":
+			if bad := comparableType(t); bad != "" {
+				c.errorAt(at, t.String()+" does not satisfy Compare", owner+"["+param+": Compare]: "+bad,
+					"Compare needs comparable fields: numeric / bool / str / payload-free enum / struct / Compare-enabled class (AIC language spec §6.2)")
+				ok = false
+			}
 			if !orderedType(t) {
-				c.errorAt(at, t.String()+" does not satisfy Ord", owner+"["+param+": Ord]",
-					"Ord needs a total order: numeric / str, or a class with @derive(Compare) (core design §16 N3)")
+				c.errorAt(at, t.String()+" does not satisfy Compare", owner+"["+param+": Compare]",
+					"Compare needs a total order: numeric / str, or a type with `derive Compare` (AIC language spec §6.2)")
 				ok = false
 			}
 		case name == "Hash":
 			if bad := hashableType(t); bad != "" {
 				c.errorAt(at, t.String()+" does not satisfy Hash", owner+"["+param+": Hash]: "+bad,
-					"Hash needs hashable fields: numeric / bool / str / payload-free enum / @packed / Hash-enabled class (core design §16 N3)")
+					"Hash needs hashable fields: numeric / bool / str / payload-free enum / struct / Hash-enabled class (AIC language spec §6.2)")
 				ok = false
 			}
-		case name == "Print":
-			if bad := unprintableClass(t, 0); bad != nil {
-				c.errorAt(at, t.String()+" does not satisfy Print", owner+"["+param+": Print]: "+bad.String()+" has no ToString",
-					"add @derive(ToString) to the type, or drop the Print constraint (core design §16 N3)")
+		case name == "Clone":
+			if bad := firstNonClonableFor(t); bad != "" {
+				c.errorAt(at, t.String()+" does not satisfy Clone", owner+"["+param+": Clone]: "+bad,
+					"Clone needs clonable fields; add `derive Clone` to the type (AIC language spec §6.2)")
 				ok = false
 			}
-		case name == "Zero":
-			// 每种类型都有零值（§二.3），恒满足 —— 保留这个名字是为了让约束
-			// 集合与 @derive 完全一致（同一封闭集合，不引入新概念）。
+		case name == "Json":
+			// Json 是序列化能力：任何类型都可 satisfy（生成 toJson/fromJson），
+			// 但不支持的类型在 derive 阶段报错。这里不预设字段规则。
 		case name == "value":
 			if !isValueType(t) {
 				c.errorAt(at, t.String()+" does not satisfy value", owner+"["+param+": value]",
-					"a value constraint asks for a type without a region header: numeric / bool / str / Err / enum / @packed / [T;N] / fn (core design §16 N3)")
+					"a value constraint asks for a type without a region header: numeric / bool / str / Err / enum / struct / [T;N] / fn (AIC language spec §6.2)")
 				ok = false
 			}
 		case name == "ref":
 			if !isReference(t) {
 				c.errorAt(at, t.String()+" does not satisfy ref", owner+"["+param+": ref]",
-					"a ref constraint asks for a region-managed type: class / interface / container (core design §16 N3)")
+					"a ref constraint asks for a region-managed type: class / interface / container (AIC language spec §6.2)")
 				ok = false
 			}
 		default:
@@ -339,6 +342,12 @@ func (c *Checker) checkCallConstraints(at parse.Pos, owner string, tps []parse.T
 		arg := m[tpc.Name]
 		if arg == nil {
 			continue // 解不出已在别处报错
+		}
+		// 形参自身仍是**类型参数**时无法判定满足性（模板体内的自引用，
+		// 如 `func init(v T) -> Box[T]` 的 Box[T]）——推迟到实例化点，
+		// 与 @packed 字段白名单同一模式（含 TypeParam 就推迟）。
+		if containsTypeParam(arg) {
+			continue
 		}
 		if !c.satisfiesConstraints(at, owner, tpc.Name, arg, tpc.Constraints) {
 			ok = false

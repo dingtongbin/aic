@@ -1,0 +1,7 @@
+import fmt
+
+// 移位计数越界 = trap
+func main() {
+    var n i32 = 64
+    fmt.println(str.fromI64(1 << n))
+}

@@ -1,0 +1,20 @@
+import fmt
+import str
+
+// region = 块级区域；退出即整块回收
+// 对象头 8B {reg, line}，分代槽位；store 守卫防浅区域逃逸
+class Node {
+    var v i32
+    var next Node
+}
+
+func main() {
+    var root Node = Node{v: 0, next: nil}
+    region {
+        var a Node = Node{v: 1, next: root}
+        var b Node = Node{v: 2, next: a}
+        fmt.println("{b.next.v}")
+    }
+    // 区域已退出：其内对象不可再达
+    fmt.println("{root.v}")
+}

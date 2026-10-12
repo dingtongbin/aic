@@ -1,0 +1,8 @@
+import fmt
+
+// C28：export 签名禁含私有类型
+class hidden { var x i32 }
+
+export func leak() -> hidden {
+    return hidden{x: 1}
+}

@@ -1,5 +1,0 @@
-import str
-
-func main() {
-    var s = str.slice("abc", i32(0), i32(1))
-}

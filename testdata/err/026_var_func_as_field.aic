@@ -1,3 +1,0 @@
-class C {
-    var m() -> i32 { return 1 }
-}

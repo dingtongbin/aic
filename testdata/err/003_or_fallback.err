@@ -1,0 +1,6 @@
+testdata/err/003_or_fallback.aic:6:5: error: multiple results must be bound slot by slot
+    var v = f()
+    fix: write var a, err = f() or var a = check f(); discard explicitly with _ (red line 2)
+testdata/err/003_or_fallback.aic:6:17: error: undeclared name
+    or
+    fix: declare it first (var name Type = value) or check the spelling; type and function names are not values

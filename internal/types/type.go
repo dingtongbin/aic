@@ -97,6 +97,9 @@ type Enum struct {
 	variantI   map[string]int
 	HasData    bool
 	TypeParams []string
+	// ErrCode = true 表示 `enum X: ErrCode { … }`：错误码约束枚举。
+	// 码由编译器按（模块路径哈希, 变体序号）分配，构建图内冲突 = 编译错误（C26）。
+	ErrCode bool
 	// DeclPos 是声明位置（诊断用：负载解析推迟到类型收齐后，报错仍要指回声明处）。
 	DeclPos parse.Pos
 }
@@ -175,19 +178,39 @@ var (
 	TF64   = &Basic{"f64"}
 	TBool  = &Basic{"bool"}
 	TStr   = &Basic{"str"}
+	TRune  = &Basic{"rune"}
 	TErr   = &Basic{"Err"}
 )
 
 var basicByName = map[string]*Basic{
 	"i8": TI8, "i16": TI16, "i32": TI32, "i64": TI64,
 	"u8": TU8, "u16": TU16, "u32": TU32, "u64": TU64, "usize": TUsize,
-	"f32": TF32, "f64": TF64, "bool": TBool, "str": TStr, "Err": TErr,
+	"f32": TF32, "f64": TF64, "bool": TBool, "str": TStr, "rune": TRune, "Err": TErr,
 }
 
 func basicType(name string) (*Basic, bool) {
 	b, ok := basicByName[name]
 	return b, ok
 }
+
+// reservedTypeNames 是 C2 的保留类型名表（《AIC 语言规范》§12）。
+//
+// 基本类型直接取 basicByName（**同一张表**，禁第二份名单）；根类型是规范 §1
+// 那批无需 import 即可用的名字 —— 它们一旦被用户声明成同名类型，
+// `var x Option[i32]` 就同时指向两个东西，而"歧义即错误"。
+var reservedTypeNames = func() map[string]bool {
+	m := map[string]bool{}
+	for name := range basicByName {
+		m[name] = true
+	}
+	for _, name := range []string{
+		"Option", "Result", "Value", "Duration", "Code", "Iterator", "LogLevel", "ctx",
+		"map", "set", "chan", // 容器形参：类型位置的保留词
+	} {
+		m[name] = true
+	}
+	return m
+}()
 
 func (t *Basic) String() string     { return t.Name }
 func (t *Class) String() string     { return qualName(t.Pkg, t.Name) }
@@ -232,7 +255,7 @@ func isNumeric(t Type) bool {
 		return false
 	}
 	switch b.Name {
-	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize", "f32", "f64":
+	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize", "f32", "f64", "rune":
 		return true
 	}
 	return false
@@ -244,7 +267,7 @@ func isInt(t Type) bool {
 		return false
 	}
 	switch b.Name {
-	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize":
+	case "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "usize", "rune":
 		return true
 	}
 	return false
@@ -266,8 +289,8 @@ func isErr(t Type) bool {
 }
 
 // ErrFieldIndex 是 `Err` 字段的**冻结下标**（§16 N5 ④：`{code i32, msg str, cause}`）。
-// **唯一实现**：AIR 降级的 `field` 下标与 L5 的 C 发端都走这里 —— 此前 AIR 侧对 Err
-// 一律给下标 0，于是 `e.msg` 被降成 `field e, 0`（读的是 code），IR 路径**静默读错字段**。
+// **唯一实现**：AIR 降级的 `field` 下标与 L5 的 C 发端都走这里 —— AIR 侧对 Err
+// 一律给下标 0 会让 `e.msg` 被降成 `field e, 0`（读的是 code），IR 路径**静默读错字段**。
 func ErrFieldIndex(name string) (int, bool) {
 	switch name {
 	case "code":
@@ -288,7 +311,7 @@ func isReference(t Type) bool {
 		return !v.Packed
 	case *Interface:
 		return true
-	case *Slice, *MapT, *SetT, *BytesT:
+	case *Slice, *MapT, *SetT:
 		return true
 	}
 	return false
@@ -340,6 +363,73 @@ func containsReference(t Type) bool {
 	return false
 }
 
+// captureSafe 报告类型能否被 `func` 字面量按值捕获（《AIC 语言规范》§5.3
+// 捕获规则 + C11 扩展）。
+//
+// 判据 = §5.3 白名单的直译：**标量（含 str/rune）/ 无载荷 enum / [T;N] /
+// 全字段值类型的 struct**。背后的两条理由（§5.3 判据 1、2）：
+//  1. 值类型 ⇒ 闭包环境是纯值结构体，**无区域头**；
+//  2. 不含引用 ⇒ 随闭包值拷贝后没有任何指针可能悬垂。
+// 合起来才是规范说的"可证无悬垂"。class / 容器 / 接口 / chan / 带负载且含引用的
+// enum 一律 false —— 捕获它们 = 编译错误，修复提示改用显式上下文参数。
+func captureSafe(t Type, depth int) bool {
+	if t == nil || depth > 8 {
+		return false
+	}
+	switch v := t.(type) {
+	case *Basic:
+		return true // 标量 / str / rune / Err：按值、无区域头
+	case *Enum:
+		return !v.HasData // 无载荷 enum；带负载的不在白名单（§5.3）
+	case *ArrayT:
+		return captureSafe(v.Elem, depth+1) // [T;N]：元素必须也是白名单类型
+	case *Class:
+		if !v.Packed {
+			return false // 引用 class：环境会含区域头
+		}
+		for i := range v.Fields {
+			if !captureSafe(v.Fields[i].Type, depth+1) {
+				return false // "全字段值类型的 struct"
+			}
+		}
+		return true
+	case *Instance:
+		// 泛型实例（Option[i64] / Box[Node] …）：按实参代换基座后再判，
+		// 否则 TypeParam 落不进任何分支，会把纯值实例一并拒掉。
+		return captureInstanceSafe(v, depth)
+	}
+	return false
+}
+
+// captureInstanceSafe 是 captureSafe 对泛型实例的展开：把基座的字段/负载按实参
+// 代换（Subst，单一实现）后逐个过 captureSafe。
+func captureInstanceSafe(v *Instance, depth int) bool {
+	if v == nil || len(v.Args) == 0 {
+		return captureSafe(v.Base, depth+1)
+	}
+	switch b := v.Base.(type) {
+	case *Class:
+		if !b.Packed {
+			return false
+		}
+		for i := range b.Fields {
+			if !captureSafe(Subst(b.Fields[i].Type, b.TypeParams, v.Args), depth+1) {
+				return false
+			}
+		}
+		return true
+	case *Enum:
+		for i := range b.Variants {
+			p := Subst(b.Variants[i].Payload, b.TypeParams, v.Args)
+			if p != nil && !captureSafe(p, depth+1) {
+				return false
+			}
+		}
+		return true
+	}
+	return captureSafe(v.Base, depth+1)
+}
+
 // --- 同一性与赋值 -----------------------------------------------------------
 
 // identical: 无隐式转换的世界里，类型相等只有一种（泛型实例与 TypeParam 同名即同）。
@@ -357,12 +447,6 @@ func identical(a, b Type) bool {
 	case *Enum:
 		bv, ok := b.(*Enum)
 		return ok && av.Name == bv.Name && av.Pkg == bv.Pkg
-	case *MutexT:
-		_, ok := b.(*MutexT)
-		return ok
-	case *BytesT:
-		_, ok := b.(*BytesT)
-		return ok
 	case *ChanT:
 		bv, ok := b.(*ChanT)
 		return ok && identical(av.Elem, bv.Elem)
@@ -445,6 +529,10 @@ func intRange(t Type) (lo, hi int64, ok bool) {
 		return 0, 4294967295, true
 	case "u64", "usize":
 		return 0, 9223372036854775807, true // 上半区间由 uint64 位宽另行判定
+	case "rune":
+		// Unicode 标量值：0..=0x10FFFF，代理区 [0xD800, 0xDFFF] 非法（§2.1）。
+		// 范围上界由构造处单独判定代理区（intRange 只给连续区间）。
+		return 0, 0x10FFFF, true
 	}
 	return 0, 0, false
 }

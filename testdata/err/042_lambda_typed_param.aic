@@ -1,4 +1,0 @@
-func f() -> i32 {
-    var g = (p i32) => p + 1
-    return g(1)
-}

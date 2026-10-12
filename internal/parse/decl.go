@@ -39,14 +39,10 @@ func (p *Parser) skipSemis() {
 	}
 }
 
-// parseDecl reads one top-level declaration. Annotations and the export /
-// extern modifiers may precede it.
+// parseDecl reads one top-level declaration. The export / extern modifiers may
+// precede it. v7 起无注解（《AIC 语言规范》§1.3）。
 // 顶层只许 const 与类型/函数声明：顶层 `var` = 编译错（红线 21）。
 func (p *Parser) parseDecl() Decl {
-	var annotations []string
-	for p.cur().Kind == ANNOT {
-		annotations = append(annotations, p.parseAnnotationUse())
-	}
 	export, extern := false, false
 	for {
 		switch {
@@ -55,6 +51,12 @@ func (p *Parser) parseDecl() Decl {
 			p.next()
 			continue
 		case p.at(KW, "extern"):
+			// `extern from "h"` 是**整条声明**（§11.2），不是 extern 修饰符。
+			// 这里若先吃掉 extern，下面行 108 的 `p.at(KW,"extern")` 就再也
+			// 看不到它，于是报"顶层非声明语句 got IDENT"（037 实测）。
+			if p.peekIs(IDENT, "from") {
+				break
+			}
 			extern = true
 			p.next()
 			continue
@@ -72,14 +74,14 @@ func (p *Parser) parseDecl() Decl {
 				"capitalise the first letter to make the constant visible across packages (core design §4); a `_` prefix makes it package-private, so drop export")
 			export = false
 		}
-		d = p.parseConst(annotations)
+		d = p.parseConst()
 	case p.at(KW, "enum"):
 		if export {
 			p.errorHere(p.pos(), "export is only for exporting functions to C (core design §8)", "export enum",
 				"capitalise the first letter to make the type visible across packages (core design §4); a `_` prefix makes it package-private, so drop export")
 			export = false
 		}
-		d = p.parseEnum(annotations)
+		d = p.parseEnum()
 	case p.at(KW, "var"):
 		at := p.pos()
 		p.errorHere(at, "a top-level var declaration is not allowed (red line 21)", "a top-level var",
@@ -87,32 +89,30 @@ func (p *Parser) parseDecl() Decl {
 		p.synchronize(false)
 		return nil
 	case p.at(KW, "func"):
-		d = p.parseFunc("", false, export, extern, annotations, false)
+		d = p.parseFunc("", false, export, extern, false)
+	case p.at(KW, "struct"):
+		d = p.parseStruct(export)
 	case p.at(KW, "class"):
-		d = p.parseClass(export, annotations)
+		d = p.parseClass(export)
 	case p.at(KW, "interface"):
-		d = p.parseInterface(export, annotations)
+		d = p.parseInterface(export)
 	default:
 		handled = false
 	}
 	if handled {
-		// 注解落点白名单（@packed 只能挂类、@noblock 只能挂 extern func…）。
-		if d != nil {
-			p.checkAnnotationPlacement(d, annotations)
-		}
 		return d
 	}
-	// N4 `comptime { … }`：上下文关键字（`comptime` 自己仍是合法标识符）。
-	if p.atIdent("comptime") && p.peekIs(PUNCT, "{") {
+	// 《AIC 语言规范》§6.4：`comptime { … }` 是硬关键字开头的编译期块。
+	if p.at(KW, "comptime") {
 		if export || extern {
 			p.errorHere(p.pos(), "comptime cannot be exported or extern", "comptime { … }",
-				"a comptime block is compile-time only: it emits no code, so there is nothing to export (core design §16 N4)")
-		}
-		if len(annotations) > 0 {
-			p.errorHere(p.pos(), "annotations are not allowed on comptime", "comptime { … }",
-				"annotations belong to classes/interfaces/enums/methods/local variables; drop it from comptime")
+				"a comptime block is compile-time only: it emits no code, so there is nothing to export")
 		}
 		return p.parseComptimeBlock()
+	}
+	// 《AIC 语言规范》§11.2：`extern from "header.h"` 直接包装 C 头文件。
+	if p.at(KW, "extern") && p.peekIs(IDENT, "from") {
+		return p.parseExternFrom(export)
 	}
 
 	at := p.pos()
@@ -122,63 +122,85 @@ func (p *Parser) parseDecl() Decl {
 		p.synchronize(false)
 		return nil
 	}
-	if t := p.cur(); t.Kind == IDENT && isRetiredKeyword(t.Text) {
-		p.errorHere(at, retiredDesc(t.Text), "got "+t.Text, retiredFix(t.Text))
-		p.next()
-		p.synchronize(false)
-		return nil
-	}
 	p.errorHere(at, "a non-declaration statement at the top level", "got "+describe(p.cur()),
-		"the top level holds import / const / func / class / interface / enum (optionally with export, extern, or annotations)")
+		"the top level holds import / const / func / class / struct / interface / enum / comptime / extern (optionally with export or extern)")
 	p.synchronize(false)
 	return nil
 }
 
-// parseAnnotationUse reads `@name` or `@name(args)` (e.g. `@derive(ToString)`).
-// The raw spelling including arguments is kept verbatim so later stages
-// (expand / @derive) can inspect the arguments.
-func (p *Parser) parseAnnotationUse() string {
-	name := p.next().Text
-	if !p.at(PUNCT, "(") {
-		return name
-	}
-	var b strings.Builder
-	b.WriteString(name)
-	depth := 0
-	for {
-		t := p.cur()
-		if t.Kind == EOF {
-			p.errorCur("annotation argument list is not closed", "got "+describe(t), "add the closing `)`")
-			break
-		}
-		if t.Kind == PUNCT && t.Text == "(" {
-			depth++
-		}
-		if t.Kind == PUNCT && t.Text == ")" {
-			depth--
-		}
-		b.WriteString(t.Text)
-		p.next()
-		if depth == 0 {
-			break
-		}
-	}
-	return b.String()
-}
+// 注解（`@name`）已随《AIC 语言规范》§1.3 整体删除：`@` 在词法层就是非法字符，
+// 这里连同 parseAnnotationUse 一起清掉 —— 留着一个永远调不到的解析函数，会让
+// 下一个读代码的人以为注解还在（阶段 1 退出条件：注解机制从代码中消失）。
 
 func (p *Parser) parseImport() Decl {
 	at := p.pos()
 	p.next() // import
 	if !p.atKind(IDENT) {
-		p.errorHere(at, "import is missing the package name", "got "+describe(p.cur()),
-			"write `import name` (a bare identifier, no quotes; a directory is a package)")
+		p.errorHere(at, "import is missing the package path", "got "+describe(p.cur()),
+			"write `import app/ui` (a path of ASCII identifiers separated by `/`; a directory is a package)")
 		return nil
 	}
-	name := p.next().Text
-	return &ImportDecl{Name: name, Pos: at}
+	path := p.next().Text
+	// 路径导入：`import a/b/c` → 限定名 = 末段 `c`（《AIC 语言规范》§10.1）。
+	// 单段名（`import fmt`）同时覆盖标准包与本地顶层包，解析规则见 §10.2。
+	for p.at(PUNCT, "/") {
+		if p.peekText() == "" || p.peekText() == "/" {
+			p.errorHere(p.pos(), "import path has a trailing `/`", path+"/",
+				"write the full path: `import app/ui`")
+			break
+		}
+		p.next() // /
+		if !p.atKind(IDENT) {
+			p.errorHere(p.pos(), "import path segment is missing after `/`", "got "+describe(p.cur()),
+				"each segment is an ASCII identifier: `import app/ui`")
+			break
+		}
+		path = path + "/" + p.next().Text
+	}
+	return &ImportDecl{Name: path, Pos: at}
 }
 
-func (p *Parser) parseConst(annotations []string) Decl {
+// parseExternFrom 读 `extern from "header.h"`（《AIC 语言规范》§11.2）。
+// 它把 C 头文件的声明映射为本包的 extern 声明；头文件搜索路径与宏定义
+// 写在 aic.mod 的 cflag 行。解析实现在 internal/cinterp（阶段 6），
+// 这里只固定语法面。
+func (p *Parser) parseExternFrom(export bool) Decl {
+	at := p.pos()
+	p.next() // extern
+	p.next() // from
+	if !p.atKind(STR) {
+		p.errorHere(at, "extern from needs a header path in quotes", "got "+describe(p.cur()),
+			"write extern from \"sqlite3.h\"; add search paths with cflag -I... in aic.mod")
+		p.synchronize(false)
+		return nil
+	}
+	if export {
+		p.errorHere(at, "export cannot be combined with extern from", "export extern from",
+			"extern from brings C declarations in; there is no AIC declaration to export")
+	}
+	header := p.next().Text
+	// 可选的 only 过滤清单：extern from "h" only a, b, c
+	var only []string
+	if p.atKind(IDENT) && p.cur().Text == "only" {
+		p.next()
+		for {
+			if !p.atKind(IDENT) {
+				p.errorHere(p.pos(), "only needs a name list", "got "+describe(p.cur()),
+					"write `extern from \"h\" only a, b, c`")
+				break
+			}
+			only = append(only, p.next().Text)
+			if p.at(PUNCT, ",") {
+				p.next()
+				continue
+			}
+			break
+		}
+	}
+	return &ExternFromDecl{Header: header, Only: only, Pos: at}
+}
+
+func (p *Parser) parseConst() Decl {
 	at := p.pos()
 	p.next() // const
 	if !p.atKind(IDENT) {
@@ -202,10 +224,6 @@ func (p *Parser) parseConst(annotations []string) Decl {
 		p.errorHere(at, "a constant must be explicitly initialised", "got "+describe(p.cur()),
 			"write `const name = expression`; compile-time evaluation requires an initialiser")
 		return nil
-	}
-	if len(annotations) > 0 {
-		p.errorHere(at, "annotations are not allowed on const", "const "+name+" carries "+strings.Join(annotations, " "),
-			"annotations belong to classes/interfaces/enums/methods/local variables; drop it from const")
 	}
 	return d
 }
@@ -300,11 +318,6 @@ func (p *Parser) parseVarTarget() (VarTarget, bool) {
 		return tgt, false
 	}
 	tgt.Name = p.next().Text
-	// `var mut x` — the v1 mutability annotation arrived as a target name.
-	if tgt.Name == "mut" && p.atKind(IDENT) {
-		p.errorHere(tgt.Pos, "`mut` is retired: assignment shares a reference, there is no mutability annotation", "var mut "+p.peekText(),
-			"drop the mut keyword: var "+p.peekText()+" = ...; variables are reassignable by default")
-	}
 	return tgt, true
 }
 

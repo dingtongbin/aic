@@ -1,0 +1,41 @@
+import fmt
+import str
+
+// 需要状态时的正路：显式上下文参数 + 调用方传 ctx
+// 而不是捕获引用（那会引入区域悬垂风险）
+interface Handler {
+    func handle(req i64) -> i64
+}
+
+class Doubler implements Handler {
+    var factor i64
+
+    func handle(req i64) -> i64 { return req * this.factor }
+}
+
+// 框架形态：func(A) -> R + 调用方传 ctx A
+func serve(h Handler, req i64) -> i64 {
+    return h.handle(req)
+}
+
+// 迭代协议：需要状态用 class + 方法，不靠捕获
+class Counter {
+    var n i64
+
+    func next() -> (i64, bool) {
+        if this.n >= 3 { return 0, false }
+        this.n = this.n + 1
+        return this.n, true
+    }
+}
+
+func main() {
+    var d Doubler = Doubler{factor: 3}
+    fmt.println("{serve(d, 7)}")
+    var c Counter = Counter{n: 0}
+    var v, ok = c.next()
+    for ok {
+        fmt.println("{v}")
+        v, ok = c.next()
+    }
+}

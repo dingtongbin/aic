@@ -1,3 +1,0 @@
-func f() -> u8 {
-    return u8(300)
-}

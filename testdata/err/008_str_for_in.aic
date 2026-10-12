@@ -1,0 +1,8 @@
+import fmt
+
+// str 不在 for-in 协议内：字节 ≠ 字符
+func main() {
+    for v in "hello" {
+        fmt.println(v)
+    }
+}

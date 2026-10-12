@@ -1,0 +1,9 @@
+import fmt
+
+// C5：同一文件内限定名冲突
+import app/ui
+import lib/ui
+
+func main() {
+    fmt.println(ui.name())
+}

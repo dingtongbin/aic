@@ -36,14 +36,6 @@ func NewFuncCache(dir, prefix string, no bool) *FuncCache {
 	return &FuncCache{store: pkg.NewCacheStore(dir, prefix), prefix: prefix, No: no}
 }
 
-// Stats 返回命中/未命中计数（诊断用）。
-func (fc *FuncCache) Stats() (hits, misses int) {
-	if fc == nil {
-		return 0, 0
-	}
-	return fc.hits, fc.misses
-}
-
 // Get 查一片函数 C 文本。
 func (fc *FuncCache) Get(key string) ([]byte, bool) {
 	if fc == nil || fc.No || key == "" {
@@ -101,6 +93,3 @@ var curFuncCache *FuncCache
 
 // SetFuncCache 设置/清空当前函数缓存（nil = 关闭）。CLI 在构建前后调用。
 func SetFuncCache(fc *FuncCache) { curFuncCache = fc }
-
-// FuncCacheStats 返回当前缓存的命中统计（CLI 的 --cache-stats 用）。
-func FuncCacheStats() (hits, misses int) { return curFuncCache.Stats() }

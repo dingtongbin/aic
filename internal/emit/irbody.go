@@ -8,13 +8,13 @@ import (
 
 	"aic/internal/air"
 	"aic/internal/cir"
-	"aic/internal/pkg"
 	"aic/internal/parse"
+	"aic/internal/pkg"
 	"aic/internal/types"
 )
 
 // ---------------------------------------------------------------------------
-// IR → C 后端（L5d/L5f）：直译路径（AST → C）退役后的唯一后端。
+// IR → C 后端（L5d/L5f）：唯一的后端。
 //
 // 为什么放在 emit 包里：类型→C 名（ctype.go）、按需合成的打印器（printgen.go）、
 // 见证表与 trampoline（iface.go）、@derive 家族（derive.go）、返回结构体、入口
@@ -58,7 +58,8 @@ func (p *IRProg) Add(sym string, f *cir.Func) error {
 func (p *IRProg) resetUsed() { p.used = map[string]bool{} }
 
 // verifyAllUsed 报告有没有没被任何签名消费的函数体（符号对不上 = 编译器 bug）。
-func (p *IRProg) verifyAllUsed() error {	var orphans []string
+func (p *IRProg) verifyAllUsed() error {
+	var orphans []string
 	for sym := range p.Bodies {
 		if !p.used[sym] {
 			orphans = append(orphans, sym)
@@ -120,7 +121,6 @@ func (c *Ctx) buildIRTypeTab() {
 		types.TI8, types.TI16, types.TI32, types.TI64,
 		types.TU8, types.TU16, types.TU32, types.TU64, types.TUsize,
 		types.TF32, types.TF64, types.TBool, types.TStr, types.TErr,
-		types.TBytes, types.TMutex,
 	} {
 		tab[air.TyText(b)] = b
 	}
@@ -136,7 +136,7 @@ func (c *Ctx) buildIRTypeTab() {
 		tab[text] = t
 		// 与 noteNamedPkg 同一条约定（那里有注释）：**不带 `*` 的裸文本**也要登记 ——
 		// 分配点（`alloc task(ok_Box[i32])`）与字段宿主解析用的是对象类型本身。
-		// 泛型实例此前只有带 `*` 的键，宿主查表落空 ⇒ 字段名掉成 `_0`（740 实测）。
+		// 泛型实例若只登记带 `*` 的键，宿主查表会落空 ⇒ 字段名掉成 `_0`（740 实测）。
 		if bare := strings.TrimSuffix(text, "*"); bare != "" && bare != text {
 			if _, seen := tab[bare]; !seen {
 				tab[bare] = t
@@ -285,15 +285,6 @@ func noteSig(note func(types.Type), sig *types.FuncSig) {
 	for _, r := range sig.Results {
 		note(r)
 	}
-}
-
-// irTypeOfText 取 AIR 类型文本对应的语义类型（拿不到 = 第二种返回值 false）。
-func (c *Ctx) irTypeOfText(text string) (types.Type, bool) {
-	if text == "" || text == "void" {
-		return nil, true
-	}
-	t, ok := c.irTab[text]
-	return t, ok
 }
 
 // irNeedRetStruct 登记一个"合成返回结构体"的需求（元组/多返回值类型）。
@@ -455,11 +446,6 @@ func splitMultiText(text string) ([]string, bool) {
 // envPrefix 是 AIR 里闭包环境伪类型的前缀（`env(<符号>)`）。
 const envPrefix = "env("
 
-// envStructName 是某个闭包的环境结构体名（确定性：由闭包符号拼出）。
-func (c *Ctx) envStructName(sym string) string {
-	return "aic_env_" + sanitize(sym)
-}
-
 // ---------------------------------------------------------------------------
 // 值名与临时量
 // ---------------------------------------------------------------------------
@@ -605,17 +591,6 @@ func (c *Ctx) irValTy(v string) string {
 	return c.irTemps[v]
 }
 
-// irValC 是「值名 → C 表达式」并顺带把字面量的类型定下来（打印分派要用）。
-func (c *Ctx) irValC(v string) (string, error) {
-	if strings.HasPrefix(v, "const ") {
-		if strings.Contains(v, "\x00") {
-			return "", fmt.Errorf("emit(IR): NUL in a literal is not supported")
-		}
-		return c.irVal(v), nil
-	}
-	return v, nil
-}
-
 // ---------------------------------------------------------------------------
 // 调用符号 → C 符号
 // ---------------------------------------------------------------------------
@@ -652,9 +627,11 @@ func (c *Ctx) irFuncRefCName(lit string) (string, bool, error) {
 }
 
 // irFuncCName 定函数体的 C 符号名（三源同表）：
-//  ① 实例符号 `<base>[args]` ⇒ 实例名（调用点 irCallee 同一规则）；
-//  ② extern/export ⇒ 零 mangle 原名；
-//  ③ 其余 ⇒ 签名表（包名 + 接收者 + 名）。
+//
+//	① 实例符号 `<base>[args]` ⇒ 实例名（调用点 irCallee 同一规则）；
+//	② extern/export ⇒ 零 mangle 原名；
+//	③ 其余 ⇒ 签名表（包名 + 接收者 + 名）。
+//
 // lambda 提升体走 ③：合成签名时 Name 取符号尾段、无接收者。
 func (c *Ctx) irFuncCName(sym string, sig *types.FuncSig) string {
 	if strings.Contains(sym, "[") {
@@ -800,23 +777,6 @@ func splitArgTexts(s string) []string {
 		out = append(out, t)
 	}
 	return out
-}
-
-// stdRuntimeCap 把运行时符号名归到 L2 按需链接的能力位（红线 16：不用不发）。
-func stdRuntimeCap(name string) string {
-	switch {
-	case strings.HasPrefix(name, "aic_list_"), strings.HasPrefix(name, "aic_map_"),
-		strings.HasPrefix(name, "aic_set_"), strings.HasPrefix(name, "aic_str_"),
-		strings.HasPrefix(name, "aic_bytes_"), strings.HasPrefix(name, "aic_option_"),
-		strings.HasPrefix(name, "aic_array_"):
-		return "l1"
-	case strings.HasPrefix(name, "aic_chan_"), strings.HasPrefix(name, "aic_spawn"),
-		strings.HasPrefix(name, "aic_scope_"), strings.HasPrefix(name, "aic_select_"),
-		strings.HasPrefix(name, "aic_sched"), strings.HasPrefix(name, "aic_mutex"),
-		strings.HasPrefix(name, "aic_task"):
-		return "l2"
-	}
-	return "l0"
 }
 
 // ---------------------------------------------------------------------------
@@ -989,8 +949,8 @@ func (c *Ctx) irOneFunc(sym string, sig *types.FuncSig, pos parse.Pos) error {
 		return fmt.Errorf("emit(IR): no IR body for %s (the checker and the IR disagree — compiler bug, not a source error)", sym)
 	}
 	c.ir.used[sym] = true
-	// 事实按函数重置（与直译路径同纪律）：长度/守卫/归纳事实只在本函数体内有效。
-	c.lenSym, c.lenFacts, c.appendFacts, c.loopCondBound, c.loopLenBound = nil, nil, nil, nil, nil
+	// 事实按函数重置：长度事实只在本函数体内有效。
+	c.lenFacts = nil
 	c.declaredVars = map[string]bool{}
 	for _, p := range f.Params {
 		c.declaredVars[p.Name] = true
@@ -1370,8 +1330,8 @@ func (c *Ctx) irStmt(s cir.Stmt, ind string) error {
 		needLabel := c.irHasContinue(v.Body) || c.irHasContinue(v.Head)
 		label := c.tmp("post")
 		// F5（B1 第一靶）：循环内**按下标访问且句柄不变**的局部切片，把 len/data
-		// 缓存提到循环外。IR 路径此前完全没接（AST 路径的 emitCacheDecls 随直译
-		// 退役）⇒ gcc 无法外提 `l->len`/`l->data`，matmul 11× / sieve 2.7× 同源。
+		// 缓存提到循环外。这一段只在 IR 路径上生效 ⇒ gcc 无法外提
+		// `l->len`/`l->data`，matmul 11× / sieve 2.7× 同源。
 		// 语义不变：慢路径（越界/增长）仍走原访问器并刷新缓存（宏内建）。
 		c.emitIRCacheDecls([][]cir.Stmt{v.Head, v.Body, v.Post})
 		c.line("%sfor (;;) {", ind)
@@ -1746,7 +1706,11 @@ func locLine(loc air.Loc) int {
 func (c *Ctx) irLeaf(in air.Inst, ind string) error {
 	switch v := in.(type) {
 	case *air.Let:
-		return c.irLet(v, ind)
+		if err := c.irLet(v, ind); err != nil {
+			return err
+		}
+		// 容器方法的实参是存储点时，在调用之后补发守卫（§五 R3 存储点 ③）。
+		return c.irArgGuard(v, ind)
 	case *air.Var:
 		return c.irVar(v, ind)
 	case *air.Store:
@@ -1792,7 +1756,7 @@ func (c *Ctx) irSpawn(v *air.Spawn, ind string) error {
 	c.irSpawnSeq++
 	// 实参类型先收集：上下文块的**定义**在文件作用域（原型段，第二遍按第一遍的
 	// 登记发），这里只发使用点（块内声明变量 + 填字段 + spawn 调用）。
-	// 曾经把结构体定义发在函数体内 —— thunk 在 TU 末尾，看不见它（742/773 实测
+	// 结构体定义若发在函数体内 —— thunk 在 TU 末尾，看不见它（742/773 实测
 	// "storage size isn't known"）。
 	argTys := make([]string, 0, len(v.Vals))
 	for i, val := range v.Vals {
@@ -1875,6 +1839,28 @@ func (c *Ctx) emitIRSpawnBodies() {
 		c.line("}")
 		c.line("")
 	}
+}
+
+// irArgGuard 发射「实参即存储点」的守卫（§五 R3 存储点 ③）。
+//
+// 容器方法 append/insert/put/add 把值写进**可能更浅**的区域，检查器把 GuardSpec
+// 打在实参节点上，降级时随 Call 带到 IR（air.Call.ArgGuard）。守卫发在调用之后
+// —— 与 store 点同序（afterStore：先写入，再验证刚写进去的值所在区域的深度）。
+//
+// host 恒空：容器方法的宿主界拿不到宿主表达式（它就是这次调用本身），按当前
+// 深度兜底 —— irGuardLimit 的 host 分支在 hostExpr 为空时正是这个形态。
+func (c *Ctx) irArgGuard(v *air.Let, ind string) error {
+	call, ok := v.Rhs.(*air.Call)
+	if !ok || call.ArgGuard == nil {
+		return nil
+	}
+	g := call.ArgGuard
+	if g.Arg < 0 || g.Arg >= len(call.Args) {
+		return fmt.Errorf("emit(IR): guard on argument %d of %s but it only has %d (line %d)",
+			g.Arg, call.Sym, len(call.Args), v.Loc.Line)
+	}
+	return c.irGuardLimit(g.Limit, c.irVal(call.Args[g.Arg]), "container element",
+		ind, cstr(c.locFile(v.Loc)), locLine(v.Loc), "")
 }
 
 func (c *Ctx) irLet(v *air.Let, ind string) error {
@@ -1999,7 +1985,7 @@ func (c *Ctx) irVar(v *air.Var, ind string) error {
 	if v.Init != "" {
 		// 定长数组是值类型但 C 里不可赋值：整体初始化走 memcpy。
 		// **声明必须先发**（C 的数组声明把名字写在中间，只有 irDeclText 会写对）——
-		// 曾经这里只发 memcpy，`a` 从未声明过，语料 730/715/784 全部编译失败。
+		// 只发 memcpy 会让 `a` 从未声明过，语料 730/715/784 全部编译失败。
 		if t, ok := c.irTab[v.Ty]; ok && types.IsArray(t) {
 			c.line("%s%s;", ind, ct)
 			c.line("%smemcpy((void *)%s, (const void *)%s, sizeof(%s));", ind, cname, c.irVal(v.Init), cname)
@@ -2469,7 +2455,7 @@ func (c *Ctx) irRHS(r air.RHS) (string, error) {
 				c.parenVal(v.A), v.Op, c.parenVal(v.B)), nil
 		}
 		// 移位计数越界 = trap（§一：计数 ≥ 左操作数位宽或有符号负计数在 C 里都是 UB；
-		// 此前静默算出 0 —— "静默算错"级缺陷，778 锚点）。形态同上：内联比较 + cold。
+		// 不查会静默算出 0 —— "静默算错"级缺陷，778 锚点）。形态同上：内联比较 + cold。
 		if v.Op == "<<" || v.Op == ">>" {
 			if w, ok := irIntWidth(c.irValTy(v.A)); ok {
 				return fmt.Sprintf("((%s) < 0 || (%s) >= %d ? (aic_trap(AIC_TRAP_SHIFT_RANGE, %s, %d), 0) : %s %s %s)",
@@ -2560,7 +2546,7 @@ func (c *Ctx) irRHS(r air.RHS) (string, error) {
 
 // parenVal 取一个 AIR 操作数的 C 表达式。
 // **必须走 irVal/irName**：AIR 里的操作数是值名，而值名要按当前 C 作用域解析
-// （同名遮蔽 → `i` / `i__1`）。曾经这里对非字面量直接原样返回，于是
+// （同名遮蔽 → `i` / `i__1`）。对非字面量直接原样返回会让
 // `cmp`/`binop`/`unop` 的操作数**绕过别名表**：第二个 `for i in 0..n` 的
 // 条件与体里写的是外层那个 `i`（`i < n` 恒假 ⇒ 循环一次都不跑；751/749 实测）。
 func (c *Ctx) parenVal(v string) string { return c.irVal(v) }
@@ -2598,7 +2584,7 @@ func (c *Ctx) irCmp(v *air.Cmp) (string, error) {
 	a, b := c.parenVal(v.A), c.parenVal(v.B)
 	// @packed 类是**值类型**（C 结构），`==`/`<` 在 C 里没有运算符 ⇒ 走每类一份的
 	// 比较助手（@derive(Compare) 的方法或按字段序生成的助手，见 packed.go）。
-	// 曾经 IR 路径直接发 `p == q`，C 报 "invalid operands to binary == (have
+	// IR 路径直接发 `p == q` 会被 C 编译器报错 "invalid operands to binary == (have
 	// 'aic_ok_Pair' and 'aic_ok_Pair')"（776 实测）。
 	if cl, ok := c.irPackedClassOf(v.A); ok {
 		call := c.packedCompareCall(cl, a, b)
@@ -2681,7 +2667,7 @@ func (c *Ctx) irAlloc(v *air.Alloc) (string, error) {
 	}
 	base := c.cTypeName(t)
 	// **@packed 类是值类型**：没有堆对象可分配，`alloc` 在这里的语义就是"造一个值"，
-	// 发零值复合字面量（后续 `store field` 就地写字段）。曾经这里无条件发指针转换，
+	// 发零值复合字面量（后续 `store field` 就地写字段）。无条件发指针转换会让
 	// `aic_ok_Pair obj6 = (aic_ok_Pair *)aic_alloc_hdr(…)` 被 C 直接拒绝
 	// （invalid initializer；731/733 实测）。判据 = 类的 Packed 位（与类型定义同源；
 	// 泛型实例的 Packed 位在**基类**上 —— 实例本身不是 Class）。
@@ -2731,7 +2717,7 @@ func (c *Ctx) irField(v *air.FieldRHS) (string, error) {
 
 // irArrow 是字段访问算符：宿主是引用（类指针）→ `->`，是值（@packed 类 / Err /
 // 元组 / 合成多返回结构）→ `.`。**读取（irField）与写入（irPlace）必须同源** ——
-// 写侧曾经无条件发 `->`，@packed 类的字段写就直接非法
+// 写侧若无条件发 `->`，@packed 类的字段写就直接非法
 // （`obj6->a = 7`：invalid type argument of '->'；731/733 实测）。
 func (c *Ctx) irArrow(host air.Place) string {
 	if strings.HasSuffix(c.irPlaceTy(host), "*") {
@@ -3401,6 +3387,9 @@ func (c *Ctx) irBuiltinCall(sym string, args []string, vals []string, loc air.Lo
 	case strings.HasPrefix(sym, "os_"):
 		s, err := c.irOSCall(sym, args, file, ln)
 		return s, true, err
+	case strings.HasPrefix(sym, "fmt_"):
+		s, err := c.irFmtCall(sym, args)
+		return s, true, err
 	case strings.HasPrefix(sym, "str_"):
 		s, err := c.irStrCall(sym, args, file, ln)
 		return s, true, err
@@ -3428,6 +3417,36 @@ func (c *Ctx) irBuiltinCall(sym string, args []string, vals []string, loc air.Lo
 			args[0], args[1], args[0], args[1]), true, nil
 	}
 	return "", false, nil
+}
+
+// irFmtCall 发射 fmt.print/println/eprint/eprintln。
+//
+// 参数恒为 str（签名即契约：格式化唯一入口是字符串插值，不做任意值的多态
+// 分派 —— 《AIC 标准库规范》§3.1 判据 1），四件套的差别只在换行与目标流：
+//
+//	print(s)    → aic_print_str(s)
+//	println(s)  → (aic_print_str(s), aic_print_nl())
+//	eprint(s)   → aic_eprint_str(s)
+//	eprintln(s) → (aic_eprint_str(s), aic_print_nl())
+func (c *Ctx) irFmtCall(sym string, args []string) (string, error) {
+	fn := strings.TrimPrefix(sym, "fmt_")
+	if len(args) != 1 {
+		return "", fmt.Errorf("emit(IR): fmt.%s takes exactly one str", fn)
+	}
+	var print string
+	switch fn {
+	case "print":
+		print = "aic_print_str"
+	case "println":
+		return fmt.Sprintf("(aic_print_str(%s), aic_print_nl())", args[0]), nil
+	case "eprint":
+		print = "aic_eprint_str"
+	case "eprintln":
+		return fmt.Sprintf("(aic_eprint_str(%s), aic_print_nl())", args[0]), nil
+	default:
+		return "", fmt.Errorf("emit(IR): unsupported fmt.%s", fn)
+	}
+	return fmt.Sprintf("%s(%s)", print, args[0]), nil
 }
 
 // irOptionCtor 发射 Some(x) / None（目标类型 = 当前 let 的类型）。
@@ -3626,7 +3645,7 @@ func (c *Ctx) irChanCall(sym string, args []string, file string, ln int) (string
 		return fmt.Sprintf("aic_chan_send_%s(%s, %s, %s, %d)", suf, recv, argAt(args, 1), file, ln), nil
 	case "recv":
 		// **直接发原生调用**：结果结构（aic_chan_<S>_recv_t）与 AIR 多值结构的
-		// 转换在 irLet 处按字段做（两条语句）。此前这里发结构体强转，tcc 收、
+		// 转换在 irLet 处按字段做（两条语句）。这里若发结构体强转，tcc 收、
 		// gcc/clang 拒（742 的 H3 潜伏坑）。
 		return fmt.Sprintf("aic_chan_recv_%s(%s, %s, %d)", suf, recv, file, ln), nil
 	case "len":
@@ -3644,8 +3663,8 @@ func (c *Ctx) irChanCall(sym string, args []string, file string, ln int) (string
 // irArrayCall 发射定长数组的内建（长度 = 编译期常量）。
 //
 // 符号里带的是**元素类型**后缀（`array_i32_len`），长度要从不变量本身取 ——
-// 实参的类型文本就是 `[i32;3]`。曾经的实现把元素后缀当长度文本去解析，
-// `array_i32_len` 于是恒发 `0u`：`a.len()` = 0、`for i < a.len()` 一轮都不跑
+// 实参的类型文本就是 `[i32;3]`。把元素后缀当长度文本去解析会让
+// `array_i32_len` 恒发 `0u`：`a.len()` = 0、`for i < a.len()` 一轮都不跑
 // （715/716/032 实测的"定长数组全错"就是这个）。
 func (c *Ctx) irArrayCall(sym string, args []string) (string, error) {
 	op := ""
@@ -4063,7 +4082,7 @@ func (c *Ctx) tyTextOf(t types.Type) string {
 // 规则（src → tgt，两者都是整型）：
 //   - tgt 位宽 > src 位宽            ⇒ 加宽，不查；
 //   - tgt 位宽 < src 位宽            ⇒ 区间检查（bound 用目标类型字面量，比较在
-//                                      src 类型里进行 —— bound 必能装进 src）；
+//     src 类型里进行 —— bound 必能装进 src）；
 //   - 等宽换号（i64→u64 / u64→i64）  ⇒ `>= 0` / `<= INT64_MAX`；
 //   - tgt = bool                     ⇒ 只能 0/1（负数强转成 unsigned 巨大 ⇒ 拦得住）；
 //   - 任一侧是浮点                   ⇒ 不查（精度损失不是 trap）。
@@ -4168,6 +4187,7 @@ func intBounds(name string) (string, string) {
 //   - 句柄不变：循环各段（Head/Body/Post）里没有对该裸名的整体 store；
 //   - 循环开始前已绑定（c.irBound ⇒ C 作用域里拿得到）；
 //   - 类型是切片且运行时有实例后缀。
+//
 // 声明直接展开（不依赖宏的 ctype 参数），编号走 c.cacheSeq（确定性 ⇒ H2）。
 func (c *Ctx) emitIRCacheDecls(parts [][]cir.Stmt) {
 	accessed := map[string]bool{}

@@ -1,8 +1,0 @@
-enum Shape {
-    Circle(i32),
-    Square
-}
-
-func f() {
-    var s Shape = Shape.Circle
-}

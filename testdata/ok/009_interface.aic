@@ -1,0 +1,35 @@
+import fmt
+import str
+
+// 接口满足的唯一途径是 implements（大项目里"谁实现了这个接口"必须可 grep）
+interface Shape {
+    func area() -> i32
+    func name() -> str
+}
+
+class Square implements Shape {
+    var side i32
+
+    func area() -> i32 { return this.side * this.side }
+    func name() -> str { return "square" }
+}
+
+class Dot implements Shape {
+    func area() -> i32 { return 0 }
+    func name() -> str { return "dot" }
+}
+
+func report(s Shape) {
+    fmt.println(s.name())
+    fmt.println("{s.area()}")
+}
+
+func main() {
+    report(Square{side: 4})
+    report(Dot{})
+    // 接口值即 {self, itable}；槽位 = 声明序、只增不挪
+    var xs Shape[] = [Square{side: 2}, Dot{}]
+    for s in xs {
+        report(s)
+    }
+}
