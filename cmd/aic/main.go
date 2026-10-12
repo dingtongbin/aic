@@ -16,6 +16,7 @@ import (
 	"aic/internal/air"
 	"aic/internal/cir"
 	"aic/internal/emit"
+	"aic/internal/escape"
 	"aic/internal/lex"
 	"aic/internal/parse"
 	"aic/internal/pkg"
@@ -194,7 +195,9 @@ func cmdBuild(args []string) int {
 			fmt.Fprintf(os.Stderr, "aic build: note: %s\n", w)
 		}
 		if reportGuards {
-			fmt.Printf("guards: kept=%d (store=%d, return=%d)\n",
+			// 报告走 **stderr**：`--emit-c` 的 stdout 是纯 C 文本（H3），
+			// 混一行人话就破坏了逐字节可复现的产物。
+			fmt.Fprintf(os.Stderr, "guards: emitted=%d (store=%d, return=%d)\n",
 				res.Guards.Kept, res.Guards.Store, res.Guards.Return)
 		}
 		if out, ok := flagValue(args, "-o"); ok {
@@ -251,8 +254,9 @@ func buildCached(prog *Program, out string, noCache bool) error {
 		fmt.Fprintf(os.Stderr, "aic build: note: %s\n", w)
 	}
 	if reportGuards {
-		// §10.3 可验证性：total / eliminated / kept 分桶（eliminated 由检查器静态证明承担）。
-		fmt.Printf("guards: kept=%d (store=%d, return=%d)\n",
+		// §10.3 可验证性：eliminated 由 escape.Analyze 打印（stderr，见上）。
+		// 这里报**发射了几条**守卫 —— 与 eliminated 是两个独立事实，不可合成一个数。
+		fmt.Fprintf(os.Stderr, "guards: emitted=%d (store=%d, return=%d)\n",
 			res.Guards.Kept, res.Guards.Store, res.Guards.Return)
 	}
 	if err := buildExecutable(res.C, out, needsL2(res.Needed)); err != nil {
@@ -556,6 +560,13 @@ func emitIRUnit(prog *Program) (*emit.Result, error) {
 		// 不可达"才算得清（见 PruneUnreachable 的注释）。
 		for _, f := range m.Funcs {
 			air.PruneUnreachable(f)
+		}
+		// §10.3 检查消除：证明与消除分两 pass，Elim 只消费 Prove 的事实。
+		// 必须在 desugar + prune 之后（Store 与 region.enter/exit 此时才是最终形态），
+		// 且在 cir.Build 之前 —— Elim 直接清空 Store.Limit，落进 CIR 就再没有守卫可消。
+		// 这条线以前只接在 `aic dump-ir` 上，build 路径不跑 ⇒ 守卫无条件发射。
+		if escRep := escape.Analyze(m); reportGuards {
+			fmt.Fprintf(os.Stderr, "%s (pkg %s)\n", escRep.Summary(), name)
 		}
 		cp, err := cir.Build(m)
 		if err != nil {

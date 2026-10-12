@@ -38,16 +38,18 @@ func (b Bound) le(o Bound) bool {
 
 // Fact 是一条证明事实：某个 store 的守卫点的值与宿主界。
 type Fact struct {
-	Fn       string
-	Block    string
-	Val      string
-	ValB     Bound
-	Host     string
-	HostB    Bound
-	Limit    string
-	PlaceVar string // 目标 place 的根变量名（E1 用）
-	Live     bool   // 目标变量带 live（E1 必须保留的反例）
-	DeclIn   bool   // 目标变量声明在**本 region 实例内**（E1 的充分条件）
+	Fn         string
+	Block      string
+	Val        string
+	ValB       Bound
+	Host       string
+	HostB      Bound
+	Limit      string
+	PlaceVar   string // 目标 place 的根变量名（E1 用）
+	Live       bool   // 目标变量带 live（E1 必须保留的反例）
+	DeclIn     bool   // 目标变量声明在**本 region 实例内**（E1 的充分条件）
+	DeclDepth  int    // 目标变量声明时的 region 深度（E1 用于排除「目标在外层、写入在内层」）
+	StoreDepth int    // 存储点所在 region 深度（E1 复核用）
 }
 
 // Report 是分析报告（--report-guards 的 AIR 侧）。
@@ -149,13 +151,15 @@ func proveFunc(f *air.Func, out map[storeKey]Fact) {
 				}
 				out[storeKey{fn: f.Sym, block: b.Label, idx: idx}] = Fact{
 					Fn: f.Sym, Block: b.Label, Val: v.Val,
-					ValB:     boundOfVal(v.Val, depth, vars),
-					Host:     host,
-					HostB:    hb,
-					Limit:    v.Limit,
-					PlaceVar: placeVar,
-					Live:     live[placeVar],
-					DeclIn:   declInRegion[placeVar],
+					ValB:       boundOfVal(v.Val, depth, vars),
+					Host:       host,
+					HostB:      hb,
+					Limit:      v.Limit,
+					PlaceVar:   placeVar,
+					Live:       live[placeVar],
+					DeclIn:     declInRegion[placeVar],
+					DeclDepth:  declDepth[placeVar],
+					StoreDepth: depth,
 				}
 				idx++
 			}
@@ -279,9 +283,14 @@ func elimFunc(f *air.Func, facts map[storeKey]Fact, rep *Report) {
 
 // decide 按 E1–E4 判定（每条独立，理由必须能写出来）。
 func decide(ft Fact) (rule, reason string, eliminate bool) {
-	// E1 声明域活性：存入「在本 region 实例内声明」的变量槽 → 恒真
-	if ft.DeclIn && !ft.Live {
-		return "E1", fmt.Sprintf("target %s is declared inside the current region instance", ft.PlaceVar), true
+	// E1 声明域活性：存入**本 region 实例内声明**的变量槽 → 恒真。
+	// 前提必须收紧到「值不比目标变量的区域更深」：目标在 region 内声明只保证
+	// 「目标随该 region 死去」，而存储点可能落在**更内层的 region**（检查器给的
+	// Delta = regionOff − DeclOffset > 0 正是这种形态），内层先弹出 —— 值若更深就
+	// 悬垂，存储点守卫正是为它发的。旧写法只看 DeclIn，会把嵌套 region 的守卫
+	// 误消，C 里再无 AIC_GUARD（实测：外层 region 声明 a、内层 region 写 a）。
+	if ft.DeclIn && !ft.Live && ft.ValB.Known && ft.ValB.Depth <= ft.DeclDepth {
+		return "E1", fmt.Sprintf("target %s is declared inside the current region instance (value bound %d <= decl depth %d)", ft.PlaceVar, ft.ValB.Depth, ft.DeclDepth), true
 	}
 	// E4 返回点摘要：limit = fnentry 且返回值界精确为 0
 	if ft.Limit == "fnentry" && ft.ValB.Known && ft.ValB.Exact && ft.ValB.Depth == 0 {

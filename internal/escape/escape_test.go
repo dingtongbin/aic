@@ -125,3 +125,30 @@ func TestSummaryShape(t *testing.T) {
 		t.Fatalf("摘要形态不符：%s", s)
 	}
 }
+
+// TestE1KeepsNestedRegion：目标在**外层** region 内声明、存储点落在**内层** region，
+// 值界（调用摘要 = 非精确当前深度）比声明深度更深 —— 守卫必须保留。
+// 旧 E1 只看 DeclIn，会把这条守卫误消（C 里不再有 AIC_GUARD）＝ 静默内存损坏。
+func TestE1KeepsNestedRegion(t *testing.T) {
+	loc := air.Loc{File: "t.aic", Line: 9, Col: 1}
+	f := &air.Func{Sym: "t_n", Loc: loc}
+	b := &air.Block{Label: "entry", Loc: loc}
+	b.Insts = append(b.Insts,
+		&air.RegionEnter{TypeID: "outer", Loc: loc},                         // depth 1
+		&air.Var{Name: "slot", Ty: "T*", Loc: loc},                          // 在外层 region 内声明
+		&air.RegionEnter{TypeID: "inner", Loc: loc},                         // depth 2（比目标所在层更深）
+		&air.Let{Tmp: "c", Ty: "T*", Rhs: &air.Call{Sym: "make"}, Loc: loc}, // 值界 = 非精确 2
+		&air.Store{Place: &air.VarPlace{Name: "slot"}, Val: "tmp c", Limit: "depth-1", Loc: loc},
+		&air.RegionExit{Loc: loc},
+		&air.RegionExit{Loc: loc},
+	)
+	b.Term = &air.Ret{Loc: loc}
+	f.Blocks = []*air.Block{b}
+	rep := Analyze(&air.Module{Pkg: "t", Funcs: []*air.Func{f}})
+	if rep.Eliminated != 0 {
+		t.Fatalf("嵌套 region 的守卫被误消：%s", rep.Summary())
+	}
+	if got := b.Insts[4].(*air.Store).Limit; got != "depth-1" {
+		t.Fatalf("守卫被清空：Limit=%q", got)
+	}
+}
