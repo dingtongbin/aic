@@ -19,6 +19,9 @@ import (
 type Info struct {
 	// Pkg 是包名（目录即包；CLI 单文件编译时 = main）。
 	Pkg string
+	// PkgPath 是包的符号身份路径（import 路径 / 入口的模块名），由 CLI 从
+	// pkg.Package 填入。符号命名与错误码分配读它：同名不同包必须不同符号。
+	PkgPath string
 	// Locals 记录函数体/方法体里出现过的局部名与参数名。
 	// 键 = 函数标识（自由函数 = 名字；方法 = "Class.method"）。
 	Locals map[string]map[string]bool
@@ -57,9 +60,10 @@ type Info struct {
 }
 
 // ComptimeVal 是一次编译期内省的折叠结果。
-//   Kind = "typeName" | "sizeOf" | "isValueType"
-//   Ty   = 实参类型（sizeOf 在 C 侧用 sizeof(Ty) 现算真尺寸）
-//   Const= 折叠值；sizeOf 对 struct/[T;N] 不可折（ConstNone），由 C 的 sizeof 承担
+//
+//	Kind = "typeName" | "sizeOf" | "isValueType"
+//	Ty   = 实参类型（sizeOf 在 C 侧用 sizeof(Ty) 现算真尺寸）
+//	Const= 折叠值；sizeOf 对 struct/[T;N] 不可折（ConstNone），由 C 的 sizeof 承担
 type ComptimeVal struct {
 	Kind  string
 	Ty    Type
@@ -347,21 +351,21 @@ func (c *Checker) buildInfo() *Info {
 	info := &Info{
 		// 包名 = 源文件所在目录名（目录即包）。唯一所有者在这里，
 		// emit 只读它：两处各算一次包名 = 同款病（mangling 会分叉）。
-		Pkg:        c.pkg,
-		Locals:     c.locals,
-		Types:      c.types,
-		Guards:     c.guards,
-		Consts:     c.consts,
-		Funcs:      c.funcs,
-		Classes:    c.classes,
-		Interfaces: c.ifaces,
-		Enums:      c.enums,
-		Imported:   c.imports,
-		FuncInsts:  c.funcInsts,
-		Closures:   c.closures,
-		CapRefs:    c.capRefs,
-		Comptime:   c.comptime,
-		ArrayLens:  c.arrayLens,
+		Pkg:           c.pkg,
+		Locals:        c.locals,
+		Types:         c.types,
+		Guards:        c.guards,
+		Consts:        c.consts,
+		Funcs:         c.funcs,
+		Classes:       c.classes,
+		Interfaces:    c.ifaces,
+		Enums:         c.enums,
+		Imported:      c.imports,
+		FuncInsts:     c.funcInsts,
+		Closures:      c.closures,
+		CapRefs:       c.capRefs,
+		Comptime:      c.comptime,
+		ArrayLens:     c.arrayLens,
 		TypeExprTypes: c.typeExprTypes,
 		CallTypeArgs:  c.callTypeArgs,
 	}

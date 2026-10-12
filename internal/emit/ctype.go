@@ -161,6 +161,27 @@ func (c *Ctx) namedTypeName(pkg, name string) string {
 }
 
 // ownerPkg 补齐符号所属包名：空 = 本包（跨包符号一律带 Pkg，见 types 侧唯一所有者）。
+// pkgPath 是当前文件的包**符号身份路径**（import 路径 / 入口模块名）。
+// 符号命名（C 符号、缓存键）读它：包名在多模块工程里必然重复，路径才唯一。
+// 兜底 = 包名（单文件语料 / 未填 PkgPath 的调用点）。
+func (c *Ctx) pkgPath() string {
+	if c.Info != nil && c.Info.PkgPath != "" {
+		return c.Info.PkgPath
+	}
+	return c.pkg()
+}
+
+// depPath 取依赖包的符号身份路径（跨包符号用）；缺信息时退回包名。
+func (c *Ctx) depPath(pkg string) string {
+	if pkg == "" {
+		return c.pkgPath()
+	}
+	if info := c.depInfo(pkg); info != nil && info.PkgPath != "" {
+		return info.PkgPath
+	}
+	return pkg
+}
+
 func (c *Ctx) ownerPkg(pkg string) string {
 	if pkg == "" {
 		return c.pkg()

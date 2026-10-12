@@ -55,6 +55,13 @@ type Package struct {
 	Name string
 	// Dir 是包目录的绝对路径。
 	Dir string
+	// PkgPath 是包的**符号身份路径**：被 import 的包 = 其 import 路径（`app/core`）；
+	// 入口包 = 模块名（aic.mod 的 module 行），无 aic.mod 时 = 包名。
+	//
+	// 符号命名（air 的 IR 符号、emit 的 C 符号）与 ErrCode 码分配都读它：
+	// 同名不同包（两个模块各有一个 `util.parse`）必须得到不同符号，否则多模块
+	// 工程里符号互撞 —— 链接撞名、缓存键污染、错误码互相冒充。机器路径**不**入内。
+	PkgPath string
 	// Files 是包内源文件，按文件名排序（收集顺序确定性 → H2）。
 	Files []*File
 	// Imports 是本包 import 的包名，按声明序去重。
@@ -135,6 +142,7 @@ func loadSingleFile(abs string) (*Package, error) {
 	p := &Package{
 		Name:      filepath.Base(dir),
 		Dir:       dir,
+		PkgPath:   filepath.Base(dir),
 		Files:     []*File{f},
 		ImportPos: map[string]parse.Pos{},
 	}
@@ -189,6 +197,9 @@ func (l *loader) walk(p *Package) error {
 		if err != nil {
 			return err
 		}
+		// 包的**符号身份** = import 路径（`app/core`）—— 不是目录名。目录名在
+		// 多模块工程里必然重复（每个模块都有 `util`），只有 import 路径全局唯一。
+		dep.PkgPath = name
 		// 路径导入：`import app/ui` 的限定名 = 末段 `ui`，必须等于目录名。
 		// 单段导入（`import fmt`）时末段就是它本身，规则统一（§10.1）。
 		qualifier := name
@@ -319,7 +330,7 @@ func loadPackage(dir string, at parse.Pos) (*Package, error) {
 	if modName, ok := moduleName(dir); ok {
 		pkgName = modName
 	}
-	p := &Package{Name: pkgName, Dir: dir, ImportPos: map[string]parse.Pos{}}
+	p := &Package{Name: pkgName, Dir: dir, PkgPath: pkgName, ImportPos: map[string]parse.Pos{}}
 	seen := map[string]bool{}
 	for _, n := range names {
 		f, err := parseFileAt(dir, n, "")

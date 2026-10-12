@@ -26,6 +26,7 @@ type LowerInput struct {
 	Mono bool
 
 	Pkg     string
+	PkgPath string
 	Files   []*parse.File
 	Info    *types.Info
 	Imports []string
@@ -38,8 +39,13 @@ func Lower(in LowerInput) (*Module, error) {
 		pkg = in.Info.Pkg // 包名唯一所有者 = 检查器（目录即包）
 		in.Pkg = pkg
 	}
+	// 符号身份路径：优先进 Info.PkgPath（CLI 从 pkg 层带入），否则退回包名。
+	// 它只用于**符号命名**，不参与解析（解析仍按包名）。
+	if in.PkgPath == "" && in.Info != nil {
+		in.PkgPath = in.Info.PkgPath
+	}
 	l := &lowerer{
-		mod:  &Module{Pkg: pkg, Imports: in.Imports},
+		mod:  &Module{Pkg: pkg, PkgPath: in.PkgPath, Imports: in.Imports},
 		in:   in,
 		info: in.Info,
 		seen: map[string]bool{},
@@ -172,10 +178,10 @@ type lowerer struct {
 	// **同一块**里的外层变量同名 ⇒ 重命名成 fresh 名并走 loopAlias 改写体内引用
 	// （审计 D1：`var v i64 = 1; for v in xs` 旧行为 = 误报"重复声明"）。
 	// 只在真冲突时改名 ⇒ 无冲突程序的 IR 快照不动（H8）。
-	blockVars  map[*Block]map[string]bool
-	loopAlias  map[string]string
-	renameSeq  int
-	lamSeq   int // lambda 提升编号（确定性）
+	blockVars map[*Block]map[string]bool
+	loopAlias map[string]string
+	renameSeq int
+	lamSeq    int // lambda 提升编号（确定性）
 	// envCur 非空 = 正在降级一个闭包体：捕获引用读 `field envCur, <槽>`。
 	envCur string
 	// instParams/instArgs 非空 = 正在降级一个泛型**实例**（mair 层）：类型先代换再渲染。

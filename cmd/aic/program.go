@@ -38,6 +38,10 @@ func loadProgram(entry string) (*Program, string) {
 			continue // 该包检查失败：不发它的 C，也不给下游当依赖（避免级联噪音）
 		}
 		deps[p.Name] = res.Info
+		// 符号身份路径从 pkg 层带进来（检查器只认包名，路径是构建层的知识）。
+		if res.Info != nil && res.Info.PkgPath == "" {
+			res.Info.PkgPath = p.PkgPath
+		}
 		for _, f := range p.Files {
 			prog.Emit.Files = append(prog.Emit.Files,
 				&emit.FileUnit{Path: f.Path, File: f.AST, Info: res.Info})

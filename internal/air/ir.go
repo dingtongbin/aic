@@ -31,7 +31,10 @@ func (l Loc) Pos(defFile string) parse.Pos {
 
 // Module 是一个包（整程序 = 多个 Module，按拓扑序）。
 type Module struct {
-	Pkg     string
+	Pkg string
+	// PkgPath 是包的符号身份路径（import 路径 / 入口模块名）。符号命名读它：
+	// Pkg 是多模块工程里必然重复的目录名，PkgPath 才是全局唯一的那个。
+	PkgPath string
 	Imports []string
 	Types   []*TypeDecl
 	Funcs   []*Func
@@ -229,10 +232,10 @@ type SelWait struct {
 func (*Let) airInst()         {}
 func (*Var) airInst()         {}
 func (*Store) airInst()       {}
-func (*RegionEnter) airInst()      {}
-func (*RegionExit) airInst()       {}
-func (*Spawn) airInst()            {}
-func (*DeferReg) airInst()         {}
+func (*RegionEnter) airInst() {}
+func (*RegionExit) airInst()  {}
+func (*Spawn) airInst()       {}
+func (*DeferReg) airInst()    {}
 func (*DeferInit) airInst()   {}
 func (*DeferRun) airInst()    {}
 func (*TrapIfErr) airInst()   {}
@@ -429,6 +432,7 @@ type ElemPlace struct {
 	Base Place
 	Idx  string
 }
+
 // StrViewPlace 是 str 视图的 place 形态（Lo/Hi 与 StrViewRHS 同语义；
 // str 不可变，视图只能当值用，place 形态是为 IR 完整性保留）。
 type StrViewPlace struct {
