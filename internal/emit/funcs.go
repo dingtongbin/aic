@@ -64,7 +64,7 @@ func (c *Ctx) cFuncName(sig *types.FuncSig) string {
 	if sig.Extern || sig.Export {
 		return ExternName(sig.Name)
 	}
-	return MangleFunc(c.pkg(), sig.Recv, sig.Name)
+	return MangleFunc(c.pkgPath(), sig.Recv, sig.Name)
 }
 
 // paramList 返回 C 形参表文本 (方法首位补 this 为第一参数)。
@@ -226,8 +226,8 @@ func (c *Ctx) emitProtos() error {
 // irBodySymFor 找签名对应的 IR 体符号（普通函数 / 类方法两种拼法；找不到 = false）。
 func (c *Ctx) irBodySymFor(sig *types.FuncSig) (string, bool) {
 	for _, sym := range []string{
-		air.FuncSym(c.pkg(), "", sig.Name),
-		air.FuncSym(c.pkg(), sig.Recv, sig.Name),
+		air.FuncSym(c.pkgPath(), "", sig.Name),
+		air.FuncSym(c.pkgPath(), sig.Recv, sig.Name),
 	} {
 		if c.ir != nil {
 			if _, has := c.ir.Bodies[sym]; has {
@@ -360,7 +360,7 @@ func (c *Ctx) initMethod(cl *types.Class) (*types.FuncSig, bool) {
 // 跨包调用（可见性、 包管理器）。
 //
 // 调用点所在的包 ≠ 被调函数所在的包，故符号名必须用**被调包**的包名拼
-// （c.pkg() 是调用者的包名，直接用会拼错）——mangling 单表照旧，只是喂对包名。
+// （c.pkgPath() 是调用者的包名，直接用会拼错）——mangling 单表照旧，只是喂对包名。
 // ---------------------------------------------------------------------------
 
 // depFuncResults 取跨包函数的结果类型（emit 定宽/选打印原语用）。

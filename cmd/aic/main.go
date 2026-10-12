@@ -518,6 +518,15 @@ func emitIRUnit(prog *Program) (*emit.Result, error) {
 		}
 		byPkg[fu.Info.Pkg] = append(byPkg[fu.Info.Pkg], fu)
 	}
+	// 依赖包名 → 符号身份路径：跨包具名类型的符号命名用（只拿包名会撞）。
+	importPaths := map[string]string{}
+	if prog.Unit != nil {
+		for _, p := range prog.Unit.Order {
+			if p.PkgPath != "" {
+				importPaths[p.Name] = p.PkgPath
+			}
+		}
+	}
 	ir := emit.NewIRProg()
 	for _, name := range order {
 		fus := byPkg[name]
@@ -531,7 +540,11 @@ func emitIRUnit(prog *Program) (*emit.Result, error) {
 		for im := range info.Imported {
 			imports = append(imports, im)
 		}
-		m, err := air.Lower(air.LowerInput{Pkg: name, Files: files, Info: info, Imports: imports, Mono: true})
+		pkgPath := ""
+		if info != nil {
+			pkgPath = info.PkgPath
+		}
+		m, err := air.Lower(air.LowerInput{Pkg: name, PkgPath: pkgPath, ImportPaths: importPaths, Files: files, Info: info, Imports: imports, Mono: true})
 		if err != nil {
 			return nil, err
 		}

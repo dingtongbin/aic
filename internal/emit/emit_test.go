@@ -108,23 +108,48 @@ func main() {
 	}
 }
 
-// TestManglingTableIsSingle:「mangling 单表」—— 函数/方法/泛型/类型
-// 四条命名规则各钉一个锚点；改动命名 = 这里的断言先红。
+// TestManglingTableIsSingle:「mangling 单表」—— 内部符号是**哈希定长**的，
+// 断言的是规则的四条不变量（不是具体字面量：哈希会随版本变，但不变量不会）：
+//
+//	① 前缀恒为 aic_，长度恒为 aic_ + 16 hex；
+//	② 同名不同包（路径不同）必须得到不同符号 —— 这条是大项目不撞名的底线；
+//	③ 同输入恒等（确定性，H2）；
+//	④ 实参集不同 → 泛型实例符号不同；
+//	⑤ export/extern 原名直出，零 mangle。
 func TestManglingTableIsSingle(t *testing.T) {
-	cases := []struct {
-		got, want, what string
-	}{
-		{MangleFunc("main", "", "work"), "aic_main_work", "自由函数"},
-		{MangleFunc("main", "Buf", "size"), "aic_main_Buf_size", "方法（this 首位）"},
-		{MangleGeneric("main", "Box", []string{"i32"}), "aic_main_Box__i32", "泛型实例"},
-		{MangleGeneric("main", "Pair", []string{"i32", "str"}), "aic_main_Pair__i32_str", "多实参双下划线分隔"},
-		{mangleType("main", "Buf"), "aic_main_Buf", "具名类型"},
-		{ExternName("sqlite3_open"), "sqlite3_open", "extern 原名直出（零 mangle）"},
-	}
-	for _, tc := range cases {
-		if tc.got != tc.want {
-			t.Errorf("%s：mangling 得到 %q，期望 %q", tc.what, tc.got, tc.want)
+	hexOK := func(s, what string) {
+		t.Helper()
+		if len(s) != len("aic_")+16 || s[:4] != "aic_" {
+			t.Errorf("%s：形态应为 aic_<16 hex>，得到 %q", what, s)
+			return
 		}
+		for _, r := range s[4:] {
+			if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+				t.Errorf("%s：哈希位必须是小写十六进制，得到 %q", what, s)
+				return
+			}
+		}
+	}
+	free := MangleFunc("app/core", "", "work")
+	hexOK(free, "自由函数")
+	hexOK(MangleFunc("app/core", "Buf", "size"), "方法（this 首位）")
+	hexOK(MangleGeneric("app/core", "Box", []string{"i32"}), "泛型实例")
+	hexOK(mangleType("app/core", "Buf"), "具名类型")
+
+	if free != MangleFunc("app/core", "", "work") {
+		t.Error("同输入必须恒等（H2 确定性）")
+	}
+	if free == MangleFunc("app/ui", "", "work") {
+		t.Error("同名不同包（app/core vs app/ui）撞了符号 —— 多模块工程直接不可用")
+	}
+	if MangleFunc("app/core", "", "work") == MangleFunc("app/core", "Buf", "work") {
+		t.Error("自由函数与同名方法撞了符号")
+	}
+	if MangleGeneric("app/core", "Box", []string{"i32"}) == MangleGeneric("app/core", "Box", []string{"str"}) {
+		t.Error("不同泛型实例撞了符号")
+	}
+	if got := ExternName("sqlite3_open"); got != "sqlite3_open" {
+		t.Errorf("extern 必须原名直出（零 mangle），得到 %q", got)
 	}
 }
 

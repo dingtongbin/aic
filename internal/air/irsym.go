@@ -24,7 +24,10 @@ import (
 // ---------------------------------------------------------------------------
 
 // FuncSym 是函数/方法在 IR 里的符号名（pkg 为空 = 不带包前缀）。
+// pkg 应是包的**身份路径**（import 路径 / 入口模块名），不是目录名 —— 符号
+// 必须全局唯一，目录名在多模块工程里必然重复。路径里的 `/` `.` `-` 折成 `_`。
 func FuncSym(pkg, recv, name string) string {
+	pkg = sanitizePkg(pkg)
 	switch {
 	case pkg == "" && recv == "":
 		return name

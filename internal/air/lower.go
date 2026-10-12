@@ -27,9 +27,27 @@ type LowerInput struct {
 
 	Pkg     string
 	PkgPath string
-	Files   []*parse.File
-	Info    *types.Info
-	Imports []string
+	// ImportPaths 是 依赖包名 → 符号身份路径（import 路径）。跨包具名类型的符号
+	// 命名用它 —— 只拿得到包名时符号会撞。
+	ImportPaths map[string]string
+	Files       []*parse.File
+	Info        *types.Info
+	Imports     []string
+}
+
+// symPkg 把包名映射为**符号身份路径**：本包 = PkgPath，依赖包 = ImportPaths 表，
+// 查不到时退回包名（符号仍可用，只是失去了跨模块唯一性）。
+func (l *lowerer) symPkg(pkgName string) string {
+	if pkgName == "" || (l.in.Info != nil && pkgName == l.in.Pkg) || pkgName == l.in.Pkg {
+		if l.in.PkgPath != "" {
+			return l.in.PkgPath
+		}
+		return l.in.Pkg
+	}
+	if p, ok := l.in.ImportPaths[pkgName]; ok && p != "" {
+		return p
+	}
+	return pkgName
 }
 
 // Lower 把一个包降级为 AIR 模块（结构性去糖；表达式在 lower_expr.go）。
@@ -220,7 +238,7 @@ func (l *lowerer) emitInstanceTypes() {
 			argsText = append(argsText, tyText(a))
 			emit(a)
 		}
-		sym := mangleType(cl.Pkg, cl.Name) + "[" + strings.Join(argsText, ", ") + "]"
+		sym := mangleType(l.symPkg(cl.Pkg), cl.Name) + "[" + strings.Join(argsText, ", ") + "]"
 		if seen[key{sym}] {
 			return
 		}
@@ -279,7 +297,7 @@ func (l *lowerer) types() error {
 				continue // 实例声明由 emitInstanceTypes 发（下面）
 			}
 		}
-		td := &TypeDecl{Sym: mangleType(cl.Pkg, cl.Name), Kind: "struct", Struct: cl.Struct}
+		td := &TypeDecl{Sym: mangleType(l.symPkg(cl.Pkg), cl.Name), Kind: "struct", Struct: cl.Struct}
 		for i := range cl.Fields {
 			td.Fields = append(td.Fields, Field{Idx: i, Name: cl.Fields[i].Name, Ty: l.ty(cl.Fields[i].Type)})
 		}
@@ -291,7 +309,7 @@ func (l *lowerer) types() error {
 	}
 	for _, name := range sortedKeys(l.info.Enums) {
 		en := l.info.Enums[name]
-		td := &TypeDecl{Sym: mangleType(en.Pkg, en.Name), Kind: "enum"}
+		td := &TypeDecl{Sym: mangleType(l.symPkg(en.Pkg), en.Name), Kind: "enum"}
 		for i, va := range en.Variants {
 			pl := ""
 			if va.Payload != nil {
@@ -303,7 +321,7 @@ func (l *lowerer) types() error {
 	}
 	for _, name := range sortedKeys(l.info.Interfaces) {
 		ifc := l.info.Interfaces[name]
-		td := &TypeDecl{Sym: mangleType(ifc.Pkg, ifc.Name), Kind: "iface"}
+		td := &TypeDecl{Sym: mangleType(l.symPkg(ifc.Pkg), ifc.Name), Kind: "iface"}
 		for i, slot := range types.InterfaceSlots(ifc) {
 			sig, _ := ifc.Method(slot)
 			td.Slots = append(td.Slots, Slot{Idx: i, Name: slot, Sig: sigText(sig)})
@@ -320,7 +338,7 @@ func (l *lowerer) funcDecl(d *parse.FuncDecl, recv string) error {
 	if sig == nil {
 		return fmt.Errorf("air: no signature for %s", d.Name)
 	}
-	sym := mangleFunc(l.in.Pkg, recv, d.Name)
+	sym := mangleFunc(l.symPkg(""), recv, d.Name)
 	if l.symOverride != "" {
 		sym = l.symOverride
 	}
@@ -1079,7 +1097,7 @@ func instancesOf(info *types.Info, recv, name string) []instInstance {
 func (l *lowerer) lowerInstance(d *parse.FuncDecl, recv string, params []string, inst instInstance) error {
 	savedP, savedA, savedSym := l.instParams, l.instArgs, l.symOverride
 	l.instParams, l.instArgs = params, inst.Args
-	l.symOverride = FuncInstSym(l.in.Pkg, recv, d.Name, inst.Args)
+	l.symOverride = FuncInstSym(l.symPkg(""), recv, d.Name, inst.Args)
 	err := l.funcDecl(d, recv)
 	l.instParams, l.instArgs, l.symOverride = savedP, savedA, savedSym
 	return err

@@ -73,7 +73,7 @@ func (p *IRProg) verifyAllUsed() error {
 		len(orphans), strings.Join(orphans, ", "))
 }
 
-// EmitIRUnit 是 IR 路径的整程序入口（与 EmitUnit 同纪律：两遍、纯函数）。
+// EmitIRUnit 是 IR 路径的整程序入口（两遍发射、纯函数：同名输入两次编译逐字节相同）。
 func EmitIRUnit(u *Unit, ir *IRProg) (*Result, error) {
 	if u == nil || len(u.Files) == 0 {
 		return nil, fmt.Errorf("emit: empty emission unit")
@@ -596,7 +596,7 @@ func (c *Ctx) irValTy(v string) string {
 // ---------------------------------------------------------------------------
 
 // irCNameOf 是签名在 C 侧的符号名（与 emitProtos 的 cFuncName 同一规则，
-// 但包名由调用方给出：跨包调用点上 c.pkg() 不是签名所属的包）。
+// 但包名由调用方给出：跨包调用点上 c.pkgPath() 不是签名所属的包）。
 func (c *Ctx) irCNameOf(pkg string, sig *types.FuncSig) string {
 	if sig == nil {
 		return ""
@@ -639,7 +639,7 @@ func (c *Ctx) irFuncCName(sym string, sig *types.FuncSig) string {
 			return inst
 		}
 	}
-	return c.irCNameOf(c.pkg(), sig)
+	return c.irCNameOf(c.pkgPath(), sig)
 }
 
 // buildIRCallMap 建「IR 符号 → C 符号」表：用户函数、方法、泛型函数实例。
@@ -803,7 +803,7 @@ func (c *Ctx) emitIRFuncs(u *Unit) error {
 				if sig == nil {
 					return fmt.Errorf("emit(IR): unknown function %s", v.Name)
 				}
-				if err := c.irOneFunc(air.FuncSym(c.pkg(), "", v.Name), sig, v.Pos); err != nil {
+				if err := c.irOneFunc(air.FuncSym(c.pkgPath(), "", v.Name), sig, v.Pos); err != nil {
 					return err
 				}
 			case *parse.ClassDecl:
@@ -822,7 +822,7 @@ func (c *Ctx) emitIRFuncs(u *Unit) error {
 					if sig == nil {
 						return fmt.Errorf("emit(IR): unknown method %s.%s", v.Name, m.Name)
 					}
-					if err := c.irOneFunc(air.FuncSym(c.pkg(), v.Name, m.Name), sig, m.Pos); err != nil {
+					if err := c.irOneFunc(air.FuncSym(c.pkgPath(), v.Name, m.Name), sig, m.Pos); err != nil {
 						return err
 					}
 				}

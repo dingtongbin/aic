@@ -51,13 +51,13 @@ func (c *Ctx) forwardTypes() {
 			if len(v.TypeParams) > 0 {
 				continue
 			}
-			c.line("typedef struct %s %s;", c.typedefName(c.pkg(), v.Name), c.typedefName(c.pkg(), v.Name))
+			c.line("typedef struct %s %s;", c.typedefName(c.pkgPath(), v.Name), c.typedefName(c.pkgPath(), v.Name))
 		case *parse.EnumDecl:
 			if hasDataVariants(v) {
-				c.line("typedef enum %s_tag %s_tag;", c.typedefName(c.pkg(), v.Name), c.typedefName(c.pkg(), v.Name))
-				c.line("typedef struct %s %s;", c.typedefName(c.pkg(), v.Name), c.typedefName(c.pkg(), v.Name))
+				c.line("typedef enum %s_tag %s_tag;", c.typedefName(c.pkgPath(), v.Name), c.typedefName(c.pkgPath(), v.Name))
+				c.line("typedef struct %s %s;", c.typedefName(c.pkgPath(), v.Name), c.typedefName(c.pkgPath(), v.Name))
 			} else {
-				c.line("typedef enum %s %s;", c.typedefName(c.pkg(), v.Name), c.typedefName(c.pkg(), v.Name))
+				c.line("typedef enum %s %s;", c.typedefName(c.pkgPath(), v.Name), c.typedefName(c.pkgPath(), v.Name))
 			}
 		}
 	}
@@ -83,7 +83,7 @@ func (c *Ctx) emitTypeDefs() error {
 			if len(v.TypeParams) > 0 {
 				continue // 泛型类按实例发（emitInstances）
 			}
-			name := c.typedefName(c.pkg(), v.Name)
+			name := c.typedefName(c.pkgPath(), v.Name)
 			if seen[name] {
 				continue
 			}
@@ -100,7 +100,7 @@ func (c *Ctx) emitTypeDefs() error {
 				c.emitClass(cl)
 			}, deps: deps})
 		case *parse.EnumDecl:
-			name := c.typedefName(c.pkg(), v.Name)
+			name := c.typedefName(c.pkgPath(), v.Name)
 			if seen[name] {
 				continue
 			}
@@ -194,7 +194,7 @@ func (c *Ctx) valueTypeDepsType(t types.Type) []string {
 // emitClass 发射 class 的 C struct。布局 = 对象头 + 字段按声明序 。
 // struct 无对象头 (值类型, 无区域托管)。
 func (c *Ctx) emitClass(v *parse.ClassDecl) {
-	name := c.typedefName(c.pkg(), v.Name)
+	name := c.typedefName(c.pkgPath(), v.Name)
 	c.line("struct %s {", name)
 	if !v.Struct {
 		c.line("    aic_hdr hdr;")
@@ -390,7 +390,7 @@ func basicByName(name string) (types.Type, bool) {
 
 // emitEnum 发射 enum: 无数据 = C enum ; 带数据 = {tag, union}。
 func (c *Ctx) emitEnum(v *parse.EnumDecl) {
-	name := c.typedefName(c.pkg(), v.Name)
+	name := c.typedefName(c.pkgPath(), v.Name)
 	if !hasDataVariants(v) {
 		c.line("enum %s {", name)
 		codes := c.errCodesOf(v.Name)

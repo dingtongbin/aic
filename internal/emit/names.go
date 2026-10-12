@@ -279,7 +279,7 @@ func (c *Ctx) callResultType(call *parse.Call) types.Type {
 				for _, a := range call.Args {
 					argTypes = append(argTypes, c.ti(a))
 				}
-				if _, inst, ok := c.genericCallName(c.pkg(), sig, argTypes); ok {
+				if _, inst, ok := c.genericCallName(c.pkgPath(), sig, argTypes); ok {
 					return resultsType(inst.Results)
 				}
 				return nil

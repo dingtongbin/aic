@@ -892,11 +892,20 @@ func refSuffix(cl *types.Class) string {
 	return "*"
 }
 
+// sanitizePkg 把包身份路径折成符号可用片段：`/` `.` `-` 一律变 `_`。
+// 符号是 C 标识符与 IR 文本的一部分，不能含路径分隔符。
+func sanitizePkg(p string) string {
+	if p == "" {
+		return p
+	}
+	return strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(p)
+}
+
 func mangleType(pkg, name string) string {
 	if pkg == "" {
 		return name
 	}
-	return pkg + "_" + name
+	return sanitizePkg(pkg) + "_" + name
 }
 
 func mangleFunc(pkg, recv, name string) string { return FuncSym(pkg, recv, name) }

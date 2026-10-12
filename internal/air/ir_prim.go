@@ -212,9 +212,9 @@ type ScopeInst struct {
 // 调 aic_select_wait），属于 IR-2；本节点是**语言语义**（有哪些臂、谁 send
 // 谁 recv、绑定什么），属于 IR-1。
 type SelectInst struct {
-	Arms []SelectArm
+	Arms  []SelectArm
 	After string
-	Loc  Loc
+	Loc   Loc
 }
 
 // SelectArm 是一个 select 臂。Kind ∈ {"send","recv",""}（空 = 时间臂）。
