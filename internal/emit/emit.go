@@ -96,7 +96,10 @@ type Ctx struct {
 	// needed 记录本翻译单元需要的运行时能力 (L2 按需链接的判据)。
 	needed map[string]bool
 	// insts/instSeen 是泛型实例登记 (确定性顺序 + 实例缓存)。
-	insts    []instEntry
+	insts []instEntry
+	// rtInsts/rtSeen 是运行期容器/通道的 struct 元素实例（emit 按需生成，见 runtimeinst.go）。
+	rtInsts  []rtInst
+	rtSeen   map[string]bool
 	instSeen map[string]bool
 	// printers/printSeen/printSeq 是按需合成的打印函数登记 (任意单值)。
 	printers  []printerEntry
@@ -342,6 +345,8 @@ func runEmit(u *Unit, pre *seed, ir *IRProg) (*Result, *seed, error) {
 		}
 	}
 	c.emitInstances()
+	c.collectRuntimeInsts()
+	c.emitRuntimeInstances()
 	if err := c.emitPrinters(); err != nil {
 		return nil, nil, err
 	}

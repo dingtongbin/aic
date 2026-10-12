@@ -1,5 +1,7 @@
 package types
 
+import "aic/internal/pkg"
+
 // ---------------------------------------------------------------------------
 // 运行时容器/通道实例化后缀（**唯一实现**）。
 //
@@ -32,14 +34,28 @@ func RuntimeSuffix(t Type) (string, bool) {
 		if !cl.Struct {
 			return "Box", true
 		}
-		return "", false
+		// struct（值类型，按 C struct 布局）：无**预置**实例，但按类型唯一一份
+		// —— 后缀是定长十六进制（pkg.RuntimeSym；无 `aic_` 前缀、无下划线，
+		// 否则 `chan_<后缀>_recv` 的按 `_` 切段会乱），emit 见到这个后缀时
+		// 为它发一份 AIC_CHAN_OP / AIC_LIST_OP / AIC_SET_OP / AIC_MAP_OP。
+		if cl.PkgPath == "" && cl.Pkg == "" {
+			return "", false
+		}
+		return pkg.RuntimeSym(cl.PkgPath, cl.Name), true
 	}
 	// 泛型实例：引用类实例 = 指针 ⇒ 与用户类指针共用 void* 槽位（Box）；
-	// struct 实例是值类型（按 C struct 布局）⇒ 无运行期实例后缀。
-	// 缺这一条会让 `Box[i32][]` / `map[str]Box[i32]` 报"元素类型未实例化"。
+	// 泛型**枚举**实例（Option[T] / Result[T] / Value）是值类型（{tag, union}
+	// 布局）⇒ 按类型唯一一份运行期实例（后缀含实参，不同实参不同实例）。
+	// 缺这一条会让 `list[Result[i64]]` / `map[str]Value` 报"元素类型未实例化"。
 	if inst, ok := t.(*Instance); ok {
-		if cl, isCl := IsClass(inst.Base); isCl && !cl.Struct {
-			return "Box", true
+		if cl, isCl := IsClass(inst.Base); isCl {
+			if !cl.Struct {
+				return "Box", true
+			}
+			return pkg.RuntimeSym(cl.PkgPath, instSegName(inst)), true
+		}
+		if en, isEn := inst.Base.(*Enum); isEn {
+			return pkg.RuntimeSym(en.PkgPath, instSegName(inst)), true
 		}
 		return "", false
 	}
@@ -63,6 +79,36 @@ func isContainerTy(t Type) bool {
 		return true
 	}
 	return false
+}
+
+// instSegName 是泛型实例的名字段（`Name[arg, arg]`）。运行期后缀与 C 类型名
+// 都按它派生，所以它必须**只由类型结构决定**（同一实例永远同一段文本）。
+func instSegName(inst *Instance) string {
+	base := ""
+	switch b := inst.Base.(type) {
+	case *Class:
+		base = b.Name
+	case *Enum:
+		base = b.Name
+	case *Interface:
+		base = b.Name
+	}
+	args := make([]string, 0, len(inst.Args))
+	for _, a := range inst.Args {
+		args = append(args, a.String())
+	}
+	return base + "[" + joinCommaText(args) + "]"
+}
+
+func joinCommaText(args []string) string {
+	out := ""
+	for i, a := range args {
+		if i > 0 {
+			out += ", "
+		}
+		out += a
+	}
+	return out
 }
 
 // RuntimeMapKeySuffix：map[K]V 的键后缀 = runtime/aic_l1_map.h 实例表的**精确互射**
